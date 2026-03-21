@@ -5,7 +5,7 @@
  * system tray, auto-updater, and chat browser window.
  */
 
-import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import log from 'electron-log';
 import path from 'path';
 
@@ -13,6 +13,7 @@ import { serverManager } from './server';
 import { createLauncherWindow, getLauncherWindow } from './launcher';
 import { setupTray, updateTrayMenu } from './tray';
 import { setupUpdater, checkForUpdates, downloadUpdate, installUpdate } from './updater';
+import authManager from './auth/index';
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -82,14 +83,14 @@ function createChatWindow(port: number): void {
 // IPC Handlers
 // ---------------------------------------------------------------------------
 function setupIPC(): void {
-  // Server lifecycle
+  // ── Server lifecycle ──────────────────────────────────────────────────
   ipcMain.handle('server:start', async () => {
     try {
       const result = await serverManager.start();
       if (result.success) {
         const launcher = getLauncherWindow();
         if (launcher && !launcher.isDestroyed()) {
-          launcher.webContents.send('server:started', { port: result.port });
+          launcher.webContents.send('server:started', result.port);
         }
         updateTrayMenu(true);
       }
@@ -104,6 +105,10 @@ function setupIPC(): void {
     try {
       await serverManager.stop();
       updateTrayMenu(false);
+      const launcher = getLauncherWindow();
+      if (launcher && !launcher.isDestroyed()) {
+        launcher.webContents.send('server:stopped');
+      }
       return { success: true };
     } catch (err: any) {
       log.error('server:stop failed:', err);
@@ -115,19 +120,44 @@ function setupIPC(): void {
     return serverManager.getStatus();
   });
 
-  // Auth
+  // ── Auth ──────────────────────────────────────────────────────────────
   ipcMain.handle('auth:check', async () => {
-    // Placeholder — auth module can be wired in later
-    return { authenticated: false, providers: {} };
+    try {
+      const statuses = await authManager.checkAll();
+      return statuses;
+    } catch (err: any) {
+      log.error('auth:check failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle('auth:check-all', async () => {
+    try {
+      const statuses = await authManager.checkAll();
+      // Also push the result to the renderer for event-based listeners
+      const launcher = getLauncherWindow();
+      if (launcher && !launcher.isDestroyed()) {
+        launcher.webContents.send('auth:status', statuses);
+      }
+      return statuses;
+    } catch (err: any) {
+      log.error('auth:check-all failed:', err);
+      return [];
+    }
   });
 
   ipcMain.handle('auth:login', async (_event, provider: string) => {
     log.info('auth:login requested for provider:', provider);
-    // Placeholder — delegate to authManager when implemented
-    return { success: false, error: 'Auth not yet implemented' };
+    try {
+      await authManager.login(provider);
+      return { success: true };
+    } catch (err: any) {
+      log.error('auth:login failed:', err);
+      return { success: false, error: err.message ?? String(err) };
+    }
   });
 
-  // Updates
+  // ── Updates ───────────────────────────────────────────────────────────
   ipcMain.handle('update:check', async () => {
     try {
       await checkForUpdates();
@@ -150,7 +180,7 @@ function setupIPC(): void {
     }
   });
 
-  // App-level
+  // ── App-level ─────────────────────────────────────────────────────────
   ipcMain.handle('app:open-chat', () => {
     const status = serverManager.getStatus();
     if (!status.running) {
@@ -163,6 +193,44 @@ function setupIPC(): void {
 
   ipcMain.handle('app:get-version', () => {
     return app.getVersion();
+  });
+
+  ipcMain.handle('app:pick-folder', async () => {
+    const launcher = getLauncherWindow();
+    if (!launcher || launcher.isDestroyed()) return null;
+
+    const result = await dialog.showOpenDialog(launcher, {
+      properties: ['openDirectory'],
+      title: 'Select Default Workspace',
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      const folderPath = result.filePaths[0];
+      launcher.webContents.send('app:folder-picked', folderPath);
+      return folderPath;
+    }
+    return null;
+  });
+
+  ipcMain.handle('app:save-settings', (_event, settings: Record<string, any>) => {
+    log.info('Settings saved:', settings);
+    // Settings persistence can be wired to electron-store or similar later
+    return { success: true };
+  });
+
+  // ── Window controls (titlebar) ────────────────────────────────────────
+  ipcMain.handle('window:minimize', () => {
+    const launcher = getLauncherWindow();
+    if (launcher && !launcher.isDestroyed()) {
+      launcher.minimize();
+    }
+  });
+
+  ipcMain.handle('window:close', () => {
+    const launcher = getLauncherWindow();
+    if (launcher && !launcher.isDestroyed()) {
+      launcher.close();
+    }
   });
 }
 

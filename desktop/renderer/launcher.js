@@ -1,14 +1,16 @@
 /**
  * AI Chattr — Launcher Window Renderer
  *
- * Communicates with the Electron main process via IPC to manage:
+ * Communicates with the Electron main process via the preload bridge
+ * (window.api) to manage:
  *   - Server start / stop
  *   - Provider authentication checks & login
  *   - Auto-update lifecycle
  *   - Window controls (minimize / close)
  */
 
-const { ipcRenderer } = require('electron');
+// Preload bridge exposed via contextBridge (see main/preload.ts)
+const api = window.api;
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 
@@ -34,22 +36,29 @@ let providerStatuses = [];
 // ── Titlebar controls ────────────────────────────────────────────────────────
 
 document.getElementById('btn-minimize').addEventListener('click', () => {
-  ipcRenderer.send('window:minimize');
+  api.invoke('window:minimize');
 });
 
 document.getElementById('btn-close').addEventListener('click', () => {
-  ipcRenderer.send('window:close');
+  api.invoke('window:close');
 });
 
 // ── Server controls ──────────────────────────────────────────────────────────
 
-$btnServer.addEventListener('click', () => {
+$btnServer.addEventListener('click', async () => {
   if (serverRunning) {
-    ipcRenderer.send('server:stop');
     setServerState('stopping');
+    const result = await api.invoke('server:stop');
+    if (!result || !result.success) {
+      setServerState('error');
+    }
   } else {
-    ipcRenderer.send('server:start');
     setServerState('starting');
+    const result = await api.invoke('server:start');
+    if (!result || !result.success) {
+      setServerState('error');
+      $footerStatus.textContent = (result && result.error) || 'Server failed to start';
+    }
   }
 });
 
@@ -176,10 +185,10 @@ function renderProviders(statuses) {
       const btn = document.createElement('button');
       btn.className = 'connect-btn';
       btn.textContent = 'Connect';
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         btn.textContent = 'Opening...';
         btn.disabled = true;
-        ipcRenderer.send('auth:login', s.provider);
+        await api.invoke('auth:login', s.provider);
         // Re-check after a delay to give the user time to complete login
         setTimeout(() => refreshAuth(), 5000);
       });
@@ -197,7 +206,7 @@ function renderProviders(statuses) {
  * Request a fresh auth check from main process.
  */
 function refreshAuth() {
-  ipcRenderer.send('auth:check-all');
+  api.invoke('auth:check-all');
 }
 
 // ── Update UI ────────────────────────────────────────────────────────────────
@@ -240,66 +249,66 @@ function setUpdateError(message) {
   $updateProgress.style.display = 'none';
 }
 
-$btnUpdate.addEventListener('click', () => {
-  ipcRenderer.send('update:download');
+$btnUpdate.addEventListener('click', async () => {
   $btnUpdate.style.display = 'none';
   setUpdateProgress(0);
+  await api.invoke('update:download');
 });
 
 $btnRestart.addEventListener('click', () => {
-  ipcRenderer.send('update:install');
+  api.invoke('update:install');
 });
 
-// ── IPC listeners ────────────────────────────────────────────────────────────
+// ── Event listeners (main → renderer) ────────────────────────────────────────
 
 // Server lifecycle
-ipcRenderer.on('server:started', (_event, port) => {
+api.on('server:started', (port) => {
   setServerState('running');
   if (port) $portDisplay.textContent = 'Port: ' + port;
   // Auto-open the chat window after a short delay
   setTimeout(() => {
-    ipcRenderer.send('app:open-chat');
+    api.invoke('app:open-chat');
   }, 2000);
 });
 
-ipcRenderer.on('server:stopped', () => {
+api.on('server:stopped', () => {
   setServerState('stopped');
 });
 
-ipcRenderer.on('server:error', (_event, errorMsg) => {
+api.on('server:error', (errorMsg) => {
   setServerState('error');
   $footerStatus.textContent = errorMsg || 'Server error';
 });
 
 // Auth status updates
-ipcRenderer.on('auth:status', (_event, statuses) => {
+api.on('auth:status', (statuses) => {
   renderProviders(statuses);
 });
 
 // Auto-update lifecycle
-ipcRenderer.on('update:available', (_event, info) => {
+api.on('update:available', (info) => {
   setUpdateAvailable(info.version || info);
 });
 
-ipcRenderer.on('update:not-available', () => {
+api.on('update:not-available', () => {
   setUpdateUpToDate();
 });
 
-ipcRenderer.on('update:progress', (_event, progress) => {
+api.on('update:progress', (progress) => {
   const percent = typeof progress === 'number' ? progress : (progress.percent || 0);
   setUpdateProgress(percent);
 });
 
-ipcRenderer.on('update:downloaded', () => {
+api.on('update:downloaded', () => {
   setUpdateDownloaded();
 });
 
-ipcRenderer.on('update:error', (_event, err) => {
+api.on('update:error', (err) => {
   setUpdateError(err);
 });
 
 // Version info
-ipcRenderer.on('app:version', (_event, ver) => {
+api.on('app:version', (ver) => {
   $version.textContent = 'v' + ver;
 });
 
@@ -329,10 +338,10 @@ if ($settingsToggle && $settingsBody && $settingsArrow) {
 const $btnPickFolder = document.getElementById('btn-pick-folder');
 if ($btnPickFolder) {
   $btnPickFolder.addEventListener('click', () => {
-    ipcRenderer.send('app:pick-folder');
+    api.invoke('app:pick-folder');
   });
 }
-ipcRenderer.on('app:folder-picked', (_e, path) => {
+api.on('app:folder-picked', (path) => {
   const $ws = document.getElementById('setting-workspace');
   if ($ws) $ws.value = path;
 });
@@ -349,16 +358,27 @@ document.querySelectorAll('#settings-body input, #settings-body select').forEach
       autoStart: document.getElementById('setting-autostart')?.checked || false,
       updateChannel: document.getElementById('setting-update-channel')?.value || 'stable',
     };
-    ipcRenderer.send('app:save-settings', settings);
+    api.invoke('app:save-settings', settings);
   });
 });
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   // Request initial state from main process
-  ipcRenderer.send('server:status');
-  ipcRenderer.send('auth:check-all');
-  ipcRenderer.send('app:check-version');
-  ipcRenderer.send('update:check');
+  const status = await api.invoke('server:status');
+  if (status && status.running) {
+    setServerState('running');
+    $portDisplay.textContent = 'Port: ' + status.port;
+  }
+
+  // Fetch auth statuses
+  api.invoke('auth:check-all');
+
+  // Fetch version
+  const ver = await api.invoke('app:get-version');
+  if (ver) $version.textContent = 'v' + ver;
+
+  // Check for updates
+  api.invoke('update:check');
 });

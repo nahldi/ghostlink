@@ -321,7 +321,10 @@ async def send_message(request: Request):
 
 @app.post("/api/messages/{msg_id}/pin")
 async def pin_message(msg_id: int, request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
     pinned = body.get("pinned", True)
     result = await store.pin(msg_id, pinned)
     if result:
@@ -1117,6 +1120,9 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 if STATIC_DIR.exists():
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
+        # Never intercept /api/ routes — let them 404 normally
+        if full_path.startswith("api/"):
+            return JSONResponse({"error": "not found"}, 404)
         file_path = STATIC_DIR / full_path
         if file_path.is_file():
             return FileResponse(file_path)

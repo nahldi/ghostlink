@@ -90,7 +90,7 @@ function buildMenu(serverRunning: boolean): Menu {
             updateTrayMenu(true);
             const launcher = getLauncherWindow();
             if (launcher && !launcher.isDestroyed()) {
-              launcher.webContents.send('server:started', { port: result.port });
+              launcher.webContents.send('server:started', result.port);
             }
           }
         }
