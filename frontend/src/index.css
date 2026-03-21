@@ -393,7 +393,7 @@ body {
    THEME PRESETS
    ═══════════════════════════════════════════════════ */
 
-/* ── Cyberpunk Neon ── */
+/* ── Cyberpunk Neon ── sharp edges, glitch feel, neon glow */
 [data-theme="cyberpunk"] {
   --color-primary: #ff00ff;
   --color-primary-container: #cc00cc;
@@ -413,16 +413,26 @@ body {
 [data-theme="cyberpunk"] .ambient-bg {
   background:
     radial-gradient(ellipse 60% 50% at 20% 20%, rgba(255,0,255,0.08) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(0,255,255,0.06) 0%, transparent 70%) !important;
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(0,255,255,0.06) 0%, transparent 70%),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,0,255,0.015) 2px, rgba(255,0,255,0.015) 4px) !important;
 }
-[data-theme="cyberpunk"] .glass { background: rgba(20,0,32,0.92) !important; }
-[data-theme="cyberpunk"] .glass-strong { background: rgba(14,0,22,0.95) !important; }
-[data-theme="cyberpunk"] .input-float { background: rgba(20,0,32,0.9) !important; }
-[data-theme="cyberpunk"] .sidebar-rail { background: #0d0018 !important; }
-[data-theme="cyberpunk"] .channel-active { background: rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.2); }
-[data-theme="cyberpunk"] .prose code:not(pre code) { background: rgba(255,0,255,0.12); color: #ff80ff; }
+[data-theme="cyberpunk"] .glass { background: rgba(20,0,32,0.92) !important; border-color: rgba(255,0,255,0.1) !important; }
+[data-theme="cyberpunk"] .glass-strong { background: rgba(14,0,22,0.95) !important; border-color: rgba(0,255,255,0.08) !important; }
+[data-theme="cyberpunk"] .input-float { background: rgba(20,0,32,0.9) !important; border-color: rgba(255,0,255,0.08) !important; }
+[data-theme="cyberpunk"] .sidebar-rail { background: #0d0018 !important; border-color: rgba(255,0,255,0.06) !important; }
+[data-theme="cyberpunk"] .channel-active { background: rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.3); box-shadow: 0 0 12px rgba(255,0,255,0.15); }
+[data-theme="cyberpunk"] .prose code:not(pre code) { background: rgba(255,0,255,0.12); color: #ff80ff; border: 1px solid rgba(255,0,255,0.2); }
+/* Sharp edges for cyberpunk */
+[data-theme="cyberpunk"] .rounded-2xl { border-radius: 4px !important; }
+[data-theme="cyberpunk"] .rounded-xl { border-radius: 3px !important; }
+[data-theme="cyberpunk"] .rounded-lg { border-radius: 2px !important; }
+[data-theme="cyberpunk"] .agent-chip { border: 1px solid rgba(255,0,255,0.15) !important; box-shadow: 0 0 8px rgba(255,0,255,0.08); }
+[data-theme="cyberpunk"] .msg-enter { animation: msg-slide-in 0.15s ease-out both; }
+[data-theme="cyberpunk"] .setting-input { border-color: rgba(255,0,255,0.1); }
+[data-theme="cyberpunk"] .setting-input:focus { border-color: rgba(255,0,255,0.4); box-shadow: 0 0 16px rgba(255,0,255,0.1); }
+[data-theme="cyberpunk"] ::-webkit-scrollbar-thumb { background: rgba(255,0,255,0.2); }
 
-/* ── Terminal Green ── */
+/* ── Terminal Green ── full monospace, CRT scanlines, blinking cursor feel */
 [data-theme="terminal"] {
   --color-primary: #00ff41;
   --color-primary-container: #00cc33;
@@ -440,16 +450,29 @@ body {
 }
 [data-theme="terminal"] html, [data-theme="terminal"] body { background: #000 !important; color: #00ff41 !important; }
 [data-theme="terminal"] #root { background: #000; }
-[data-theme="terminal"] .ambient-bg { display: none; }
+[data-theme="terminal"] .ambient-bg {
+  background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,255,65,0.02) 1px, rgba(0,255,65,0.02) 2px) !important;
+  display: block !important;
+}
 [data-theme="terminal"] .glass { background: rgba(0,10,0,0.92) !important; border-color: rgba(0,255,65,0.08) !important; }
 [data-theme="terminal"] .glass-strong { background: rgba(0,6,0,0.95) !important; border-color: rgba(0,255,65,0.1) !important; }
 [data-theme="terminal"] .input-float { background: rgba(0,8,0,0.9) !important; border-color: rgba(0,255,65,0.06) !important; }
 [data-theme="terminal"] .sidebar-rail { background: #000 !important; border-color: rgba(0,255,65,0.06) !important; }
 [data-theme="terminal"] .channel-active { background: rgba(0,255,65,0.08); border-color: rgba(0,255,65,0.2); }
-[data-theme="terminal"] .prose { color: #00ff41; }
+[data-theme="terminal"] .prose { color: #00ff41; font-family: 'JetBrains Mono', monospace; }
 [data-theme="terminal"] .prose strong { color: #80ff80; }
-[data-theme="terminal"] .prose code:not(pre code) { background: rgba(0,255,65,0.1); color: #00ff41; }
+[data-theme="terminal"] .prose code:not(pre code) { background: rgba(0,255,65,0.1); color: #00ff41; border: 1px solid rgba(0,255,65,0.15); }
 [data-theme="terminal"] ::-webkit-scrollbar-thumb { background: rgba(0,255,65,0.15); }
+/* No border radius — everything sharp like a real terminal */
+[data-theme="terminal"] .rounded-2xl { border-radius: 0 !important; }
+[data-theme="terminal"] .rounded-xl { border-radius: 0 !important; }
+[data-theme="terminal"] .rounded-lg { border-radius: 0 !important; }
+[data-theme="terminal"] .rounded-full { border-radius: 0 !important; }
+[data-theme="terminal"] .agent-chip { border-radius: 0 !important; border: 1px solid rgba(0,255,65,0.15) !important; }
+[data-theme="terminal"] button { text-transform: uppercase; letter-spacing: 0.1em; }
+[data-theme="terminal"] .msg-enter { animation: none; }
+[data-theme="terminal"] .setting-input { font-family: 'JetBrains Mono', monospace; border-color: rgba(0,255,65,0.1); border-radius: 0; color: #00ff41; }
+[data-theme="terminal"] .setting-input:focus { border-color: rgba(0,255,65,0.4); box-shadow: 0 0 8px rgba(0,255,65,0.1); }
 
 /* ── Ocean Deep ── */
 [data-theme="ocean"] {
@@ -473,11 +496,20 @@ body {
     radial-gradient(ellipse 60% 50% at 20% 80%, rgba(34,211,238,0.06) 0%, transparent 70%),
     radial-gradient(ellipse 50% 40% at 80% 20%, rgba(52,211,153,0.04) 0%, transparent 70%) !important;
 }
-[data-theme="ocean"] .glass { background: rgba(5,21,37,0.92) !important; }
-[data-theme="ocean"] .glass-strong { background: rgba(5,18,32,0.95) !important; }
+[data-theme="ocean"] .glass { background: rgba(5,21,37,0.92) !important; border-color: rgba(34,211,238,0.06) !important; }
+[data-theme="ocean"] .glass-strong { background: rgba(5,18,32,0.95) !important; border-color: rgba(34,211,238,0.08) !important; }
 [data-theme="ocean"] .input-float { background: rgba(8,24,40,0.9) !important; }
 [data-theme="ocean"] .sidebar-rail { background: #041220 !important; }
-[data-theme="ocean"] .channel-active { background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.2); }
+[data-theme="ocean"] .channel-active { background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.25); box-shadow: 0 0 16px rgba(34,211,238,0.08); }
+/* Soft, rounded — underwater feel */
+[data-theme="ocean"] .rounded-2xl { border-radius: 20px !important; }
+[data-theme="ocean"] .rounded-xl { border-radius: 16px !important; }
+[data-theme="ocean"] .agent-chip { border-color: rgba(34,211,238,0.12) !important; }
+[data-theme="ocean"] .prose code:not(pre code) { background: rgba(34,211,238,0.1); color: #67e8f9; }
+[data-theme="ocean"] .setting-input { border-color: rgba(34,211,238,0.08); }
+[data-theme="ocean"] .setting-input:focus { border-color: rgba(34,211,238,0.3); }
+[data-theme="ocean"] ::-webkit-scrollbar-thumb { background: rgba(34,211,238,0.12); }
+[data-theme="ocean"] .msg-enter { animation: msg-slide-in 0.35s ease-out both; } /* slower, floaty */
 
 /* ── Sunset Warm ── */
 [data-theme="sunset"] {
@@ -501,11 +533,17 @@ body {
     radial-gradient(ellipse 60% 50% at 30% 70%, rgba(249,115,22,0.08) 0%, transparent 70%),
     radial-gradient(ellipse 50% 40% at 70% 30%, rgba(225,29,72,0.05) 0%, transparent 70%) !important;
 }
-[data-theme="sunset"] .glass { background: rgba(26,14,8,0.92) !important; }
+[data-theme="sunset"] .glass { background: rgba(26,14,8,0.92) !important; border-color: rgba(249,115,22,0.06) !important; }
 [data-theme="sunset"] .glass-strong { background: rgba(22,12,6,0.95) !important; }
 [data-theme="sunset"] .input-float { background: rgba(30,16,10,0.9) !important; }
 [data-theme="sunset"] .sidebar-rail { background: #150b06 !important; }
-[data-theme="sunset"] .channel-active { background: rgba(249,115,22,0.1); border-color: rgba(249,115,22,0.2); }
+[data-theme="sunset"] .channel-active { background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.25); box-shadow: 0 0 12px rgba(249,115,22,0.08); }
+/* Warm, cozy — generous padding feel */
+[data-theme="sunset"] .prose code:not(pre code) { background: rgba(249,115,22,0.1); color: #fdba74; }
+[data-theme="sunset"] .agent-chip { border-color: rgba(249,115,22,0.12) !important; }
+[data-theme="sunset"] .setting-input { border-color: rgba(249,115,22,0.08); }
+[data-theme="sunset"] .setting-input:focus { border-color: rgba(249,115,22,0.35); box-shadow: 0 0 12px rgba(249,115,22,0.08); }
+[data-theme="sunset"] ::-webkit-scrollbar-thumb { background: rgba(249,115,22,0.15); }
 
 /* ── Midnight Purple ── */
 [data-theme="midnight"] {
@@ -529,11 +567,18 @@ body {
     radial-gradient(ellipse 60% 50% at 50% 50%, rgba(129,140,248,0.06) 0%, transparent 60%),
     radial-gradient(ellipse 40% 40% at 20% 80%, rgba(192,132,252,0.04) 0%, transparent 60%) !important;
 }
-[data-theme="midnight"] .glass { background: rgba(12,10,26,0.92) !important; }
+[data-theme="midnight"] .glass { background: rgba(12,10,26,0.92) !important; border-color: rgba(129,140,248,0.06) !important; }
 [data-theme="midnight"] .glass-strong { background: rgba(10,8,22,0.95) !important; }
 [data-theme="midnight"] .input-float { background: rgba(14,12,30,0.9) !important; }
 [data-theme="midnight"] .sidebar-rail { background: #0a0816 !important; }
-[data-theme="midnight"] .channel-active { background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.2); }
+[data-theme="midnight"] .channel-active { background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.25); box-shadow: 0 0 16px rgba(129,140,248,0.1); }
+/* Dreamy, soft glow — everything has a subtle indigo haze */
+[data-theme="midnight"] .prose code:not(pre code) { background: rgba(129,140,248,0.1); color: #a5b4fc; }
+[data-theme="midnight"] .agent-chip { box-shadow: 0 0 12px rgba(129,140,248,0.06); }
+[data-theme="midnight"] .bubble-glow:hover { box-shadow: 0 0 28px rgba(129,140,248,0.12); }
+[data-theme="midnight"] .setting-input { border-color: rgba(129,140,248,0.08); }
+[data-theme="midnight"] .setting-input:focus { border-color: rgba(129,140,248,0.35); box-shadow: 0 0 16px rgba(129,140,248,0.1); }
+[data-theme="midnight"] ::-webkit-scrollbar-thumb { background: rgba(129,140,248,0.12); }
 
 /* ── Rose Gold ── */
 [data-theme="rosegold"] {
@@ -557,11 +602,18 @@ body {
     radial-gradient(ellipse 60% 50% at 40% 60%, rgba(244,63,94,0.06) 0%, transparent 70%),
     radial-gradient(ellipse 40% 40% at 70% 30%, rgba(251,146,60,0.04) 0%, transparent 60%) !important;
 }
-[data-theme="rosegold"] .glass { background: rgba(26,12,16,0.92) !important; }
+[data-theme="rosegold"] .glass { background: rgba(26,12,16,0.92) !important; border-color: rgba(244,63,94,0.06) !important; }
 [data-theme="rosegold"] .glass-strong { background: rgba(22,10,14,0.95) !important; }
 [data-theme="rosegold"] .input-float { background: rgba(30,14,18,0.9) !important; }
 [data-theme="rosegold"] .sidebar-rail { background: #160a0e !important; }
-[data-theme="rosegold"] .channel-active { background: rgba(244,63,94,0.1); border-color: rgba(244,63,94,0.2); }
+[data-theme="rosegold"] .channel-active { background: rgba(244,63,94,0.1); border-color: rgba(244,63,94,0.25); box-shadow: 0 0 12px rgba(244,63,94,0.08); }
+/* Elegant, luxurious — pill-shaped buttons, extra rounded */
+[data-theme="rosegold"] .rounded-2xl { border-radius: 24px !important; }
+[data-theme="rosegold"] .agent-chip { border-radius: 24px !important; }
+[data-theme="rosegold"] .prose code:not(pre code) { background: rgba(244,63,94,0.1); color: #fda4af; }
+[data-theme="rosegold"] .setting-input { border-color: rgba(244,63,94,0.08); border-radius: 14px; }
+[data-theme="rosegold"] .setting-input:focus { border-color: rgba(244,63,94,0.3); box-shadow: 0 0 12px rgba(244,63,94,0.08); }
+[data-theme="rosegold"] ::-webkit-scrollbar-thumb { background: rgba(244,63,94,0.15); }
 
 /* ── Arctic ── */
 [data-theme="arctic"] {
