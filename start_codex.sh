@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start AI Chattr server + Codex agent wrapper
+# Start GhostLink server + Codex agent wrapper
 set -e
 cd "$(dirname "$0")/backend"
 source ../.venv/bin/activate

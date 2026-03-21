@@ -78,9 +78,7 @@ function ChatFeed() {
       <div className="px-4 lg:px-6">
       {channelMessages.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-center opacity-30">
-          <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10 mb-3">
-            <path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" fill="#a78bfa" opacity="0.5" />
-          </svg>
+          <img src="/ghostlink.png" alt="GhostLink" className="w-12 h-12 mb-3 opacity-50" style={{ filter: 'invert(1)' }} />
           <div className="text-xs text-on-surface-variant/40">
             #{activeChannel} — waiting for messages
           </div>
@@ -178,7 +176,7 @@ class ErrorBoundary extends Component<{children: ReactNode}, {error: Error | nul
     if (this.state.error) {
       return (
         <div style={{padding: 40, color: '#e0dff0', background: '#08080f', minHeight: '100vh', fontFamily: 'Inter, sans-serif'}}>
-          <h1 style={{color: '#a78bfa', marginBottom: 16, fontSize: 20}}>AI Chattr</h1>
+          <h1 style={{color: '#a78bfa', marginBottom: 16, fontSize: 20}}>GhostLink</h1>
           <p style={{color: '#fca5a5', fontSize: 14}}>Something went wrong:</p>
           <pre style={{color: '#a9a4b8', fontSize: 12, marginTop: 12, whiteSpace: 'pre-wrap'}}>{this.state.error.message}</pre>
           <button onClick={() => window.location.reload()} style={{marginTop: 20, padding: '10px 20px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer'}}>Reload</button>
@@ -230,7 +228,7 @@ function AppInner() {
       if (ctrl && e.key === 'n' && !e.shiftKey) {
         e.preventDefault();
         // Dispatch custom event that Sidebar can listen to
-        window.dispatchEvent(new CustomEvent('aichttr:new-channel'));
+        window.dispatchEvent(new CustomEvent('ghostlink:new-channel'));
         return;
       }
       // Ctrl+1-9 — switch channel by number
@@ -283,7 +281,7 @@ function AppInner() {
 
   // Apply title to document
   useEffect(() => {
-    document.title = title || 'AI Chattr';
+    document.title = title || 'GhostLink';
   }, [title]);
 
   // Apply theme

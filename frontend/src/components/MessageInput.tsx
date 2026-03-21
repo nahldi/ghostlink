@@ -163,10 +163,10 @@ export function MessageInput() {
       description: 'Test desktop notification',
       execute: () => {
         if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('AI Chattr', { body: 'Notifications are working!', icon: '/favicon.ico' });
+          new Notification('GhostLink', { body: 'Notifications are working!', icon: '/favicon.ico' });
         } else if ('Notification' in window) {
           Notification.requestPermission().then(p => {
-            if (p === 'granted') new Notification('AI Chattr', { body: 'Notifications enabled!', icon: '/favicon.ico' });
+            if (p === 'granted') new Notification('GhostLink', { body: 'Notifications enabled!', icon: '/favicon.ico' });
           });
         }
         addMessage({ id: Date.now(), uid: 'cmd-' + Date.now(), sender: 'system', text: 'Notification test sent', type: 'system', timestamp: Date.now() / 1000, time: new Date().toLocaleTimeString(), channel: activeChannel });

@@ -1,5 +1,5 @@
 /**
- * AI Chattr — Launcher Window Renderer
+ * GhostLink — Launcher Window Renderer
  *
  * Communicates with the Electron main process via the preload bridge
  * (window.api) to manage:

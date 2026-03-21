@@ -6,7 +6,7 @@ Usage:
     python wrapper.py gemini
 
 How it works:
-  1. Registers with the AI Chattr server (POST /api/register)
+  1. Registers with the GhostLink server (POST /api/register)
   2. Starts MCP identity proxy (if needed)
   3. Writes MCP config pointing agent CLI to the MCP bridge
   4. Starts agent in a tmux session
@@ -29,7 +29,7 @@ except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore
 
 ROOT = Path(__file__).parent
-SERVER_NAME = "aichttr"
+SERVER_NAME = "ghostlink"
 
 
 # ── Per-instance provider config ────────────────────────────────────
@@ -294,7 +294,7 @@ def main():
     config = load_config()
     agent_names = list(config.get("agents", {}).keys())
 
-    parser = argparse.ArgumentParser(description="AI Chattr agent wrapper")
+    parser = argparse.ArgumentParser(description="GhostLink agent wrapper")
     parser.add_argument("agent", choices=agent_names, help="Agent to wrap")
     parser.add_argument("--no-restart", action="store_true")
     parser.add_argument("--label", type=str, default=None)
@@ -322,7 +322,7 @@ def main():
         registration = _register(server_port, agent, label)
     except Exception as exc:
         print(f"  Registration failed: {exc}")
-        print(f"  Is the AI Chattr server running on port {server_port}?")
+        print(f"  Is the GhostLink server running on port {server_port}?")
         sys.exit(1)
 
     assigned_name = registration["name"]
@@ -527,7 +527,7 @@ def main():
     # Run agent
     from wrapper_unix import get_activity_checker, run_agent
 
-    session_name = f"aichttr-{assigned_name}"
+    session_name = f"ghostlink-{assigned_name}"
     _activity_checker = get_activity_checker(session_name, trigger_flag=_trigger_flag)
 
     try:

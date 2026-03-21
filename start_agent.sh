@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start an agent wrapper for AI Chattr
+# Start an agent wrapper for GhostLink
 # Usage: ./start_agent.sh claude [--headless]
 #        ./start_agent.sh codex [--headless]
 

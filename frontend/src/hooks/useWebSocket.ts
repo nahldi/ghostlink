@@ -107,7 +107,7 @@ export function useWebSocket() {
                   const agent = agents.find(a => a.name === parsed.data.sender);
                   const title = agent?.label || parsed.data.sender;
                   const body = parsed.data.text.length > 100 ? parsed.data.text.slice(0, 100) + '...' : parsed.data.text;
-                  new Notification(title, { body, icon: '/favicon.ico', tag: 'aichttr-' + parsed.data.id });
+                  new Notification(title, { body, icon: '/favicon.ico', tag: 'ghostlink-' + parsed.data.id });
                 }
               }
             }

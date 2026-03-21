@@ -22,6 +22,7 @@ export function MobileHeader() {
               {mobileMenuOpen ? 'close' : 'menu'}
             </span>
           </button>
+          <img src="/ghostlink.png" alt="GhostLink" className="w-7 h-7 object-contain" style={{ filter: 'invert(1)' }} />
           <div>
             <div className="text-sm font-semibold text-on-surface">
               <span className="text-on-surface-variant/40">#</span> {activeChannel}

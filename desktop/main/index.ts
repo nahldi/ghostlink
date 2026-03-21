@@ -1,5 +1,5 @@
 /**
- * AI Chattr — Electron Main Process Entry Point
+ * GhostLink — Electron Main Process Entry Point
  *
  * Orchestrates the launcher window, backend server lifecycle,
  * system tray, auto-updater, and chat browser window.
@@ -20,7 +20,7 @@ import authManager from './auth/index';
 // ---------------------------------------------------------------------------
 log.transports.file.level = 'info';
 log.transports.console.level = 'debug';
-log.info('AI Chattr starting — version', app.getVersion());
+log.info('GhostLink starting — version', app.getVersion());
 
 // ---------------------------------------------------------------------------
 // Single-instance lock — prevent multiple app instances
@@ -57,7 +57,7 @@ function createChatWindow(port: number): void {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: 'AI Chattr',
+    title: 'GhostLink',
     backgroundColor: '#09090f',
     show: false,
     webPreferences: {

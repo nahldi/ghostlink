@@ -42,7 +42,7 @@ function getTrayIconPath(): string {
 function buildMenu(serverRunning: boolean): Menu {
   return Menu.buildFromTemplate([
     {
-      label: 'Open AI Chattr',
+      label: 'Open GhostLink',
       click: () => {
         const status = serverManager.getStatus();
         if (status.running) {
@@ -51,7 +51,7 @@ function buildMenu(serverRunning: boolean): Menu {
           // Find existing chat window or show launcher
           const allWindows = BW.getAllWindows();
           const chat = allWindows.find((w: BrowserWindow) =>
-            w.getTitle() === 'AI Chattr' && w !== getLauncherWindow()
+            w.getTitle() === 'GhostLink' && w !== getLauncherWindow()
           );
           if (chat) {
             chat.show();
@@ -139,7 +139,7 @@ export function setupTray(launcherWindow: BrowserWindow): void {
     : nativeImage.createEmpty();
 
   tray = new Tray(icon);
-  tray.setToolTip('AI Chattr');
+  tray.setToolTip('GhostLink');
 
   // Set initial menu (server not running)
   tray.setContextMenu(buildMenu(false));

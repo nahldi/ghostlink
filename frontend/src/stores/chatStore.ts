@@ -167,7 +167,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
   settings: {
     username: 'You',
-    title: 'AI Chattr',
+    title: 'GhostLink',
     theme: 'dark' as const,
     fontSize: 14,
     loopGuard: 4,

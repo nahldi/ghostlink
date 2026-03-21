@@ -325,6 +325,9 @@ export function SettingsPanel() {
 function CleanupSection() {
   const [cleaning, setCleaning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
+  const [serverStopped, setServerStopped] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
 
   const handleCleanup = async () => {
     setCleaning(true);
@@ -337,6 +340,24 @@ function CleanupSection() {
     }
     setCleaning(false);
     setTimeout(() => setResult(null), 3000);
+  };
+
+  const handleStopServer = async () => {
+    if (!confirmStop) {
+      setConfirmStop(true);
+      setTimeout(() => setConfirmStop(false), 5000);
+      return;
+    }
+    setStopping(true);
+    setConfirmStop(false);
+    try {
+      await api.stopServer();
+      setServerStopped(true);
+    } catch {
+      // Server likely already killed itself before response arrived — that's expected
+      setServerStopped(true);
+    }
+    setStopping(false);
   };
 
   return (
@@ -360,6 +381,34 @@ function CleanupSection() {
       <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
         Kills orphaned tmux sessions and dead processes to free up resources
       </p>
+
+      {/* Stop Server */}
+      <div className="mt-3">
+        {serverStopped ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-medium text-red-400">
+            <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
+            Server stopped. Reload or restart to reconnect.
+          </div>
+        ) : (
+          <button
+            onClick={handleStopServer}
+            disabled={stopping}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all disabled:opacity-50 ${
+              confirmStop
+                ? 'bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25'
+                : 'bg-surface-container/40 border-outline-variant/8 text-on-surface-variant/60 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {stopping ? 'hourglass_empty' : 'power_settings_new'}
+            </span>
+            {stopping ? 'Stopping...' : confirmStop ? 'Click again to confirm' : 'Stop Server'}
+          </button>
+        )}
+        <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
+          Kills all agents and shuts down the backend server
+        </p>
+      </div>
     </div>
   );
 }

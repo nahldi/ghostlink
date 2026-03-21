@@ -1,5 +1,5 @@
-appId: com.aichttr.app
-productName: AI Chattr
+appId: com.ghostlink.app
+productName: GhostLink
 directories:
   output: dist
   buildResources: assets
@@ -50,4 +50,4 @@ linux:
 publish:
   provider: github
   owner: nahldi
-  repo: aichttr
+  repo: ghostlink

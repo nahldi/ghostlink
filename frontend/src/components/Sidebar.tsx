@@ -120,9 +120,7 @@ export function Sidebar() {
           title="Channels & Navigation"
           style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', boxShadow: '0 0 16px rgba(124,58,237,0.3)' }}
         >
-          <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-            <path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" fill="white" />
-          </svg>
+          <img src="/ghostlink.png" alt="GhostLink" className="w-6 h-6 object-contain" style={{ filter: 'invert(1)' }} />
         </div>
 
         {/* Nav icons */}

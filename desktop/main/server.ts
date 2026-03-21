@@ -104,7 +104,7 @@ class ServerManager {
   /**
    * Stop the backend server gracefully.
    * Sends SIGTERM, waits up to 3 s, then SIGKILL if still alive.
-   * Also kills any lingering tmux sessions prefixed with 'aichttr-'.
+   * Also kills any lingering tmux sessions prefixed with 'ghostlink-'.
    */
   async stop(): Promise<void> {
     if (!this.process) {
@@ -277,12 +277,12 @@ class ServerManager {
   }
 
   /**
-   * Kill any tmux sessions prefixed with 'aichttr-' (agent sessions).
+   * Kill any tmux sessions prefixed with 'ghostlink-' (agent sessions).
    * Fails silently if tmux is not installed.
    */
   private killTmuxSessions(): void {
     try {
-      execSync("tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^aichttr-' | xargs -I{} tmux kill-session -t {}", {
+      execSync("tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {}", {
         stdio: 'ignore',
         timeout: 5000,
       });

@@ -239,7 +239,7 @@ def _trigger_mentions(sender: str, text: str, channel: str):
 # ── MCP Instructions ───────────────────────────────────────────────
 
 _INSTRUCTIONS = (
-    "AI Chattr — a shared chat channel for coordinating development between AI agents and humans. "
+    "GhostLink — a shared chat channel for coordinating development between AI agents and humans. "
     "Use chat_send to post messages. Use chat_read to check recent messages. "
     "Use chat_join when you start a session to announce your presence. "
     "Use chat_rules to list or propose shared rules (humans approve via the web UI). "
@@ -287,7 +287,7 @@ def chat_send(
     job_id: int = 0,
     ctx: Context | None = None,
 ) -> str:
-    """Send a message to the AI Chattr chat room.
+    """Send a message to the GhostLink chat room.
 
     Args:
         sender: Your agent name (claude/codex/gemini)
@@ -437,7 +437,7 @@ def chat_read(
 
 
 def chat_join(name: str, channel: str = "general", ctx: Context | None = None) -> str:
-    """Announce that you've connected to AI Chattr."""
+    """Announce that you've connected to GhostLink."""
     name, err = _resolve_identity(name, ctx, field_name="name", required=True)
     if err:
         return err
@@ -448,7 +448,7 @@ def chat_join(name: str, channel: str = "general", ctx: Context | None = None) -
 
 
 def chat_who(ctx: Context | None = None) -> str:
-    """Check who's currently online in AI Chattr."""
+    """Check who's currently online in GhostLink."""
     online = _get_online()
     return f"Online: {', '.join(online)}" if online else "Nobody online."
 
@@ -688,7 +688,7 @@ MCP_SSE_PORT = 8201
 
 def _create_server(port: int) -> FastMCP:
     server = FastMCP(
-        "aichttr",
+        "ghostlink",
         host="127.0.0.1",
         port=port,
         log_level="ERROR",

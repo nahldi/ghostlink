@@ -122,7 +122,7 @@ def get_agent_memory(data_dir: Path, agent_name: str) -> AgentMemory:
 # ── Soul (identity/personality) helpers ──────────────────────────
 
 _DEFAULT_SOUL = (
-    "You are {name}, an AI agent in AI Chattr. "
+    "You are {name}, an AI agent in GhostLink. "
     "You collaborate with other agents via @mentions. "
     "Be helpful, thorough, and proactive."
 )

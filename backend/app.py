@@ -1,4 +1,4 @@
-"""AI Chattr — FastAPI backend with WebSocket hub."""
+"""GhostLink — FastAPI backend with WebSocket hub."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ router = MessageRouter(max_hops=MAX_HOPS, default_routing=DEFAULT_ROUTING)
 SETTINGS_PATH = DATA_DIR / "settings.json"
 _settings: dict = {
     "username": "You",
-    "title": "AI Chattr",
+    "title": "GhostLink",
     "theme": "dark",
     "fontSize": 14,
     "loopGuard": MAX_HOPS,
@@ -209,7 +209,7 @@ async def lifespan(_app: FastAPI):
 
     _load_settings()
 
-    db_path = DATA_DIR / "aichttr.db"
+    db_path = DATA_DIR / "ghostlink.db"
     store = MessageStore(db_path)
     await store.init()
 
@@ -252,7 +252,7 @@ async def lifespan(_app: FastAPI):
     await db.close()
 
 
-app = FastAPI(title="AI Chattr", lifespan=lifespan)
+app = FastAPI(title="GhostLink", lifespan=lifespan)
 
 
 # ── WebSocket endpoint ──────────────────────────────────────────────
@@ -670,7 +670,7 @@ async def kill_agent(name: str):
     ok = registry.deregister(name)
 
     # Only kill this specific agent's tmux session
-    session_name = f"aichttr-{name}"
+    session_name = f"ghostlink-{name}"
     try:
         subprocess.run(
             ["tmux", "kill-session", "-t", session_name],
@@ -697,18 +697,18 @@ async def cleanup_stale():
     """Kill stale tmux sessions, clear orphaned processes, free resources."""
     cleaned = []
 
-    # Find all aichttr tmux sessions
+    # Find all ghostlink tmux sessions
     try:
         result = subprocess.run(["tmux", "list-sessions", "-F", "#{session_name}"],
                                 capture_output=True, text=True, timeout=5)
-        sessions = [s.strip() for s in result.stdout.strip().split("\n") if s.strip().startswith("aichttr-")]
+        sessions = [s.strip() for s in result.stdout.strip().split("\n") if s.strip().startswith("ghostlink-")]
     except Exception:
         sessions = []
 
     # Check which sessions have no registered agent
     live_names = {inst.name for inst in registry.get_all()}
     for session in sessions:
-        agent_name = session.replace("aichttr-", "")
+        agent_name = session.replace("ghostlink-", "")
         if agent_name not in live_names:
             try:
                 subprocess.run(["tmux", "kill-session", "-t", session], capture_output=True, timeout=5)
@@ -726,6 +726,35 @@ async def cleanup_stale():
             pass
 
     return {"ok": True, "cleaned": cleaned, "count": len(cleaned)}
+
+
+@app.post("/api/shutdown")
+async def shutdown_server():
+    """Gracefully stop the backend server. Kills all agents first, then exits."""
+    import asyncio, signal
+
+    # Kill all running agents first
+    for inst in list(registry.get_all()):
+        try:
+            proc = _agent_processes.get(inst.name)
+            if proc and proc.poll() is None:
+                proc.terminate()
+        except Exception:
+            pass
+
+    # Broadcast shutdown notice to all connected WebSocket clients
+    try:
+        await broadcast("system", {"event": "server_shutdown", "message": "Server is shutting down"})
+    except Exception:
+        pass
+
+    # Schedule the actual shutdown after response is sent
+    async def _do_shutdown():
+        await asyncio.sleep(0.5)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    asyncio.get_event_loop().create_task(_do_shutdown())
+    return {"ok": True, "message": "Server shutting down"}
 
 
 # ── Skills ──────────────────────────────────────────────────────────
@@ -988,7 +1017,7 @@ async def delete_webhook(wh_id: str):
 # ── Export ───────────────────────────────────────────────────────────
 
 @app.get("/api/export")
-async def export_channel(channel: str = "general"):
+async def export_channel(channel: str = "general", format: str = "markdown"):
     assert store._db is not None
     cursor = await store._db.execute(
         "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC",
@@ -996,11 +1025,23 @@ async def export_channel(channel: str = "general"):
     )
     rows = await cursor.fetchall()
     msgs = [store._row_to_dict(r) for r in rows]
-    md_lines = [f"# #{channel}\n"]
-    for m in msgs:
-        md_lines.append(f"**{m['sender']}** ({m.get('time', '')})\n{m['text']}\n---")
-    md = "\n\n".join(md_lines)
-    return {"markdown": md, "filename": f"{channel}-export.md"}
+
+    if format == "json":
+        return {"messages": msgs, "channel": channel, "count": len(msgs)}
+    elif format == "html":
+        html_lines = [f"<html><head><title>#{channel}</title></head><body style='background:#09090f;color:#e0dff0;font-family:sans-serif;padding:2rem'>"]
+        html_lines.append(f"<h1>#{channel}</h1>")
+        for m in msgs:
+            color = "#38bdf8" if m.get("type") == "chat" and m["sender"] not in [a.name for a in registry.get_all()] else "#a78bfa"
+            html_lines.append(f"<div style='margin:1rem 0;padding:0.75rem;border-radius:8px;background:rgba(255,255,255,0.03)'><b style='color:{color}'>{m['sender']}</b> <small style='color:#666'>{m.get('time','')}</small><p>{m['text']}</p></div>")
+        html_lines.append("</body></html>")
+        return {"html": "\n".join(html_lines), "filename": f"{channel}-export.html"}
+    else:
+        md_lines = [f"# #{channel}\n"]
+        for m in msgs:
+            md_lines.append(f"**{m['sender']}** ({m.get('time', '')})\n{m['text']}\n---")
+        md = "\n\n".join(md_lines)
+        return {"markdown": md, "filename": f"{channel}-export.md"}
 
 
 # ── Hierarchy ────────────────────────────────────────────────────────
@@ -1136,7 +1177,7 @@ if STATIC_DIR.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    print(f"AI Chattr starting on http://{HOST}:{PORT}")
+    print(f"GhostLink starting on http://{HOST}:{PORT}")
     uvicorn.run(
         "app:app",
         host=HOST,

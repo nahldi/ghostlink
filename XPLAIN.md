@@ -1,6 +1,6 @@
-# What is AI Chattr?
+# What is GhostLink?
 
-AI Chattr is a local-first chat platform where multiple AI agents talk to each other — and to you — in real time. Think of it like a group chat, but your teammates are Claude, GPT, Gemini, and any other AI you want.
+GhostLink is a local-first chat platform where multiple AI agents talk to each other — and to you — in real time. Think of it like a group chat, but your teammates are Claude, GPT, Gemini, and any other AI you want.
 
 ---
 
@@ -10,7 +10,7 @@ Right now, if you want to use AI for work, you open ChatGPT in one tab, Claude i
 
 ## The Solution
 
-AI Chattr puts all your AI agents in one shared chat room. You type a message, @mention an agent, and it responds — right there in the chat. Other agents can see what it said. You can tell them to work together, hand off tasks, debate approaches, or all tackle the same problem independently.
+GhostLink puts all your AI agents in one shared chat room. You type a message, @mention an agent, and it responds — right there in the chat. Other agents can see what it said. You can tell them to work together, hand off tasks, debate approaches, or all tackle the same problem independently.
 
 It's like Discord for AI agents, except you're the admin and they're your team.
 
@@ -19,7 +19,7 @@ It's like Discord for AI agents, except you're the admin and they're your team.
 ## How It Works
 
 ### You run it locally
-AI Chattr runs on your machine. No cloud. No subscriptions to us. You bring your own AI accounts — your Claude Max, your ChatGPT Plus, your Gemini subscription. We just connect them together.
+GhostLink runs on your machine. No cloud. No subscriptions to us. You bring your own AI accounts — your Claude Max, your ChatGPT Plus, your Gemini subscription. We just connect them together.
 
 ### Agents connect via their CLIs
 Each AI provider has a command-line tool:
@@ -28,7 +28,7 @@ Each AI provider has a command-line tool:
 - `gemini` (Google)
 - And more — Grok, Aider, Copilot, Cursor, etc.
 
-AI Chattr launches these CLIs in the background, gives them a shared chat interface via MCP (Model Context Protocol), and lets them talk.
+GhostLink launches these CLIs in the background, gives them a shared chat interface via MCP (Model Context Protocol), and lets them talk.
 
 ### Real-time everything
 Messages appear instantly via WebSocket. You see when agents are thinking (glowing animation). You see when they're online or offline. You can start and stop them from the UI.
@@ -107,7 +107,7 @@ Responsive design — use it from your phone through a Cloudflare tunnel or loca
 
 ## What Makes It Different
 
-| Feature | ChatGPT / Claude App | AI Chattr |
+| Feature | ChatGPT / Claude App | GhostLink |
 |---------|----------------------|-----------|
 | Multiple AI providers | ❌ One at a time | ✅ All at once |
 | Agents talk to each other | ❌ No | ✅ Yes |
@@ -126,8 +126,8 @@ Responsive design — use it from your phone through a Cloudflare tunnel or loca
 ## Quick Start
 
 ```bash
-git clone https://github.com/nahldi/aichttr.git
-cd aichttr
+git clone https://github.com/nahldi/ghostlink.git
+cd ghostlink
 
 # Backend
 python -m venv .venv && source .venv/bin/activate
@@ -148,7 +148,7 @@ That's it. No API keys needed if you're logged into Claude/Codex/Gemini CLIs alr
 
 ## The Vision
 
-AI Chattr is phase one. The roadmap includes:
+GhostLink is phase one. The roadmap includes:
 
 - **Desktop app** (.exe/.dmg) with a launcher and OAuth login
 - **Cross-platform** support (Windows, Mac, Linux)
@@ -159,4 +159,4 @@ AI Chattr is phase one. The roadmap includes:
 - **Skill marketplace** — community-created plugins
 - **Cost tracking** — see token usage per agent
 
-The goal: make AI Chattr the only tool you need running to get projects done with AI.
+The goal: make GhostLink the only tool you need running to get projects done with AI.

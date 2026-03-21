@@ -1,11 +1,11 @@
-# AI Chattr — Desktop App Architecture Plan
+# GhostLink — Desktop App Architecture Plan
 
 > This document outlines the desktop app implementation. Do NOT build yet — this is the plan for when the web app is fully polished.
 
 ---
 
 ## Overview
-Standalone .exe / .dmg / .AppImage that wraps the AI Chattr web app in Electron with a launcher screen, OAuth login, and system tray integration.
+Standalone .exe / .dmg / .AppImage that wraps the GhostLink web app in Electron with a launcher screen, OAuth login, and system tray integration.
 
 ## Architecture
 
@@ -116,7 +116,7 @@ gh release create v1.0.3 dist/*.exe dist/*.dmg dist/*.AppImage --notes "changelo
 ## System Tray
 - Tray icon shows server status (green/red dot)
 - Right-click menu:
-  - Open AI Chattr
+  - Open GhostLink
   - Start/Stop Server
   - Connected Agents submenu
   - Settings
@@ -165,7 +165,7 @@ npm run build:all
 
 ## Distribution
 - GitHub Releases for downloads
-- `winget install aichttr` (Windows)
-- `brew install aichttr` (macOS)
+- `winget install ghostlink` (Windows)
+- `brew install ghostlink` (macOS)
 - .deb repo for Linux
-- Docker image: `docker run -p 8300:8300 aichttr`
+- Docker image: `docker run -p 8300:8300 ghostlink`

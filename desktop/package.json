@@ -1,7 +1,7 @@
 {
-  "name": "aichttr",
+  "name": "ghostlink",
   "version": "1.0.3",
-  "description": "AI Chattr — Multi-Agent AI Chat Platform",
+  "description": "GhostLink — Multi-Agent AI Chat Platform",
   "main": "main/index.js",
   "scripts": {
     "dev": "tsc && electron .",
@@ -12,7 +12,7 @@
     "build:all": "tsc && electron-builder --win --mac --linux",
     "clean": "rimraf main/**/*.js main/**/*.js.map"
   },
-  "author": "AI Chattr",
+  "author": "GhostLink",
   "license": "MIT",
   "devDependencies": {
     "electron": "^33.0.0",

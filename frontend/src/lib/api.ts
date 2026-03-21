@@ -109,6 +109,9 @@ export const api = {
   cleanup: () =>
     request<{ ok: boolean; cleaned: string[]; count: number }>('/api/cleanup', { method: 'POST' }),
 
+  stopServer: () =>
+    request<{ ok: boolean; message: string }>('/api/shutdown', { method: 'POST' }),
+
   pauseAgent: (name: string) =>
     request<{ ok: boolean }>('/api/agents/' + name + '/pause', { method: 'POST' }),
 

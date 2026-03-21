@@ -1,4 +1,4 @@
-# AI Chattr — Ultimate Feature Blueprint
+# GhostLink — Ultimate Feature Blueprint
 
 > The only tool you need running to get projects going.
 > Every feature below includes exactly HOW to implement it.
@@ -130,7 +130,7 @@
 **Test:** `/debate claude codex "monorepo vs polyrepo"` → structured back-and-forth → you pick a winner
 
 ### 2.6 Smart Auto-Route
-**What:** Describe task without @mentioning → AI Chattr picks the best agent.
+**What:** Describe task without @mentioning → GhostLink picks the best agent.
 **How:**
 - Backend: If no @mention detected, run a lightweight classifier on the message text
 - Classifier: keyword matching first (code→codex, design→claude, research→gemini), LLM fallback for ambiguous
@@ -472,12 +472,12 @@
 ### 6.4 Package Managers & Install Scripts
 **What:** One-command install per platform.
 **Targets:**
-- `pip install aichttr` (PyPI)
-- `npm install -g aichttr` (npm)
-- `brew install aichttr` (Homebrew for macOS)
-- `winget install aichttr` (Windows)
-- Docker image: `docker run -p 8300:8300 aichttr`
-- One-liner: `curl -fsSL https://aichttr.dev/install.sh | sh`
+- `pip install ghostlink` (PyPI)
+- `npm install -g ghostlink` (npm)
+- `brew install ghostlink` (Homebrew for macOS)
+- `winget install ghostlink` (Windows)
+- Docker image: `docker run -p 8300:8300 ghostlink`
+- One-liner: `curl -fsSL https://ghostlink.dev/install.sh | sh`
 
 ### 6.5 Desktop App Installers
 **What:** Native installers per platform.
@@ -554,7 +554,7 @@
 - Each skill = a folder with `skill.json` (metadata) + implementation files
 - Skills are MCP tools that get injected into the agent's MCP config
 - Skills can be Python scripts, Node scripts, or MCP server endpoints
-- Skills directory: `~/.aichttr/skills/` (global) + `./skills/` (per-project)
+- Skills directory: `~/.ghostlink/skills/` (global) + `./skills/` (per-project)
 
 ### 7.2 Per-Agent Skill Configuration
 **What:** Each agent has its own set of enabled/disabled skills.
@@ -579,11 +579,11 @@
 **What:** Install new skills from the community or create custom ones.
 **Sources:**
 - Built-in skills (bundled with app)
-- ClawHub marketplace (if available): `aichttr skill install web-search`
-- Git repos: `aichttr skill install https://github.com/user/skill-name`
-- Local folders: `aichttr skill install ./my-custom-skill`
+- ClawHub marketplace (if available): `ghostlink skill install web-search`
+- Git repos: `ghostlink skill install https://github.com/user/skill-name`
+- Local folders: `ghostlink skill install ./my-custom-skill`
 **Updates:**
-- `aichttr skill update` — update all installed skills
+- `ghostlink skill update` — update all installed skills
 - Auto-check for updates on app start (optional)
 - Version pinning support
 
@@ -595,7 +595,7 @@
 3. Define inputs (parameters) and outputs
 4. Write/paste the implementation code
 5. Test in sandbox before enabling
-6. Save to `~/.aichttr/skills/my-skill/`
+6. Save to `~/.ghostlink/skills/my-skill/`
 
 ### 7.6 Skill Marketplace (Future)
 **What:** Community-driven skill sharing.

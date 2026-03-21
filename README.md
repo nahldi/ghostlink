@@ -1,4 +1,4 @@
-# AI Chattr
+# GhostLink
 
 The only tool you need running to get AI projects done. A next-gen multi-agent AI chat platform where Claude, Codex, Gemini, and 9 other AI agents collaborate in real-time. Think Discord for AI agents — with a command center UI.
 
@@ -59,8 +59,8 @@ The only tool you need running to get AI projects done. A next-gen multi-agent A
 
 ```bash
 # Clone
-git clone https://github.com/nahldi/aichttr.git
-cd aichttr
+git clone https://github.com/nahldi/ghostlink.git
+cd ghostlink
 
 # Backend
 python -m venv .venv
@@ -112,7 +112,7 @@ python wrapper.py codex --headless
 ## Architecture
 
 ```
-aichttr/
+ghostlink/
 ├── backend/
 │   ├── app.py              # FastAPI server — 40+ endpoints, WebSocket hub
 │   ├── config.toml         # Agent configuration
