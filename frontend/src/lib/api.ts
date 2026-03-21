@@ -151,4 +151,13 @@ export const api = {
 
   getHierarchy: () =>
     request<{ agents: import('../types').Agent[]; tree: Record<string, string[]> }>('/api/hierarchy'),
+
+  startTunnel: () =>
+    request<{ url: string; pid: number; already?: boolean }>('/api/tunnel/start', { method: 'POST' }),
+
+  stopTunnel: () =>
+    request<{ ok: boolean }>('/api/tunnel/stop', { method: 'POST' }),
+
+  getTunnelStatus: () =>
+    request<{ active: boolean; url: string | null }>('/api/tunnel/status'),
 };

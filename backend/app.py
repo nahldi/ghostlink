@@ -1151,6 +1151,86 @@ async def delete_agent_memory(name: str, key: str):
     return {"ok": ok}
 
 
+# ── Cloudflare Tunnel (Remote Session) ──────────────────────────────
+
+import asyncio as _asyncio
+import re as _re
+
+_tunnel_process: subprocess.Popen | None = None
+_tunnel_url: str | None = None
+
+
+@app.post("/api/tunnel/start")
+async def tunnel_start():
+    global _tunnel_process, _tunnel_url
+    if _tunnel_process and _tunnel_process.poll() is None:
+        return JSONResponse({"url": _tunnel_url, "pid": _tunnel_process.pid, "already": True})
+
+    try:
+        proc = subprocess.Popen(
+            ["cloudflared", "tunnel", "--url", f"http://127.0.0.1:{PORT}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return JSONResponse({"error": "cloudflared not found. Install it first."}, 500)
+
+    url_pattern = _re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+    found_url: str | None = None
+
+    # cloudflared prints the URL to stderr — read in a thread to avoid blocking
+    import threading, time
+
+    lines_buf: list[str] = []
+
+    def _read_stderr():
+        assert proc.stderr
+        for raw in proc.stderr:
+            lines_buf.append(raw.decode("utf-8", errors="replace"))
+
+    t = threading.Thread(target=_read_stderr, daemon=True)
+    t.start()
+
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        for line in lines_buf:
+            m = url_pattern.search(line)
+            if m:
+                found_url = m.group(0)
+                break
+        if found_url:
+            break
+        await _asyncio.sleep(0.3)
+
+    if not found_url:
+        proc.kill()
+        stderr_text = "\n".join(lines_buf)
+        return JSONResponse({"error": "Timed out waiting for tunnel URL", "stderr": stderr_text}, 500)
+
+    _tunnel_process = proc
+    _tunnel_url = found_url
+    return {"url": found_url, "pid": proc.pid}
+
+
+@app.post("/api/tunnel/stop")
+async def tunnel_stop():
+    global _tunnel_process, _tunnel_url
+    if _tunnel_process:
+        _tunnel_process.kill()
+        _tunnel_process.wait()
+        _tunnel_process = None
+        _tunnel_url = None
+    return {"ok": True}
+
+
+@app.get("/api/tunnel/status")
+async def tunnel_status():
+    active = _tunnel_process is not None and _tunnel_process.poll() is None
+    if not active:
+        return {"active": False, "url": None}
+    return {"active": True, "url": _tunnel_url}
+
+
 # ── Serve uploads ───────────────────────────────────────────────────
 
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")

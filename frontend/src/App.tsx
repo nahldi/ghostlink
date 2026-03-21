@@ -17,6 +17,7 @@ import { StatsPanel } from './components/StatsPanel';
 import { SearchModal } from './components/SearchModal';
 import { ConnectionBanner } from './components/ConnectionBanner';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { RemoteSession } from './components/RemoteSession';
 
 function ChatFeed() {
   const messages = useChatStore((s) => s.messages);
@@ -330,6 +331,9 @@ function AppInner() {
           {/* Agent bar — desktop only */}
           <div className="hidden lg:flex items-center px-6 py-2.5 border-b border-outline-variant/6 w-full">
             <AgentBar />
+            <div className="ml-auto shrink-0">
+              <RemoteSession />
+            </div>
           </div>
           {/* Channel tabs */}
           <div className="hidden lg:block py-1.5 px-2 w-full">
