@@ -1,0 +1,27 @@
+{
+  "name": "aichttr",
+  "version": "1.0.3",
+  "description": "AI Chattr — Multi-Agent AI Chat Platform",
+  "main": "main/index.js",
+  "scripts": {
+    "dev": "tsc && electron .",
+    "build": "tsc",
+    "build:win": "tsc && electron-builder --win",
+    "build:mac": "tsc && electron-builder --mac",
+    "build:linux": "tsc && electron-builder --linux",
+    "build:all": "tsc && electron-builder --win --mac --linux",
+    "clean": "rimraf main/**/*.js main/**/*.js.map"
+  },
+  "author": "AI Chattr",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "typescript": "~5.9.0",
+    "rimraf": "^6.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0",
+    "electron-log": "^5.2.0"
+  }
+}

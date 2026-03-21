@@ -1,0 +1,583 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AI Chattr — Launcher Window Styles
+   Dark theme matching the web app aesthetic (#09090f base)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Reset & base ───────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #09090f;
+  color: #e4e4ec;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Custom titlebar ────────────────────────────────────────────────────── */
+
+#titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: #07070c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+#titlebar-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.02em;
+}
+
+#titlebar-controls {
+  display: flex;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+#titlebar-controls button {
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+#titlebar-controls button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+#btn-close:hover {
+  background: #e53935 !important;
+  color: #fff !important;
+}
+
+/* ── Content area ───────────────────────────────────────────────────────── */
+
+#content {
+  height: calc(100% - 36px - 32px); /* minus titlebar and footer */
+  overflow-y: auto;
+  padding: 20px 24px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 58, 237, 0.3) transparent;
+}
+
+#content::-webkit-scrollbar {
+  width: 6px;
+}
+
+#content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#content::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.3);
+  border-radius: 3px;
+}
+
+/* ── Header / logo ──────────────────────────────────────────────────────── */
+
+#header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+#logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(167, 139, 250, 0.08));
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  margin-bottom: 12px;
+}
+
+#header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #f0f0f8;
+  letter-spacing: -0.01em;
+  margin-bottom: 2px;
+}
+
+#subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
+/* ── Section cards ──────────────────────────────────────────────────────── */
+
+.section {
+  background: rgba(18, 18, 28, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.section:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-label {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.status-label.running {
+  color: #4ade80;
+}
+
+.section-body {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── Status dots ────────────────────────────────────────────────────────── */
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #555;
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.dot.green {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+}
+
+.dot.yellow {
+  background: #facc15;
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.3);
+}
+
+.dot.red {
+  background: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.3);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+.primary-btn {
+  padding: 7px 18px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.primary-btn:hover {
+  filter: brightness(1.15);
+}
+
+.primary-btn:active {
+  transform: scale(0.97);
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+}
+
+.secondary-btn {
+  padding: 7px 18px;
+  background: transparent;
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.secondary-btn:hover {
+  background: rgba(167, 139, 250, 0.08);
+  border-color: rgba(167, 139, 250, 0.5);
+}
+
+.secondary-btn:active {
+  transform: scale(0.97);
+}
+
+/* ── Port display ───────────────────────────────────────────────────────── */
+
+#port-display {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* ── Provider cards ─────────────────────────────────────────────────────── */
+
+#providers {
+  display: flex;
+  flex-direction: column;
+}
+
+.provider-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  transition: background 0.15s;
+}
+
+.provider-card:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.provider-card:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.provider-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.provider-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.provider-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e4ec;
+}
+
+.provider-status {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.provider-status.connected {
+  color: #4ade80;
+}
+
+.provider-status .check {
+  font-size: 10px;
+}
+
+.provider-action {
+  flex-shrink: 0;
+}
+
+.connect-btn {
+  padding: 5px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.connect-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.connected-badge {
+  padding: 5px 14px;
+  background: rgba(74, 222, 128, 0.08);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.15);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: default;
+}
+
+/* ── Progress bar ───────────────────────────────────────────────────────── */
+
+#update-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+#progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+#progress-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  min-width: 32px;
+  text-align: right;
+}
+
+#update-status {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+#update-status.up-to-date {
+  color: #4ade80;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+#footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #07070c;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+#footer-status {
+  transition: color 0.2s;
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+.dot.yellow {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.section {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+#server-section  { animation-delay: 0.05s; }
+#connections-section { animation-delay: 0.1s; }
+#settings-section { animation-delay: 0.15s; }
+#update-section  { animation-delay: 0.2s; }
+
+/* ── Settings section ─────────────────────────────────────────────────── */
+
+.clickable { cursor: pointer; }
+.clickable:hover { background: rgba(255,255,255,0.02); }
+
+.arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  color: rgba(170,165,188,0.4);
+}
+.arrow.open { transform: rotate(180deg); }
+
+.material-icon {
+  font-size: 14px;
+  color: rgba(170,165,188,0.5);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.setting-row:last-child { border-bottom: none; }
+
+.setting-row label {
+  font-size: 12px;
+  color: rgba(228,226,240,0.7);
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+
+.setting-input-sm {
+  background: rgba(18,18,28,0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: #e4e2f0;
+  outline: none;
+  width: 120px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+.setting-input-sm:focus {
+  border-color: rgba(167,139,250,0.35);
+}
+
+.setting-input-text {
+  background: rgba(18,18,28,0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: #e4e2f0;
+  outline: none;
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  transition: border-color 0.2s;
+}
+.setting-input-text:focus {
+  border-color: rgba(167,139,250,0.35);
+}
+.setting-input-text::placeholder {
+  color: rgba(170,165,188,0.3);
+}
+
+select.setting-input-sm {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23a9a4b8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+  cursor: pointer;
+}
+
+select.setting-input-sm option {
+  background: #121218;
+  color: #e4e2f0;
+}
+
+.input-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.icon-btn {
+  background: rgba(18,18,28,0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.icon-btn:hover {
+  background: rgba(167,139,250,0.1);
+  border-color: rgba(167,139,250,0.2);
+}
+
+.toggle {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s;
+}
+.toggle:checked {
+  background: #7c3aed;
+}
+.toggle:checked::after {
+  transform: translateX(16px);
+}

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <title>AI Chattr</title>
+  <link rel="stylesheet" href="launcher.css">
+</head>
+<body>
+
+  <!-- Custom titlebar (frameless window) -->
+  <div id="titlebar">
+    <div id="titlebar-text">AI Chattr</div>
+    <div id="titlebar-controls">
+      <button id="btn-minimize" title="Minimize">&#x2500;</button>
+      <button id="btn-close" title="Close">&#x2715;</button>
+    </div>
+  </div>
+
+  <!-- Scrollable main content -->
+  <div id="content">
+
+    <!-- Logo + heading -->
+    <div id="header">
+      <div id="logo">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a78bfa"/>
+              <stop offset="100%" stop-color="#7c3aed"/>
+            </linearGradient>
+          </defs>
+          <path d="M20 2 L24.5 14.5 L37 14.5 L27 22.5 L30.5 36 L20 28 L9.5 36 L13 22.5 L3 14.5 L15.5 14.5 Z"
+                fill="url(#logoGrad)" stroke="rgba(167,139,250,0.3)" stroke-width="0.5"/>
+        </svg>
+      </div>
+      <h1>AI Chattr</h1>
+      <p id="subtitle">Multi-Agent AI Command Center</p>
+    </div>
+
+    <!-- Server section -->
+    <div class="section" id="server-section">
+      <div class="section-header">
+        <span class="dot" id="server-dot"></span>
+        <span class="section-title">Server</span>
+        <span id="server-status-text" class="status-label">Stopped</span>
+      </div>
+      <div class="section-body">
+        <div id="port-display">Port: 8300</div>
+        <button id="btn-server" class="primary-btn">Start Server</button>
+      </div>
+    </div>
+
+    <!-- Connections section -->
+    <div class="section" id="connections-section">
+      <div class="section-header">
+        <span class="section-title">Connections</span>
+      </div>
+      <div id="providers">
+        <!-- Provider cards injected by launcher.js -->
+      </div>
+    </div>
+
+    <!-- Settings section (collapsible) -->
+    <div class="section" id="settings-section">
+      <div class="section-header clickable" id="settings-toggle">
+        <span class="material-icon">&#x2699;</span>
+        <span class="section-title">Settings</span>
+        <span id="settings-arrow" class="arrow">&#x25BC;</span>
+      </div>
+      <div id="settings-body" class="section-body" style="display:none">
+        <div class="setting-row">
+          <label>Port</label>
+          <input type="number" id="setting-port" value="8300" min="1024" max="65535" class="setting-input-sm">
+        </div>
+        <div class="setting-row">
+          <label>Default Workspace</label>
+          <div class="input-row">
+            <input type="text" id="setting-workspace" placeholder="/path/to/project" class="setting-input-text">
+            <button id="btn-pick-folder" class="icon-btn" title="Browse">&#128193;</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label>Python Path</label>
+          <input type="text" id="setting-python" placeholder="Auto-detect" class="setting-input-text">
+        </div>
+        <div class="setting-row">
+          <label>Platform</label>
+          <select id="setting-platform" class="setting-input-sm">
+            <option value="auto">Auto-detect</option>
+            <option value="windows">Windows (Native)</option>
+            <option value="wsl">Windows (WSL)</option>
+            <option value="macos">macOS</option>
+            <option value="linux">Linux</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label>Theme</label>
+          <select id="setting-theme" class="setting-input-sm">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label>Start server on launch</label>
+          <input type="checkbox" id="setting-autostart" class="toggle">
+        </div>
+        <div class="setting-row">
+          <label>Update Channel</label>
+          <select id="setting-update-channel" class="setting-input-sm">
+            <option value="stable">Stable</option>
+            <option value="beta">Beta</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update section -->
+    <div class="section" id="update-section">
+      <div class="section-header">
+        <span class="section-title">Updates</span>
+      </div>
+      <div class="section-body">
+        <div id="update-status">Checking...</div>
+        <div id="update-progress" style="display:none">
+          <div id="progress-bar"><div id="progress-fill"></div></div>
+          <span id="progress-text">0%</span>
+        </div>
+        <button id="btn-update" style="display:none" class="secondary-btn">Download Update</button>
+        <button id="btn-restart" style="display:none" class="primary-btn">Restart to Apply</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <span id="version">v1.0.3</span>
+    <span id="footer-status">Ready</span>
+  </div>
+
+  <script src="launcher.js"></script>
+</body>
+</html>

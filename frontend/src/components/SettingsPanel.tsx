@@ -131,18 +131,30 @@ export function SettingsPanel() {
 
         {/* Theme */}
         <SettingField label="Theme">
-          <div className="flex items-center gap-2">
-            {(['dark', 'light'] as const).map((t) => (
+          <div className="grid grid-cols-3 gap-1.5">
+            {([
+              { id: 'dark', label: 'Dark', color: '#a78bfa' },
+              { id: 'light', label: 'Light', color: '#6d28d9' },
+              { id: 'cyberpunk', label: 'Cyberpunk', color: '#ff00ff' },
+              { id: 'terminal', label: 'Terminal', color: '#00ff41' },
+              { id: 'ocean', label: 'Ocean', color: '#22d3ee' },
+              { id: 'sunset', label: 'Sunset', color: '#f97316' },
+              { id: 'midnight', label: 'Midnight', color: '#818cf8' },
+              { id: 'rosegold', label: 'Rose Gold', color: '#f43f5e' },
+              { id: 'arctic', label: 'Arctic', color: '#60a5fa' },
+            ] as const).map((t) => (
               <button
-                key={t}
-                onClick={() => applyInstant({ theme: t })}
-                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                  display.theme === t
-                    ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
+                key={t.id}
+                onClick={() => applyInstant({ theme: t.id as Settings['theme'] })}
+                className={`py-2 px-1 rounded-lg text-[10px] font-medium transition-all ${
+                  display.theme === t.id
+                    ? 'ring-1 ring-primary/30'
                     : 'bg-surface-container/40 text-on-surface-variant/40 hover:text-on-surface-variant/60'
                 }`}
+                style={display.theme === t.id ? { background: `${t.color}15`, color: t.color } : undefined}
               >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: t.color }} />
+                {t.label}
               </button>
             ))}
           </div>

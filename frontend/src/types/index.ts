@@ -96,7 +96,7 @@ export interface StatsSections {
 export interface Settings {
   username: string;
   title: string;
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'cyberpunk' | 'terminal' | 'ocean' | 'sunset' | 'midnight' | 'rosegold' | 'arctic';
   fontSize: number;
   loopGuard: number;
   notificationSounds: boolean;
