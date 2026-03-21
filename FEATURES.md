@@ -429,3 +429,177 @@
 - NSIS installer with desktop shortcut
 - Auto-update support
 - Bundles Python backend + Node frontend
+
+---
+
+## PHASE 6: Cross-Platform Support & First-Run Experience
+*Goal: Run anywhere — Windows, Mac, Linux. Auto-detect and configure.*
+
+### 6.1 Platform Detection & First-Run Wizard
+**What:** On first launch, detect the OS/shell and guide setup.
+**First-run screen:**
+- Auto-detect: Windows (PowerShell/CMD), WSL, macOS, Linux
+- Show detected platform with confirmation
+- If WSL detected: explain path translation (C:\ → /mnt/c/)
+- If macOS: use native folder picker (osascript)
+- If Linux: use zenity/kdialog folder picker
+- Store platform preference in settings.json
+
+### 6.2 Shell-Aware Agent Launching
+**What:** Launch agents correctly per platform.
+**How:**
+- Windows native: Use `cmd /c` or PowerShell to spawn agents
+- WSL: Use tmux (current approach)
+- macOS: Use tmux or screen
+- Linux: Use tmux or screen
+- Auto-install tmux if missing (prompt user)
+- Platform-specific wrapper_win.py, wrapper_mac.py alongside wrapper_unix.py
+
+### 6.3 OAuth Integration (Per Platform)
+**What:** Connect agent subscriptions instead of API keys.
+**Providers:**
+- Anthropic (Claude Max/Pro) — `claude auth login`
+- OpenAI (ChatGPT Plus/Pro) — `codex auth login` or API key
+- Google (Gemini) — `gemini auth login` or Google OAuth
+- xAI (Grok) — API key
+- GitHub (Copilot) — `gh auth login`
+**Per-platform considerations:**
+- Browser-based OAuth: detect default browser per OS
+- WSL: use `wslview` or `powershell.exe Start-Process` to open URLs
+- Headless/SSH: show URL + code for manual auth
+- Store auth status in settings, show green checkmarks
+
+### 6.4 Package Managers & Install Scripts
+**What:** One-command install per platform.
+**Targets:**
+- `pip install aichttr` (PyPI)
+- `npm install -g aichttr` (npm)
+- `brew install aichttr` (Homebrew for macOS)
+- `winget install aichttr` (Windows)
+- Docker image: `docker run -p 8300:8300 aichttr`
+- One-liner: `curl -fsSL https://aichttr.dev/install.sh | sh`
+
+### 6.5 Desktop App Installers
+**What:** Native installers per platform.
+- Windows: .exe installer (Electron + electron-builder NSIS)
+- macOS: .dmg (Electron + electron-builder)
+- Linux: .AppImage + .deb (Electron + electron-builder)
+- Auto-update via electron-updater
+- System tray icon with quick actions
+
+---
+
+## QUALITY STANDARDS (ALL PHASES)
+
+### Testing Protocol (Mandatory before any feature ships)
+1. **Fail Test** — Deliberately trigger edge cases and errors. Verify graceful handling.
+2. **Fix Test** — Apply the fix. Verify the specific bug is resolved.
+3. **Smoke Test** — Quick pass through all related features. Nothing else broke.
+4. **Stress Test** — High volume: 100+ messages, 5+ agents, rapid @mentions, concurrent users.
+
+### Performance Targets
+- Page load: < 2 seconds
+- Message send-to-display: < 200ms
+- Agent spawn: < 5 seconds
+- WebSocket reconnect: < 3 seconds
+- Memory usage: < 200MB for server + 3 agents
+
+### Accessibility
+- Keyboard navigation for all actions
+- Screen reader support (ARIA labels)
+- High contrast mode
+- Reduced motion option
+
+### Security
+- No personal data in distributed code (verified via grep scan)
+- Settings stored locally only
+- No telemetry or tracking
+- API keys never logged or transmitted
+- OAuth tokens stored securely per OS keychain
+
+---
+
+## PHASE 7: Agent Skills System
+*Goal: Install, manage, and configure skills per agent — like plugins for AI.*
+
+### 7.1 Skills Registry & Discovery
+**What:** Browse, search, and install skills from a catalog.
+**Built-in universal skills (ship with app):**
+- **Web Search** — Search the web via Brave/DuckDuckGo API
+- **Web Fetch** — Fetch and extract content from URLs
+- **File Browser** — Navigate and read project files
+- **Git Operations** — git status, diff, commit, branch, PR via `gh`
+- **Shell Execute** — Run shell commands (with approval gates)
+- **Code Analysis** — AST parsing, dependency scanning, lint
+- **Screenshot** — Capture screenshots of URLs or localhost
+- **Image Analysis** — Analyze images with vision models
+- **PDF Reader** — Extract text/data from PDFs
+- **Weather** — Current weather and forecasts
+- **Calculator** — Math expressions and unit conversions
+- **Timer/Reminder** — Set timers and reminders
+- **Note Taking** — Create and manage persistent notes
+- **Clipboard** — Read/write system clipboard
+
+**Bridged from OpenClaw (adapted for standalone):**
+- **GitHub Issues** — Fetch issues, create PRs, review code
+- **Healthcheck** — System security audit and hardening
+- **Session Logs** — Search and analyze conversation history
+- **Stitch Design** — Generate UI designs via Stitch MCP
+- **Figma** — Analyze Figma designs and export assets
+- **Web Perf** — Lighthouse audits and Core Web Vitals
+- **Accessibility Auditor** — WCAG 2.1 compliance checking
+- **Crypto Trading** — Portfolio and trade management (if configured)
+
+**How skills work:**
+- Each skill = a folder with `skill.json` (metadata) + implementation files
+- Skills are MCP tools that get injected into the agent's MCP config
+- Skills can be Python scripts, Node scripts, or MCP server endpoints
+- Skills directory: `~/.aichttr/skills/` (global) + `./skills/` (per-project)
+
+### 7.2 Per-Agent Skill Configuration
+**What:** Each agent has its own set of enabled/disabled skills.
+**How:**
+- Settings stored in `settings.json` under `agentSkills: { "claude": ["web-search", "git-ops"], "codex": ["shell-exec", "file-browser"] }`
+- Agent Info Panel → Skills tab → toggle list
+- When spawning agent, inject enabled skills into MCP config
+- Skills can have per-agent configuration (e.g., API keys, default paths)
+
+### 7.3 Skills Management UI
+**What:** Full skills browser in the app.
+**UI Components:**
+- **Skills Panel** (sidebar) — categorized list of all available skills
+- **Categories:** Development, Research, Communication, System, Creative, Data
+- **Search bar** with fuzzy matching
+- **Filter chips:** Installed / Available / Enabled / Category
+- **Sort:** Name / Category / Recently Used / Most Popular
+- **Skill Card:** icon, name, description, category, install/enable toggle
+- **Skill Detail Modal:** full description, configuration options, per-agent toggles, usage stats
+
+### 7.4 Skill Installation & Updates
+**What:** Install new skills from the community or create custom ones.
+**Sources:**
+- Built-in skills (bundled with app)
+- ClawHub marketplace (if available): `aichttr skill install web-search`
+- Git repos: `aichttr skill install https://github.com/user/skill-name`
+- Local folders: `aichttr skill install ./my-custom-skill`
+**Updates:**
+- `aichttr skill update` — update all installed skills
+- Auto-check for updates on app start (optional)
+- Version pinning support
+
+### 7.5 Custom Skill Creator
+**What:** Create your own skills from the UI.
+**Wizard:**
+1. Name, description, category, icon
+2. Choose implementation type: Python / Node / Shell / MCP endpoint
+3. Define inputs (parameters) and outputs
+4. Write/paste the implementation code
+5. Test in sandbox before enabling
+6. Save to `~/.aichttr/skills/my-skill/`
+
+### 7.6 Skill Marketplace (Future)
+**What:** Community-driven skill sharing.
+- Browse community skills with ratings and reviews
+- One-click install
+- Verified/trusted publisher badges
+- Dependency resolution

@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { CodeBlock } from './CodeBlock';
 import { DecisionCard } from './DecisionCard';
 import { JobProposal } from './JobProposal';
+import { ProgressCard } from './ProgressCard';
 import { AgentIcon } from './AgentIcon';
 import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
@@ -117,6 +118,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   const decision = metadata.decision as { title: string; description: string; choices: { label: string; value: string }[]; resolved?: string } | undefined;
   const proposal = metadata.proposal as { title: string; assignee: string; description: string; accepted?: boolean } | undefined;
+  const progress = metadata.progress as { steps: { label: string; status: 'done' | 'active' | 'pending' }[]; current: number; total: number; title?: string } | undefined;
 
   const handlePin = async () => {
     try { await api.pinMessage(message.id, !message.pinned); pinMessage(message.id, !message.pinned); } catch {}
@@ -190,6 +192,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ code: MdCode, p: MdParagraph }}>{highlightedText}</ReactMarkdown>
           </div>
           <Attachments attachments={attachments} />
+          {progress && <ProgressCard steps={progress.steps} current={progress.current} total={progress.total} title={progress.title} />}
           {decision && <DecisionCard title={decision.title} description={decision.description} choices={decision.choices} resolved={decision.resolved} onChoose={() => {}} />}
           {proposal && <JobProposal title={proposal.title} assignee={proposal.assignee} description={proposal.description} accepted={proposal.accepted} onAccept={() => {}} onDismiss={() => {}} />}
         </div>

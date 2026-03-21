@@ -14,12 +14,15 @@ function AgentChip({ agent }: { agent: Agent }) {
   const isOnline = agent.state === 'active' || agent.state === 'thinking' || agent.state === 'idle';
   const isThinking = agent.state === 'thinking';
   const isOffline = agent.state === 'offline';
+  const isPaused = agent.state === 'paused';
 
   const handleAction = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setBusy(true);
     try {
-      if (isOnline) {
+      if (isPaused) {
+        await api.resumeAgent(agent.name);
+      } else if (isOnline) {
         await api.killAgent(agent.name);
       } else {
         await api.spawnAgent(agent.base, agent.label, agent.workspace || '.', agent.args || []);
@@ -34,19 +37,11 @@ function AgentChip({ agent }: { agent: Agent }) {
   return (
     <>
       <div
-        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all cursor-pointer group ${
+        className={`agent-chip relative flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all cursor-pointer group ${
           isThinking ? 'agent-chip-thinking' : ''
-        } ${isOffline ? 'opacity-45' : ''}`}
+        }`}
         style={{
           '--agent-color': agent.color,
-          background: isOnline
-            ? `color-mix(in srgb, ${agent.color} 10%, rgba(17,17,25,0.8))`
-            : 'rgba(17,17,25,0.4)',
-          border: isThinking
-            ? `1.5px solid color-mix(in srgb, ${agent.color} 40%, transparent)`
-            : isOnline
-              ? `1px solid color-mix(in srgb, ${agent.color} 15%, transparent)`
-              : '1px solid rgba(255,255,255,0.04)',
         } as React.CSSProperties}
         onClick={() => setShowInfo(true)}
       >
@@ -54,30 +49,32 @@ function AgentChip({ agent }: { agent: Agent }) {
         {isThinking && <div className="agent-spin-border" style={{ borderRadius: '16px' }} />}
 
         <div className="relative shrink-0">
-          <AgentIcon base={agent.base} color={isOffline ? '#3a3548' : agent.color} size={34} />
+          <AgentIcon base={agent.base} color={isOffline ? '#8880a0' : agent.color} size={32} />
           <div
-            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 transition-all ${
+            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface transition-all ${
               isThinking
                 ? 'bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]'
                 : isOnline
                   ? 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.5)]'
-                  : 'bg-gray-600'
+                  : isPaused
+                    ? 'bg-orange-400'
+                    : 'bg-on-surface-variant/30'
             }`}
-            style={{ borderColor: '#08080f' }}
           />
         </div>
 
         <div className="min-w-0">
-          <div
-            className="text-[12px] font-bold leading-tight truncate"
-            style={{ color: isOffline ? '#7a7590' : agent.color }}
-          >
-            {agent.label}
+          <div className="text-[12px] font-bold leading-tight truncate" style={{
+            color: isOffline ? undefined : agent.color,
+          }}>
+            <span className={isOffline ? 'text-on-surface-variant' : undefined}>
+              {agent.label}
+            </span>
           </div>
-          <div className={`text-[10px] leading-tight truncate ${
-            isThinking ? 'text-yellow-400/80' : isOffline ? 'text-on-surface-variant/40' : 'text-on-surface-variant/50'
+          <div className={`text-[10px] leading-tight truncate font-medium ${
+            isThinking ? 'text-yellow-400' : isPaused ? 'text-orange-400' : isOnline ? 'text-green-400/70' : 'text-on-surface-variant/60'
           }`}>
-            {isThinking ? 'Thinking...' : isOffline ? 'Offline' : 'Online'}
+            {isThinking ? 'Thinking...' : isPaused ? 'Paused' : isOffline ? 'Offline' : 'Online'}
           </div>
         </div>
 
@@ -86,14 +83,16 @@ function AgentChip({ agent }: { agent: Agent }) {
           onClick={handleAction}
           disabled={busy}
           className={`w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0 ${
-            isOnline
-              ? 'hover:bg-red-500/15 text-red-400/50 hover:text-red-400'
-              : 'hover:bg-green-500/15 text-green-400/50 hover:text-green-400'
+            isPaused
+              ? 'hover:bg-green-500/15 text-green-400/60 hover:text-green-400'
+              : isOnline
+                ? 'hover:bg-red-500/15 text-red-400/60 hover:text-red-400'
+                : 'hover:bg-green-500/15 text-green-400/60 hover:text-green-400'
           } disabled:opacity-30`}
-          title={isOnline ? 'Stop' : 'Launch'}
+          title={isPaused ? 'Resume' : isOnline ? 'Stop' : 'Launch'}
         >
           <span className="material-symbols-outlined text-[16px]">
-            {busy ? 'hourglass_empty' : isOnline ? 'stop_circle' : 'play_circle'}
+            {busy ? 'hourglass_empty' : isPaused ? 'play_circle' : isOnline ? 'stop_circle' : 'play_circle'}
           </span>
         </button>
       </div>

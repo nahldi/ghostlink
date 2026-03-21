@@ -17,7 +17,7 @@ export function AgentStatusPill({ agent }: { agent: Agent }) {
         } hover:bg-surface-container-high/30`}
       >
         <div className="relative">
-          <AgentIcon base={agent.base} color={isOffline ? '#3a3548' : agent.color} size={32} />
+          <AgentIcon base={agent.base} color={isOffline ? '#6b6580' : agent.color} size={32} />
           <div
             className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-[1.5px] transition-all ${
               isOnline ? 'bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.5)]' : 'bg-gray-600'
@@ -26,10 +26,10 @@ export function AgentStatusPill({ agent }: { agent: Agent }) {
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div className={`text-xs font-semibold truncate ${isOffline ? 'text-on-surface-variant/30' : 'text-on-surface'}`}>
+          <div className={`text-xs font-semibold truncate ${isOffline ? 'text-on-surface-variant/50' : 'text-on-surface'}`}>
             {agent.label}
           </div>
-          <div className={`text-[10px] truncate ${isOffline ? 'text-on-surface-variant/20' : 'text-on-surface-variant/40'}`}>
+          <div className={`text-[10px] truncate ${isOffline ? 'text-on-surface-variant/40' : 'text-on-surface-variant/40'}`}>
             {isOffline ? 'Offline' : agent.role || providerTag(agent.base)}
           </div>
         </div>

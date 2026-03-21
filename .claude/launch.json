@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\skull\\Openclaw\\MainBot\\projects\\aichttr\\aichttrr\\frontend && npx vite --port 5174"],
+      "port": 5174
+    }
+  ]
+}

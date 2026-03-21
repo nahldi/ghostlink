@@ -51,6 +51,9 @@ export const api = {
   deleteChannel: (name: string) =>
     request('/api/channels/' + name, { method: 'DELETE' }),
 
+  renameChannel: (name: string, newName: string) =>
+    request('/api/channels/' + name, { method: 'PATCH', body: JSON.stringify({ name: newName }) }),
+
   getJobs: (channel?: string, status?: string) => {
     const params = new URLSearchParams();
     if (channel) params.set('channel', channel);
@@ -102,4 +105,17 @@ export const api = {
 
   killAgent: (name: string) =>
     request<{ ok: boolean }>('/api/kill-agent/' + name, { method: 'POST' }),
+
+  pauseAgent: (name: string) =>
+    request<{ ok: boolean }>('/api/agents/' + name + '/pause', { method: 'POST' }),
+
+  resumeAgent: (name: string) =>
+    request<{ ok: boolean }>('/api/agents/' + name + '/resume', { method: 'POST' }),
+
+  searchMessages: (q: string, channel?: string, sender?: string) =>
+    request<{ results: import('../types').Message[]; query: string }>(
+      '/api/search?q=' + encodeURIComponent(q) +
+      (channel ? '&channel=' + encodeURIComponent(channel) : '') +
+      (sender ? '&sender=' + encodeURIComponent(sender) : '')
+    ),
 };

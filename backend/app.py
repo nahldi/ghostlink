@@ -31,6 +31,7 @@ from registry import AgentRegistry
 from router import MessageRouter
 from jobs import JobStore
 from rules import RuleStore
+from skills import SkillsRegistry
 import mcp_bridge
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # ── Global state ────────────────────────────────────────────────────
 
 store: MessageStore
+skills_registry: SkillsRegistry
 job_store: JobStore
 rule_store: RuleStore
 registry = AgentRegistry()
@@ -100,6 +102,51 @@ def _save_settings():
         json.dump(_settings, f, indent=2)
 
 
+def _get_full_agent_list() -> list[dict]:
+    """Get ALL agents — live from registry + offline from config. Never loses agents."""
+    live = registry.get_public_list()
+    live_names = {a["name"] for a in live}
+    live_bases = {a["base"] for a in live}
+    agents_cfg = CONFIG.get("agents", {})
+
+    # Enrich live agents
+    for a in live:
+        cfg = agents_cfg.get(a.get("base", ""), {})
+        cwd_raw = cfg.get("cwd", ".")
+        cwd_path = str((BASE_DIR / cwd_raw).resolve()) if not Path(cwd_raw).is_absolute() else cwd_raw
+        a["workspace"] = cwd_path
+        a["command"] = cfg.get("command", a.get("base", ""))
+        a["args"] = cfg.get("args", [])
+
+    # Add persistent agents from settings
+    for pa in _settings.get("persistentAgents", []):
+        if pa["base"] not in agents_cfg and pa["base"] not in live_bases:
+            agents_cfg[pa["base"]] = {
+                "command": pa.get("command", pa["base"]),
+                "label": pa.get("label", pa["base"].capitalize()),
+                "color": pa.get("color", "#a78bfa"),
+                "cwd": pa.get("cwd", "."),
+                "args": pa.get("args", []),
+            }
+
+    # Add offline agents from config
+    for name, cfg in agents_cfg.items():
+        if name not in live_names and name not in live_bases:
+            cwd_raw = cfg.get("cwd", ".")
+            cwd_path = str((BASE_DIR / cwd_raw).resolve()) if not Path(cwd_raw).is_absolute() else cwd_raw
+            live.append({
+                "name": name, "base": name,
+                "label": cfg.get("label", name.capitalize()),
+                "color": cfg.get("color", "#a78bfa"),
+                "slot": 0, "state": "offline",
+                "registered_at": 0, "role": "",
+                "workspace": cwd_path,
+                "command": cfg.get("command", name),
+                "args": cfg.get("args", []),
+            })
+    return live
+
+
 # ── Mention routing ─────────────────────────────────────────────────
 
 def _route_mentions(sender: str, text: str, channel: str):
@@ -119,6 +166,9 @@ def _route_mentions(sender: str, text: str, channel: str):
 
     # Loop guard via router
     targets = router.get_targets(sender, text, channel, agent_names)
+
+    # Skip paused agents
+    targets = [t for t in targets if not (registry.get(t) and registry.get(t).state == "paused")]
 
     for target in targets:
         queue_file = DATA_DIR / f"{target}_queue.jsonl"
@@ -150,7 +200,7 @@ async def broadcast(event_type: str, data: dict):
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global store, job_store, rule_store
+    global store, job_store, rule_store, skills_registry
 
     _load_settings()
 
@@ -164,6 +214,7 @@ async def lifespan(_app: FastAPI):
     await job_store.init()
     rule_store = RuleStore(db)
     await rule_store.init()
+    skills_registry = SkillsRegistry(DATA_DIR)
 
     # Broadcast new messages via WebSocket
     async def on_msg(msg: dict):
@@ -262,7 +313,7 @@ async def send_message(request: Request):
     if inst and inst.state == "thinking":
         inst.state = "active"
         inst._think_ts = 0  # type: ignore[attr-defined]
-        await broadcast("status", {"agents": registry.get_public_list()})
+        await broadcast("status", {"agents": _get_full_agent_list()})
 
     return msg
 
@@ -323,56 +374,30 @@ async def upload_image(file: UploadFile = File(...)):
 
 @app.get("/api/status")
 async def get_status():
-    live = registry.get_public_list()
-    live_names = {a["name"] for a in live}
-    live_bases = {a["base"] for a in live}
-
-    # Merge config from config.toml + persistent agents from settings
-    agents_cfg = dict(CONFIG.get("agents", {}))
-    for pa in _settings.get("persistentAgents", []):
-        if pa["base"] not in agents_cfg:
-            agents_cfg[pa["base"]] = {
-                "command": pa.get("command", pa["base"]),
-                "label": pa.get("label", pa["base"].capitalize()),
-                "color": pa.get("color", "#a78bfa"),
-                "cwd": pa.get("cwd", "."),
-                "args": pa.get("args", []),
-            }
-
-    # Enrich live agents with config info
-    for a in live:
-        cfg = agents_cfg.get(a.get("base", ""), {})
-        cwd_raw = cfg.get("cwd", ".")
-        cwd_path = (BASE_DIR / cwd_raw).resolve() if not Path(cwd_raw).is_absolute() else Path(cwd_raw)
-        a["workspace"] = str(cwd_path)
-        a["command"] = cfg.get("command", a.get("base", ""))
-        a["args"] = cfg.get("args", [])
-
-    # Add offline agents from config + persistent that aren't live
-    for name, cfg in agents_cfg.items():
-        if name not in live_names and name not in live_bases:
-            cwd_raw = cfg.get("cwd", ".")
-            cwd_path = (BASE_DIR / cwd_raw).resolve() if not Path(cwd_raw).is_absolute() else Path(cwd_raw)
-            live.append({
-                "name": name,
-                "base": name,
-                "label": cfg.get("label", name.capitalize()),
-                "color": cfg.get("color", "#a78bfa"),
-                "slot": 0,
-                "state": "offline",
-                "registered_at": 0,
-                "role": "",
-                "workspace": str(cwd_path),
-                "command": cfg.get("command", name),
-                "args": cfg.get("args", []),
-            })
-
-    return {"agents": live}
+    return {"agents": _get_full_agent_list()}
 
 
 @app.get("/api/settings")
 async def get_settings():
-    return _settings
+    # Merge config.toml agents into persistentAgents if not already there
+    result = dict(_settings)
+    persistent = list(result.get("persistentAgents", []))
+    persistent_bases = {p["base"] for p in persistent}
+    agents_cfg = CONFIG.get("agents", {})
+    for name, cfg in agents_cfg.items():
+        if name not in persistent_bases:
+            cwd_raw = cfg.get("cwd", ".")
+            cwd_resolved = str((BASE_DIR / cwd_raw).resolve()) if not Path(cwd_raw).is_absolute() else cwd_raw
+            persistent.append({
+                "base": name,
+                "label": cfg.get("label", name.capitalize()),
+                "command": cfg.get("command", name),
+                "args": cfg.get("args", []),
+                "cwd": cwd_resolved,
+                "color": cfg.get("color", "#a78bfa"),
+            })
+    result["persistentAgents"] = persistent
+    return result
 
 
 @app.post("/api/settings")
@@ -425,6 +450,31 @@ async def delete_channel(name: str):
     return {"channels": channels}
 
 
+@app.patch("/api/channels/{name}")
+async def rename_channel(name: str, request: Request):
+    body = await request.json()
+    new_name = body.get("name", "").strip().lower()
+    if not new_name or len(new_name) > 20:
+        return JSONResponse({"error": "invalid name"}, 400)
+    channels = _settings.get("channels", ["general"])
+    if name not in channels:
+        return JSONResponse({"error": "not found"}, 404)
+    if new_name in channels:
+        return JSONResponse({"error": "name already exists"}, 409)
+    idx = channels.index(name)
+    channels[idx] = new_name
+    _settings["channels"] = channels
+    _save_settings()
+    # Update messages in the renamed channel
+    await store._db.execute(
+        "UPDATE messages SET channel = ? WHERE channel = ?",
+        (new_name, name),
+    )
+    await store._db.commit()
+    await broadcast("channel_update", {"channels": [{"name": c, "unread": 0} for c in channels]})
+    return {"channels": channels}
+
+
 # ── Agent Registry ──────────────────────────────────────────────────
 
 @app.post("/api/register")
@@ -436,7 +486,7 @@ async def register_agent(request: Request):
     if not base:
         return JSONResponse({"error": "base required"}, 400)
     inst = registry.register(base, label, color)
-    await broadcast("status", {"agents": registry.get_public_list()})
+    await broadcast("status", {"agents": _get_full_agent_list()})
     return inst.to_dict()
 
 
@@ -444,7 +494,7 @@ async def register_agent(request: Request):
 async def deregister_agent(name: str):
     ok = registry.deregister(name)
     if ok:
-        await broadcast("status", {"agents": registry.get_public_list()})
+        await broadcast("status", {"agents": _get_full_agent_list()})
     return {"ok": ok}
 
 
@@ -466,20 +516,35 @@ async def agent_templates():
             "defaultArgs": cfg.get("args", []),
             "available": available,
         })
-    # Also add known CLIs not in config
-    for name, cmd, label, color in [
-        ("claude", "claude", "Claude", "#e8734a"),
-        ("codex", "codex", "Codex", "#10a37f"),
-        ("gemini", "gemini", "Gemini", "#4285f4"),
-    ]:
+    # Scan for all known AI CLI agents
+    KNOWN_AGENTS = [
+        ("claude", "claude", "Claude", "#e8734a", "Anthropic", ["--dangerously-skip-permissions"]),
+        ("codex", "codex", "Codex", "#10a37f", "OpenAI", ["--sandbox", "danger-full-access", "-a", "never"]),
+        ("gemini", "gemini", "Gemini", "#4285f4", "Google", ["-y"]),
+        ("grok", "grok", "Grok", "#ff6b35", "xAI", []),
+        ("copilot", "github-copilot", "Copilot", "#6cc644", "GitHub", []),
+        ("aider", "aider", "Aider", "#14b8a6", "Aider", ["--yes"]),
+        ("goose", "goose", "Goose", "#f59e0b", "Block", []),
+        ("pi", "pi", "Pi", "#8b5cf6", "Inflection", []),
+        ("cursor", "cursor", "Cursor", "#7c3aed", "Cursor", []),
+        ("cody", "cody", "Cody", "#ff5543", "Sourcegraph", []),
+        ("continue", "continue", "Continue", "#0ea5e9", "Continue", []),
+        ("opencode", "opencode", "OpenCode", "#22c55e", "OpenCode", []),
+    ]
+    for name, cmd, label, color, provider, default_args in KNOWN_AGENTS:
         if not any(t["base"] == name for t in templates):
             import shutil as _shutil
-            if _shutil.which(cmd):
-                templates.append({
-                    "base": name, "command": cmd, "label": label,
-                    "color": color, "defaultCwd": ".", "defaultArgs": [],
-                    "available": True,
-                })
+            available = _shutil.which(cmd) is not None
+            templates.append({
+                "base": name, "command": cmd, "label": label,
+                "color": color, "defaultCwd": ".", "defaultArgs": default_args,
+                "available": available, "provider": provider,
+            })
+        else:
+            # Add provider to existing template
+            for t in templates:
+                if t["base"] == name:
+                    t["provider"] = provider
     return {"templates": templates}
 
 
@@ -544,47 +609,21 @@ async def spawn_agent(request: Request):
     if not _shutil.which(command):
         return JSONResponse({"error": f"'{command}' not found on PATH"}, 400)
 
-    # Update config.toml if cwd or args differ
+    # Update in-memory config for this session (don't overwrite config.toml)
     if cwd or extra_args:
         if base not in CONFIG.get("agents", {}):
             CONFIG.setdefault("agents", {})[base] = {
                 "command": command,
                 "label": label or base.capitalize(),
                 "color": cfg.get("color", "#a78bfa"),
+                "cwd": cwd or ".",
+                "args": extra_args or [],
             }
-        if cwd:
-            CONFIG["agents"][base]["cwd"] = cwd
-        if extra_args:
-            CONFIG["agents"][base]["args"] = extra_args
-
-        # Write config as TOML manually
-        try:
-            lines = []
-            # Server section
-            for section in ["server", "routing", "images", "mcp"]:
-                if section in CONFIG:
-                    lines.append(f"[{section}]")
-                    for k, v in CONFIG[section].items():
-                        if isinstance(v, str):
-                            lines.append(f'{k} = "{v}"')
-                        else:
-                            lines.append(f"{k} = {v}")
-                    lines.append("")
-            # Agents
-            for aname, acfg in CONFIG.get("agents", {}).items():
-                lines.append(f"[agents.{aname}]")
-                for k, v in acfg.items():
-                    if isinstance(v, str):
-                        lines.append(f'{k} = "{v}"')
-                    elif isinstance(v, list):
-                        items = ", ".join(f'"{x}"' for x in v)
-                        lines.append(f"{k} = [{items}]")
-                    else:
-                        lines.append(f"{k} = {v}")
-                lines.append("")
-            CONFIG_PATH.write_text("\n".join(lines), "utf-8")
-        except Exception:
-            pass  # Non-fatal: wrapper still reads existing config
+        else:
+            if cwd:
+                CONFIG["agents"][base]["cwd"] = cwd
+            if extra_args:
+                CONFIG["agents"][base]["args"] = extra_args
 
     # Build the wrapper command
     wrapper_path = str(BASE_DIR / "wrapper.py")
@@ -604,7 +643,8 @@ async def spawn_agent(request: Request):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        _agent_processes[base] = proc
+        # Store by base name — wrapper will register with a unique instance name
+        _agent_processes[f"{base}_{proc.pid}"] = proc
 
         import asyncio
         await asyncio.sleep(3)
@@ -621,11 +661,11 @@ async def spawn_agent(request: Request):
 
 @app.post("/api/kill-agent/{name}")
 async def kill_agent(name: str):
-    """Kill a running agent by deregistering and stopping its tmux session."""
-    # Deregister from the server
+    """Kill a specific agent by name. Only affects the named agent, never others."""
+    # Only deregister this specific agent
     ok = registry.deregister(name)
 
-    # Try to kill the tmux session
+    # Only kill this specific agent's tmux session
     session_name = f"aichttr-{name}"
     try:
         subprocess.run(
@@ -635,7 +675,7 @@ async def kill_agent(name: str):
     except Exception:
         pass
 
-    # Kill the wrapper process if we spawned it
+    # Only kill the wrapper process for THIS agent
     proc = _agent_processes.pop(name, None)
     if proc:
         try:
@@ -644,8 +684,87 @@ async def kill_agent(name: str):
             pass
 
     if ok:
-        await broadcast("status", {"agents": registry.get_public_list()})
+        await broadcast("status", {"agents": _get_full_agent_list()})
     return {"ok": ok or proc is not None}
+
+
+# ── Skills ──────────────────────────────────────────────────────────
+
+@app.get("/api/skills")
+async def list_skills(category: str = "", search: str = ""):
+    """List all available skills, optionally filtered."""
+    skills = skills_registry.get_all_skills()
+    if category:
+        skills = [s for s in skills if s.get("category", "").lower() == category.lower()]
+    if search:
+        q = search.lower()
+        skills = [s for s in skills if q in s["name"].lower() or q in s.get("description", "").lower()]
+    return {"skills": skills, "categories": skills_registry.get_categories()}
+
+
+@app.get("/api/skills/agent/{agent_name}")
+async def get_agent_skills(agent_name: str):
+    """Get enabled skills for a specific agent."""
+    enabled = skills_registry.get_agent_skills(agent_name)
+    all_skills = skills_registry.get_all_skills()
+    result = []
+    for s in all_skills:
+        result.append({**s, "enabled": s["id"] in enabled})
+    return {"skills": result, "agent": agent_name}
+
+
+@app.post("/api/skills/agent/{agent_name}/toggle")
+async def toggle_agent_skill(agent_name: str, request: Request):
+    """Enable or disable a skill for an agent."""
+    body = await request.json()
+    skill_id = body.get("skillId", "")
+    enabled = body.get("enabled", True)
+    if enabled:
+        skills_registry.enable_skill(agent_name, skill_id)
+    else:
+        skills_registry.disable_skill(agent_name, skill_id)
+    return {"ok": True, "agent": agent_name, "skillId": skill_id, "enabled": enabled}
+
+
+@app.post("/api/agents/{name}/pause")
+async def pause_agent(name: str):
+    inst = registry.get(name)
+    if not inst:
+        return JSONResponse({"error": "not found"}, 404)
+    inst.state = "paused"
+    await broadcast("status", {"agents": _get_full_agent_list()})
+    return {"ok": True, "state": "paused"}
+
+
+@app.post("/api/agents/{name}/resume")
+async def resume_agent(name: str):
+    inst = registry.get(name)
+    if not inst:
+        return JSONResponse({"error": "not found"}, 404)
+    inst.state = "active"
+    await broadcast("status", {"agents": _get_full_agent_list()})
+    return {"ok": True, "state": "active"}
+
+
+@app.get("/api/search")
+async def search_messages(q: str = "", channel: str = "", sender: str = "", limit: int = 50):
+    """Full-text search across messages."""
+    if not q.strip():
+        return {"results": []}
+    assert store._db is not None
+    query = "SELECT * FROM messages WHERE text LIKE ? COLLATE NOCASE"
+    params: list = [f"%{q}%"]
+    if channel:
+        query += " AND channel = ?"
+        params.append(channel)
+    if sender:
+        query += " AND sender = ?"
+        params.append(sender)
+    query += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    cursor = await store._db.execute(query, params)
+    rows = await cursor.fetchall()
+    return {"results": [store._row_to_dict(r) for r in rows], "query": q}
 
 
 @app.post("/api/heartbeat/{agent_name}")
@@ -673,25 +792,7 @@ async def heartbeat(agent_name: str, request: Request):
                 inst.state = "active"
         # Broadcast state change so frontend sees thinking glow
         if inst.state != old_state:
-            agents_cfg = CONFIG.get("agents", {})
-            all_agents = registry.get_public_list()
-            live_names = {a["base"] for a in all_agents}
-            for a in all_agents:
-                cfg = agents_cfg.get(a.get("base", ""), {})
-                cwd_raw = cfg.get("cwd", ".")
-                a["workspace"] = str((BASE_DIR / cwd_raw).resolve())
-                a["command"] = cfg.get("command", a.get("base", ""))
-                a["args"] = cfg.get("args", [])
-            for name, cfg in agents_cfg.items():
-                if name not in live_names:
-                    cwd_raw = cfg.get("cwd", ".")
-                    all_agents.append({
-                        "name": name, "base": name, "label": cfg.get("label", name.capitalize()),
-                        "color": cfg.get("color", "#a78bfa"), "slot": 0, "state": "offline",
-                        "registered_at": 0, "role": "", "workspace": str((BASE_DIR / cwd_raw).resolve()),
-                        "command": cfg.get("command", name), "args": cfg.get("args", []),
-                    })
-            await broadcast("status", {"agents": all_agents})
+            await broadcast("status", {"agents": _get_full_agent_list()})
         return {"ok": True, "name": inst.name}
     return JSONResponse({"error": "not found"}, 404)
 

@@ -21,7 +21,7 @@ export function StatsPanel() {
     .slice(0, 5);
 
   return (
-    <div className="w-56 shrink-0 hidden xl:flex flex-col gap-4 py-4 pr-4 overflow-y-auto">
+    <div className="w-56 shrink-0 hidden xl:flex flex-col gap-4 py-4 px-3 overflow-y-auto border-l border-outline-variant/8">
       {/* Status overview */}
       <StatCard title="Session">
         <StatRow label="Agents Online" value={`${onlineAgents.length}/${agents.length}`} color="#4ade80" />

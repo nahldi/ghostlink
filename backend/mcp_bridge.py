@@ -522,6 +522,71 @@ def chat_rules(
     return f"Unknown action: {action}. Valid actions: list, propose."
 
 
+def chat_progress(
+    sender: str,
+    channel: str = "general",
+    title: str = "",
+    steps: list[str] = [],
+    current: int = 0,
+    total: int = 0,
+    message_id: int = 0,
+    ctx: Context | None = None,
+) -> str:
+    """Report progress on a multi-step task. Shows a live-updating progress card in the chat.
+
+    Args:
+        sender: Your agent name
+        channel: Channel to post in
+        title: Short title for the progress (e.g. "Building auth module")
+        steps: List of step labels (e.g. ["Planning", "Coding", "Testing", "Deploying"])
+        current: Current step number (1-indexed)
+        total: Total number of steps
+        message_id: If updating an existing progress card, pass its message ID. 0 = create new.
+    """
+    sender, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
+    if err:
+        return err
+
+    step_data = []
+    for i, label in enumerate(steps):
+        if i + 1 < current:
+            step_data.append({"label": label, "status": "done"})
+        elif i + 1 == current:
+            step_data.append({"label": label, "status": "active"})
+        else:
+            step_data.append({"label": label, "status": "pending"})
+
+    metadata = json.dumps({
+        "progress": {
+            "steps": step_data,
+            "current": current,
+            "total": total or len(steps),
+            "title": title,
+        }
+    })
+
+    if message_id:
+        # Update existing progress message
+        _run_async(_store._db.execute(
+            "UPDATE messages SET metadata = ? WHERE id = ?",
+            (metadata, message_id),
+        ))
+        _run_async(_store._db.commit())
+        # Broadcast update
+        import asyncio
+        # Can't easily broadcast from sync context, so just return
+        return f"Updated progress (id={message_id}): step {current}/{total or len(steps)}"
+
+    msg = _run_async(_store.add(
+        sender=sender,
+        text=title or "Progress",
+        channel=channel,
+        msg_type="progress",
+        metadata=metadata,
+    ))
+    return f"Progress card created (id={msg['id']}): step {current}/{total or len(steps)}"
+
+
 def chat_propose_job(
     sender: str,
     title: str,
@@ -621,7 +686,7 @@ def chat_claim(sender: str, name: str = "", ctx: Context | None = None) -> str:
 
 _ALL_TOOLS = [
     chat_send, chat_read, chat_join, chat_who, chat_channels,
-    chat_rules, chat_propose_job, chat_react, chat_claim,
+    chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim,
 ]
 
 MCP_HTTP_PORT = 8200

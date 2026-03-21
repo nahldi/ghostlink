@@ -92,15 +92,6 @@ export function SettingsPanel() {
           />
         </SettingField>
 
-        {/* App Title */}
-        <SettingField label="App Title">
-          <input
-            type="text"
-            value={display.title}
-            onChange={(e) => updateDraft({ title: e.target.value })}
-            className="setting-input"
-          />
-        </SettingField>
 
         {/* Font size */}
         <SettingField label={`Font Size: ${display.fontSize}px`}>
@@ -112,7 +103,7 @@ export function SettingsPanel() {
             onChange={(e) => updateDraft({ fontSize: Number(e.target.value) })}
             className="w-full accent-primary"
           />
-          <div className="flex justify-between text-[9px] text-on-surface-variant/30 mt-1">
+          <div className="flex justify-between text-[9px] text-on-surface-variant/45 mt-1">
             <span>10px</span><span>24px</span>
           </div>
         </SettingField>
@@ -127,10 +118,10 @@ export function SettingsPanel() {
             onChange={(e) => updateDraft({ loopGuard: Number(e.target.value) })}
             className="w-full accent-primary"
           />
-          <div className="flex justify-between text-[9px] text-on-surface-variant/30 mt-1">
+          <div className="flex justify-between text-[9px] text-on-surface-variant/45 mt-1">
             <span>1</span><span>200</span>
           </div>
-          <p className="text-[10px] text-on-surface-variant/30 mt-1">
+          <p className="text-[10px] text-on-surface-variant/45 mt-1">
             Max agent-to-agent hops before pausing the conversation
           </p>
         </SettingField>
@@ -169,7 +160,7 @@ export function SettingsPanel() {
             className={`w-10 h-5 rounded-full relative transition-all ${
               display.notificationSounds
                 ? 'bg-green-500/80'
-                : 'bg-outline-variant/30'
+                : 'bg-outline-variant/45'
             }`}
           >
             <div
@@ -185,6 +176,12 @@ export function SettingsPanel() {
 
         {/* Persistent Agents */}
         <PersistentAgentsSection />
+
+        {/* Divider */}
+        <div className="h-px bg-outline-variant/8" />
+
+        {/* Supported Agents */}
+        <SupportedAgentsSection />
       </div>
     </div>
   );
@@ -255,7 +252,7 @@ function PersistentAgentsSection() {
       {/* Existing persistent agents */}
       <div className="space-y-2 mb-3">
         {persistent.length === 0 && !adding && (
-          <div className="text-[11px] text-on-surface-variant/30 text-center py-3">
+          <div className="text-[11px] text-on-surface-variant/45 text-center py-3">
             No persistent agents. Add one to always see it in the agent bar.
           </div>
         )}
@@ -264,11 +261,11 @@ function PersistentAgentsSection() {
             <AgentIcon base={pa.base} color={pa.color} size={28} />
             <div className="flex-1 min-w-0">
               <div className="text-[11px] font-semibold" style={{ color: pa.color }}>{pa.label}</div>
-              <div className="text-[9px] text-on-surface-variant/30 font-mono truncate">{pa.cwd}</div>
+              <div className="text-[9px] text-on-surface-variant/45 font-mono truncate">{pa.cwd}</div>
             </div>
             <button
               onClick={() => removeAgent(i)}
-              className="p-1 rounded text-on-surface-variant/20 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+              className="p-1 rounded text-on-surface-variant/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
             </button>
@@ -310,7 +307,7 @@ function PersistentAgentsSection() {
               <button
                 onClick={handlePickFolder}
                 disabled={pickingFolder}
-                className="px-2.5 rounded-lg bg-surface-container/60 border border-outline-variant/8 text-on-surface-variant/40 hover:text-primary text-[12px] shrink-0 disabled:opacity-30"
+                className="px-2.5 rounded-lg bg-surface-container/60 border border-outline-variant/8 text-on-surface-variant/40 hover:text-primary text-[12px] shrink-0 disabled:opacity-50"
               >
                 {pickingFolder ? '...' : '📁'}
               </button>
@@ -322,6 +319,76 @@ function PersistentAgentsSection() {
           >
             Add Persistent Agent
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupportedAgentsSection() {
+  const [templates, setTemplates] = useState<import('../types').AgentTemplate[]>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (open && templates.length === 0) {
+      api.getAgentTemplates().then(r => setTemplates(r.templates)).catch(() => {});
+    }
+  }, [open, templates.length]);
+
+  const installed = templates.filter(t => t.available);
+  const notInstalled = templates.filter(t => !t.available);
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center justify-between w-full py-1"
+      >
+        <span className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">
+          Supported Agents
+        </span>
+        <span className="material-symbols-outlined text-on-surface-variant/45 text-[16px]">
+          {open ? 'expand_less' : 'expand_more'}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-3">
+          {installed.length > 0 && (
+            <div>
+              <div className="text-[9px] text-green-400/50 font-semibold uppercase tracking-wider mb-1.5">Installed</div>
+              <div className="space-y-1">
+                {installed.map(t => (
+                  <div key={t.base} className="flex items-center gap-2.5 py-1.5 px-2 rounded-lg bg-surface-container/20">
+                    <AgentIcon base={t.base} color={t.color} size={22} />
+                    <div className="flex-1">
+                      <span className="text-[11px] font-semibold" style={{ color: t.color }}>{t.label}</span>
+                      <span className="text-[9px] text-on-surface-variant/45 ml-1.5">{t.provider}</span>
+                    </div>
+                    <span className="text-[9px] text-green-400/60 font-medium">Ready</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {notInstalled.length > 0 && (
+            <div>
+              <div className="text-[9px] text-on-surface-variant/45 font-semibold uppercase tracking-wider mb-1.5">Not Installed</div>
+              <div className="space-y-1">
+                {notInstalled.map(t => (
+                  <div key={t.base} className="flex items-center gap-2.5 py-1.5 px-2 rounded-lg opacity-55">
+                    <AgentIcon base={t.base} color={t.color} size={22} />
+                    <div className="flex-1">
+                      <span className="text-[11px] font-medium text-on-surface-variant/50">{t.label}</span>
+                      <span className="text-[9px] text-on-surface-variant/40 ml-1.5">{t.provider}</span>
+                    </div>
+                    <span className="text-[9px] text-on-surface-variant/40 font-mono">{t.command}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] text-on-surface-variant/40 mt-2">Install the CLI to use these agents</p>
+            </div>
+          )}
         </div>
       )}
     </div>

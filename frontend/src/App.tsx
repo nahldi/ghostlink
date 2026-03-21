@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from './stores/chatStore';
 import { useWebSocket } from './hooks/useWebSocket';
 import { api } from './lib/api';
@@ -14,6 +14,7 @@ import { JobsPanel } from './components/JobsPanel';
 import { RulesPanel } from './components/RulesPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StatsPanel } from './components/StatsPanel';
+import { SearchModal } from './components/SearchModal';
 
 function ChatFeed() {
   const messages = useChatStore((s) => s.messages);
@@ -187,7 +188,21 @@ function AppInner() {
   const title = useChatStore((s) => s.settings.title);
   const theme = useChatStore((s) => s.settings.theme);
 
+  const [showSearch, setShowSearch] = useState(false);
+
   useWebSocket();
+
+  // Ctrl+K to open search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Apply font size to root
   useEffect(() => {
@@ -237,9 +252,8 @@ function AppInner() {
 
       <main
         className={`flex flex-col h-screen relative z-10 transition-all overflow-hidden ${
-          sidebarPanel ? 'lg:ml-56 lg:mr-80' : 'lg:ml-56'
+          sidebarPanel ? 'lg:ml-14 lg:mr-80' : 'lg:ml-14'
         }`}
-        style={{ width: '100%' }}
       >
         {/* Top bar: agents + channels */}
         <header className="sticky top-0 z-20 glass max-lg:mt-14">
@@ -256,7 +270,7 @@ function AppInner() {
         <div className="lg:hidden h-14" />
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
             <ChatFeed />
             <TypingIndicator />
             <ScrollArrow />
@@ -271,6 +285,7 @@ function AppInner() {
 
       <RightPanel />
       <MobilePanel />
+      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
     </div>
   );
 }

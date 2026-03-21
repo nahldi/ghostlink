@@ -26,7 +26,7 @@ export interface Agent {
   base: string;
   label: string;
   color: string;
-  state: 'active' | 'idle' | 'pending' | 'offline' | 'thinking';
+  state: 'active' | 'idle' | 'pending' | 'offline' | 'thinking' | 'paused';
   slot: number;
   role?: string;
   workspace?: string;
@@ -97,6 +97,7 @@ export interface AgentTemplate {
   defaultCwd: string;
   defaultArgs: string[];
   available: boolean;
+  provider?: string;
 }
 
 export type WSEvent =

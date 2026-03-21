@@ -29,3 +29,6 @@ memory/
 
 # Build artifacts
 *.tsbuildinfo
+
+# Distributable project copy
+aichttrr/
