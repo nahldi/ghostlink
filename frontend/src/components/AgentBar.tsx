@@ -45,21 +45,22 @@ function AgentChip({ agent }: { agent: Agent }) {
         } as React.CSSProperties}
         onClick={() => setShowInfo(true)}
       >
-        {/* Thinking glow border */}
+        {/* Thinking glow border — uses agent's brand color */}
         {isThinking && <div className="agent-spin-border" style={{ borderRadius: '16px' }} />}
 
         <div className="relative shrink-0">
           <AgentIcon base={agent.base} color={isOffline ? '#8880a0' : agent.color} size={32} />
           <div
-            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface transition-all ${
+            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface transition-all"
+            style={
               isThinking
-                ? 'bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]'
+                ? { backgroundColor: agent.color, boxShadow: `0 0 8px ${agent.color}90` }
                 : isOnline
-                  ? 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.5)]'
+                  ? { backgroundColor: '#4ade80', boxShadow: '0 0 6px rgba(74,222,128,0.5)' }
                   : isPaused
-                    ? 'bg-orange-400'
-                    : 'bg-on-surface-variant/30'
-            }`}
+                    ? { backgroundColor: '#fb923c' }
+                    : { backgroundColor: 'rgba(255,255,255,0.15)' }
+            }
           />
         </div>
 
@@ -72,8 +73,8 @@ function AgentChip({ agent }: { agent: Agent }) {
             </span>
           </div>
           <div className={`text-[10px] leading-tight truncate font-medium ${
-            isThinking ? 'text-yellow-400' : isPaused ? 'text-orange-400' : isOnline ? 'text-green-400/70' : 'text-on-surface-variant/60'
-          }`}>
+            isPaused ? 'text-orange-400' : isOnline && !isThinking ? 'text-green-400/70' : isOffline ? 'text-on-surface-variant/60' : ''
+          }`} style={isThinking ? { color: agent.color, opacity: 0.85 } : undefined}>
             {isThinking ? 'Thinking...' : isPaused ? 'Paused' : isOffline ? 'Offline' : 'Online'}
           </div>
         </div>

@@ -121,27 +121,4 @@ export const api = {
       (channel ? '&channel=' + encodeURIComponent(channel) : '') +
       (sender ? '&sender=' + encodeURIComponent(sender) : '')
     ),
-
-  getActivity: () =>
-    request<{ events: import('../types').ActivityEvent[] }>('/api/activity'),
-
-  reportUsage: (agent: string, input_tokens: number, output_tokens: number, model: string) =>
-    request<any>('/api/usage', {
-      method: 'POST',
-      body: JSON.stringify({ agent, input_tokens, output_tokens, model }),
-    }),
-
-  getUsage: (agent?: string, period?: string) => {
-    const params = new URLSearchParams();
-    if (agent) params.set('agent', agent);
-    if (period) params.set('period', period);
-    const qs = params.toString();
-    return request<any>('/api/usage' + (qs ? '?' + qs : ''));
-  },
-
-  exportChannel: (channel: string, format: string) =>
-    request<any>(`/api/export?channel=${encodeURIComponent(channel)}&format=${encodeURIComponent(format)}`),
-
-  getHierarchy: () =>
-    request<any>('/api/hierarchy'),
 };

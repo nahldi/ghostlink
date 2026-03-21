@@ -32,26 +32,6 @@ MIGRATION_REACTIONS = """
 ALTER TABLE messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '{}';
 """
 
-FTS_SCHEMA = """
-CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
-    text, sender, channel,
-    content='messages',
-    content_rowid='id'
-);
-"""
-
-FTS_TRIGGERS = """
-CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
-    INSERT INTO messages_fts(rowid, text, sender, channel)
-    VALUES (new.id, new.text, new.sender, new.channel);
-END;
-
-CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
-    INSERT INTO messages_fts(messages_fts, rowid, text, sender, channel)
-    VALUES ('delete', old.id, old.text, old.sender, old.channel);
-END;
-"""
-
 
 class MessageStore:
     def __init__(self, db_path: str | Path):
@@ -70,19 +50,6 @@ class MessageStore:
             await self._db.commit()
         except Exception:
             pass  # Column already exists
-
-        # FTS5 full-text search index
-        try:
-            await self._db.executescript(FTS_SCHEMA)
-            await self._db.executescript(FTS_TRIGGERS)
-            await self._db.commit()
-            # Rebuild FTS index from existing data (idempotent)
-            await self._db.execute(
-                "INSERT OR IGNORE INTO messages_fts(messages_fts) VALUES('rebuild')"
-            )
-            await self._db.commit()
-        except Exception:
-            pass  # FTS5 may not be compiled in — fallback to LIKE
 
     async def close(self):
         if self._db:
@@ -201,46 +168,6 @@ class MessageStore:
         )
         await self._db.commit()
         return reactions
-
-    async def search_fts(
-        self,
-        query: str,
-        channel: str = "",
-        sender: str = "",
-        limit: int = 50,
-    ) -> list[dict]:
-        """Full-text search using FTS5 with LIKE fallback."""
-        assert self._db is not None
-        try:
-            # Try FTS5 first
-            fts_query = "SELECT m.* FROM messages m JOIN messages_fts f ON m.id = f.rowid WHERE messages_fts MATCH ?"
-            params: list = [query]
-            if channel:
-                fts_query += " AND m.channel = ?"
-                params.append(channel)
-            if sender:
-                fts_query += " AND m.sender = ?"
-                params.append(sender)
-            fts_query += " ORDER BY m.id DESC LIMIT ?"
-            params.append(limit)
-            cursor = await self._db.execute(fts_query, params)
-            rows = await cursor.fetchall()
-            return [self._row_to_dict(r) for r in rows]
-        except Exception:
-            # LIKE fallback if FTS5 is unavailable
-            like_query = "SELECT * FROM messages WHERE text LIKE ? COLLATE NOCASE"
-            params = [f"%{query}%"]
-            if channel:
-                like_query += " AND channel = ?"
-                params.append(channel)
-            if sender:
-                like_query += " AND sender = ?"
-                params.append(sender)
-            like_query += " ORDER BY id DESC LIMIT ?"
-            params.append(limit)
-            cursor = await self._db.execute(like_query, params)
-            rows = await cursor.fetchall()
-            return [self._row_to_dict(r) for r in rows]
 
     @staticmethod
     def _row_to_dict(row: Any) -> dict:

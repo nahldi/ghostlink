@@ -87,8 +87,10 @@ export function Sidebar() {
         background: '#0a0a10',
         borderRight: '1px solid rgba(255,255,255,0.03)',
       }}>
-        {/* Logo — just branding, no action */}
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+        {/* Logo — toggles channel/nav panel */}
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 cursor-pointer hover:scale-105 transition-transform"
+          onClick={() => setExpanded(!expanded)}
+          title="Channels & Navigation"
           style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', boxShadow: '0 0 16px rgba(124,58,237,0.3)' }}
         >
           <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">

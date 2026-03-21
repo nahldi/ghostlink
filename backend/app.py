@@ -89,47 +89,6 @@ _settings: dict = {
 }
 
 
-# ── Activity Timeline (in-memory, capped at 200) ──────────────────
-_activity_log: list[dict] = []
-_ACTIVITY_LOG_MAX = 200
-
-
-def _log_activity(agent: str, action_type: str, description: str):
-    """Append an activity event and broadcast via WebSocket (best-effort)."""
-    entry = {
-        "id": len(_activity_log) + 1,
-        "agent": agent,
-        "type": action_type,
-        "description": description,
-        "timestamp": time.time(),
-        "time": time.strftime("%H:%M:%S"),
-    }
-    _activity_log.append(entry)
-    if len(_activity_log) > _ACTIVITY_LOG_MAX:
-        _activity_log[:] = _activity_log[-_ACTIVITY_LOG_MAX:]
-    # Best-effort async broadcast — fire and forget
-    import asyncio
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(broadcast("activity", entry))
-    except RuntimeError:
-        pass
-
-
-# ── Token usage tracking (in-memory) ──────────────────────────────
-_token_usage: dict[str, dict] = {}  # agent_name → {input, output, calls, model, history[]}
-
-# ── Webhooks (in-memory) ──────────────────────────────────────────
-_webhooks: list[dict] = []
-_webhook_next_id = 1
-
-# ── Agent data stores (in-memory, keyed by agent name) ────────────
-_agent_souls: dict[str, str] = {}
-_agent_notes: dict[str, str] = {}
-_agent_configs: dict[str, dict] = {}
-_agent_memories: dict[str, dict[str, str]] = {}  # agent → {key: value}
-
-
 def _load_settings():
     global _settings
     if SETTINGS_PATH.exists():
@@ -212,6 +171,11 @@ def _route_mentions(sender: str, text: str, channel: str):
     targets = [t for t in targets if not (registry.get(t) and registry.get(t).state == "paused")]
 
     for target in targets:
+        # Mark agent as triggered so thinking state activates
+        inst = registry.get(target)
+        if inst:
+            inst._was_triggered = True  # type: ignore[attr-defined]
+
         queue_file = DATA_DIR / f"{target}_queue.jsonl"
         try:
             with open(queue_file, "a", encoding="utf-8") as f:
@@ -349,16 +313,8 @@ async def send_message(request: Request):
     # Route @mentions to agent wrappers
     _route_mentions(sender, text, channel)
 
-    # If sender is an agent, clear thinking state immediately
-    inst = registry.get(sender)
-    if inst:
-        inst.record_message()
-        if inst.state == "thinking":
-            inst.state = "active"
-            inst._think_ts = 0  # type: ignore[attr-defined]
-            await broadcast("status", {"agents": _get_full_agent_list()})
-
-    _log_activity(sender, "message", f"sent message in #{channel}")
+    # Don't force-clear thinking — let the heartbeat activity monitor handle it naturally.
+    # If the agent is still working after sending, glow stays. If idle, heartbeat clears it.
 
     return msg
 
@@ -531,7 +487,6 @@ async def register_agent(request: Request):
     if not base:
         return JSONResponse({"error": "base required"}, 400)
     inst = registry.register(base, label, color)
-    _log_activity(inst.name, "register", f"{inst.name} registered")
     await broadcast("status", {"agents": _get_full_agent_list()})
     return inst.to_dict()
 
@@ -540,7 +495,6 @@ async def register_agent(request: Request):
 async def deregister_agent(name: str):
     ok = registry.deregister(name)
     if ok:
-        _log_activity(name, "deregister", f"{name} deregistered")
         await broadcast("status", {"agents": _get_full_agent_list()})
     return {"ok": ok}
 
@@ -831,24 +785,37 @@ async def resume_agent(name: str):
 
 @app.get("/api/search")
 async def search_messages(q: str = "", channel: str = "", sender: str = "", limit: int = 50):
-    """Full-text search across messages (FTS5 with LIKE fallback)."""
+    """Full-text search across messages."""
     if not q.strip():
         return {"results": []}
-    results = await store.search_fts(q.strip(), channel=channel, sender=sender, limit=limit)
-    return {"results": results, "query": q}
+    assert store._db is not None
+    query = "SELECT * FROM messages WHERE text LIKE ? COLLATE NOCASE"
+    params: list = [f"%{q}%"]
+    if channel:
+        query += " AND channel = ?"
+        params.append(channel)
+    if sender:
+        query += " AND sender = ?"
+        params.append(sender)
+    query += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    cursor = await store._db.execute(query, params)
+    rows = await cursor.fetchall()
+    return {"results": [store._row_to_dict(r) for r in rows], "query": q}
 
 
 @app.post("/api/heartbeat/{agent_name}")
 async def heartbeat(agent_name: str, request: Request):
     inst = registry.get(agent_name)
     if inst:
-        inst.record_heartbeat()
         old_state = inst.state
         try:
             body = await request.json()
             if body.get("active"):
-                inst.state = "thinking"
-                inst._think_ts = time.time()  # type: ignore[attr-defined]
+                # Glow whenever agent is doing anything — but skip first 15s (startup noise)
+                if time.time() - inst.registered_at > 15:
+                    inst.state = "thinking"
+                    inst._think_ts = time.time()  # type: ignore[attr-defined]
             else:
                 # Stay "thinking" for 3s after last active report to prevent flicker
                 last_think = getattr(inst, '_think_ts', 0)
@@ -888,7 +855,6 @@ async def create_job(request: Request):
         body=body.get("body", ""),
         job_type=body.get("type", ""),
     )
-    _log_activity(body.get("created_by", "system"), "job_create", f"created job: {body.get('title', '')}")
     await broadcast("job_update", job)
     return job
 
@@ -898,7 +864,6 @@ async def update_job(job_id: int, request: Request):
     body = await request.json()
     job = await job_store.update(job_id, body)
     if job:
-        _log_activity("system", "job_update", f"updated job #{job_id}")
         await broadcast("job_update", job)
         return job
     return JSONResponse({"error": "not found"}, 404)
@@ -945,310 +910,6 @@ async def update_rule(rule_id: int, request: Request):
         await broadcast("rule_update", {"rules": rules})
         return rule
     return JSONResponse({"error": "not found"}, 404)
-
-
-# ── Activity Timeline ───────────────────────────────────────────────
-
-@app.get("/api/activity")
-async def get_activity(limit: int = 50):
-    """Return the last N activity events."""
-    return {"activity": _activity_log[-limit:]}
-
-
-# ── Token Usage ────────────────────────────────────────────────────
-
-@app.post("/api/usage")
-async def record_usage(request: Request):
-    """Accumulate token usage for an agent."""
-    body = await request.json()
-    agent = body.get("agent", "unknown")
-    input_tokens = int(body.get("input_tokens", 0))
-    output_tokens = int(body.get("output_tokens", 0))
-    model = body.get("model", "")
-
-    if agent not in _token_usage:
-        _token_usage[agent] = {
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "calls": 0,
-            "model": model,
-            "history": [],
-        }
-    bucket = _token_usage[agent]
-    bucket["input_tokens"] += input_tokens
-    bucket["output_tokens"] += output_tokens
-    bucket["calls"] += 1
-    if model:
-        bucket["model"] = model
-    bucket["history"].append({
-        "input": input_tokens,
-        "output": output_tokens,
-        "model": model,
-        "timestamp": time.time(),
-    })
-    # Keep history capped at 500
-    if len(bucket["history"]) > 500:
-        bucket["history"] = bucket["history"][-500:]
-    return {"ok": True, "agent": agent, "total_input": bucket["input_tokens"], "total_output": bucket["output_tokens"]}
-
-
-@app.get("/api/usage")
-async def get_usage(agent: str = "", period: str = ""):
-    """Get token usage data, optionally filtered by agent and period."""
-    now = time.time()
-    cutoff = 0.0
-    if period == "hour":
-        cutoff = now - 3600
-    elif period == "today":
-        import datetime
-        today_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        cutoff = today_start.timestamp()
-
-    if agent:
-        bucket = _token_usage.get(agent)
-        if not bucket:
-            return {"usage": {agent: {"input_tokens": 0, "output_tokens": 0, "calls": 0}}}
-        if cutoff:
-            filtered = [h for h in bucket["history"] if h["timestamp"] >= cutoff]
-            return {"usage": {agent: {
-                "input_tokens": sum(h["input"] for h in filtered),
-                "output_tokens": sum(h["output"] for h in filtered),
-                "calls": len(filtered),
-                "model": bucket.get("model", ""),
-            }}}
-        return {"usage": {agent: {
-            "input_tokens": bucket["input_tokens"],
-            "output_tokens": bucket["output_tokens"],
-            "calls": bucket["calls"],
-            "model": bucket.get("model", ""),
-        }}}
-
-    result = {}
-    for a, bucket in _token_usage.items():
-        if cutoff:
-            filtered = [h for h in bucket["history"] if h["timestamp"] >= cutoff]
-            result[a] = {
-                "input_tokens": sum(h["input"] for h in filtered),
-                "output_tokens": sum(h["output"] for h in filtered),
-                "calls": len(filtered),
-                "model": bucket.get("model", ""),
-            }
-        else:
-            result[a] = {
-                "input_tokens": bucket["input_tokens"],
-                "output_tokens": bucket["output_tokens"],
-                "calls": bucket["calls"],
-                "model": bucket.get("model", ""),
-            }
-    return {"usage": result}
-
-
-# ── Webhooks ───────────────────────────────────────────────────────
-
-@app.get("/api/webhooks")
-async def list_webhooks():
-    return {"webhooks": _webhooks}
-
-
-@app.post("/api/webhooks")
-async def create_webhook(request: Request):
-    global _webhook_next_id
-    body = await request.json()
-    wh = {
-        "id": _webhook_next_id,
-        "name": body.get("name", f"webhook-{_webhook_next_id}"),
-        "agent": body.get("agent", ""),
-        "channel": body.get("channel", "general"),
-        "filters": body.get("filters", {}),
-        "created_at": time.time(),
-    }
-    _webhook_next_id += 1
-    _webhooks.append(wh)
-    return wh
-
-
-@app.delete("/api/webhooks/{wh_id}")
-async def delete_webhook(wh_id: int):
-    for i, wh in enumerate(_webhooks):
-        if wh["id"] == wh_id:
-            _webhooks.pop(i)
-            return {"ok": True}
-    return JSONResponse({"error": "not found"}, 404)
-
-
-@app.post("/api/webhook/{wh_id}")
-async def receive_webhook(wh_id: int, request: Request):
-    """Receive external payload, post as system message, trigger agent."""
-    wh = None
-    for w in _webhooks:
-        if w["id"] == wh_id:
-            wh = w
-            break
-    if not wh:
-        return JSONResponse({"error": "webhook not found"}, 404)
-
-    body = await request.json()
-    payload_text = body.get("text", json.dumps(body, indent=2))
-    channel = wh.get("channel", "general")
-
-    msg = await store.add(
-        sender="webhook",
-        text=f"[Webhook: {wh['name']}] {payload_text}",
-        channel=channel,
-        msg_type="system",
-    )
-
-    # Trigger the assigned agent if any
-    agent_name = wh.get("agent", "")
-    if agent_name:
-        queue_file = DATA_DIR / f"{agent_name}_queue.jsonl"
-        try:
-            with open(queue_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"channel": channel}) + "\n")
-        except Exception:
-            pass
-
-    return {"ok": True, "message_id": msg["id"]}
-
-
-# ── Export ─────────────────────────────────────────────────────────
-
-@app.get("/api/export")
-async def export_conversation(channel: str = "general", format: str = "json"):
-    """Export conversation in markdown, json, or html format."""
-    msgs = await store.get_recent(9999, channel)
-
-    if format == "json":
-        return JSONResponse({"channel": channel, "messages": msgs, "exported_at": time.time()})
-
-    if format == "markdown":
-        lines = [f"# Channel: {channel}\n"]
-        for m in msgs:
-            lines.append(f"**{m['sender']}** ({m['time']}): {m['text']}\n")
-        from fastapi.responses import PlainTextResponse
-        return PlainTextResponse("\n".join(lines), media_type="text/markdown")
-
-    if format == "html":
-        lines = [
-            "<!DOCTYPE html><html><head><meta charset='utf-8'>",
-            f"<title>AI Chattr — #{channel}</title>",
-            "<style>body{font-family:sans-serif;max-width:800px;margin:auto;padding:20px}"
-            ".msg{margin:8px 0;padding:8px;border-radius:6px;background:#f5f5f5}"
-            ".sender{font-weight:bold;color:#333}.time{color:#999;font-size:0.85em}</style>",
-            "</head><body>",
-            f"<h1>#{channel}</h1>",
-        ]
-        for m in msgs:
-            text = m["text"].replace("<", "&lt;").replace(">", "&gt;")
-            lines.append(
-                f"<div class='msg'><span class='sender'>{m['sender']}</span> "
-                f"<span class='time'>{m['time']}</span><p>{text}</p></div>"
-            )
-        lines.append("</body></html>")
-        from fastapi.responses import HTMLResponse
-        return HTMLResponse("\n".join(lines))
-
-    return JSONResponse({"error": "format must be json, markdown, or html"}, 400)
-
-
-# ── Agent Hierarchy ────────────────────────────────────────────────
-
-@app.get("/api/hierarchy")
-async def get_hierarchy():
-    """Return agent tree from registry."""
-    all_agents = registry.get_all()
-    tree: list[dict] = []
-    agent_map: dict[str, dict] = {}
-
-    for inst in all_agents:
-        node = {
-            "name": inst.name,
-            "base": inst.base,
-            "label": inst.label,
-            "role": inst.hierarchy_role,
-            "state": inst.state,
-            "parent": inst.parent,
-            "children": [],
-        }
-        agent_map[inst.name] = node
-
-    # Build tree structure
-    for name, node in agent_map.items():
-        parent_name = node["parent"]
-        if parent_name and parent_name in agent_map:
-            agent_map[parent_name]["children"].append(node)
-        else:
-            tree.append(node)
-
-    return {"hierarchy": tree}
-
-
-# ── Agent SOUL / Notes / Health / Config / Memories ────────────────
-
-@app.get("/api/agents/{name}/soul")
-async def get_agent_soul(name: str):
-    return {"agent": name, "soul": _agent_souls.get(name, "")}
-
-
-@app.post("/api/agents/{name}/soul")
-async def set_agent_soul(name: str, request: Request):
-    body = await request.json()
-    _agent_souls[name] = body.get("soul", "")
-    return {"agent": name, "soul": _agent_souls[name]}
-
-
-@app.get("/api/agents/{name}/notes")
-async def get_agent_notes(name: str):
-    return {"agent": name, "notes": _agent_notes.get(name, "")}
-
-
-@app.post("/api/agents/{name}/notes")
-async def set_agent_notes(name: str, request: Request):
-    body = await request.json()
-    _agent_notes[name] = body.get("notes", "")
-    return {"agent": name, "notes": _agent_notes[name]}
-
-
-@app.get("/api/agents/{name}/health")
-async def get_agent_health(name: str):
-    inst = registry.get(name)
-    if not inst:
-        return JSONResponse({"error": "not found"}, 404)
-    return inst.health_dict()
-
-
-@app.get("/api/agents/{name}/config")
-async def get_agent_config(name: str):
-    return {"agent": name, "config": _agent_configs.get(name, {})}
-
-
-@app.post("/api/agents/{name}/config")
-async def set_agent_config(name: str, request: Request):
-    body = await request.json()
-    _agent_configs[name] = body.get("config", body)
-    return {"agent": name, "config": _agent_configs[name]}
-
-
-@app.get("/api/agents/{name}/memories")
-async def get_agent_memories(name: str):
-    return {"agent": name, "memories": _agent_memories.get(name, {})}
-
-
-@app.get("/api/agents/{name}/memories/{key}")
-async def get_agent_memory(name: str, key: str):
-    memories = _agent_memories.get(name, {})
-    if key not in memories:
-        return JSONResponse({"error": "key not found"}, 404)
-    return {"agent": name, "key": key, "value": memories[key]}
-
-
-@app.delete("/api/agents/{name}/memories/{key}")
-async def delete_agent_memory(name: str, key: str):
-    memories = _agent_memories.get(name, {})
-    if key not in memories:
-        return JSONResponse({"error": "key not found"}, 404)
-    del memories[key]
-    return {"ok": True, "agent": name, "key": key}
 
 
 # ── Serve uploads ───────────────────────────────────────────────────

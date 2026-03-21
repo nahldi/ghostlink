@@ -12,9 +12,6 @@ export interface Message {
   metadata?: Record<string, unknown>;
   pinned?: boolean;
   reactions?: Record<string, string[]>;
-  bookmarked?: boolean;
-  edited?: boolean;
-  thread_count?: number;
 }
 
 export interface Attachment {
@@ -31,8 +28,7 @@ export interface Agent {
   color: string;
   state: 'active' | 'idle' | 'pending' | 'offline' | 'thinking' | 'paused';
   slot: number;
-  role?: 'manager' | 'worker' | 'peer';
-  parent?: string;
+  role?: string;
   workspace?: string;
   command?: string;
   args?: string[];
@@ -42,10 +38,6 @@ export interface Agent {
 export interface Channel {
   name: string;
   unread: number;
-  description?: string;
-  category?: string;
-  pinned?: boolean;
-  order?: number;
 }
 
 export interface Job {
@@ -95,10 +87,6 @@ export interface Settings {
   notificationSounds: boolean;
   channels?: string[];
   persistentAgents?: PersistentAgent[];
-  desktopNotifications?: boolean;
-  quietHoursStart?: number;
-  quietHoursEnd?: number;
-  debugMode?: boolean;
 }
 
 export interface AgentTemplate {
@@ -112,32 +100,6 @@ export interface AgentTemplate {
   provider?: string;
 }
 
-export interface ActivityEvent {
-  id: number;
-  timestamp: number;
-  agent: string;
-  action_type: string;
-  description: string;
-}
-
-export interface Schedule {
-  id: number;
-  cron_expr: string;
-  agent: string;
-  command: string;
-  channel: string;
-  enabled: boolean;
-  last_run?: number;
-}
-
-export interface Webhook {
-  id: string;
-  name: string;
-  agent: string;
-  channel: string;
-  filters?: Record<string, string>;
-}
-
 export type WSEvent =
   | { type: 'message'; data: Message }
   | { type: 'typing'; data: { sender: string; channel: string } }
@@ -147,5 +109,4 @@ export type WSEvent =
   | { type: 'channel_update'; data: { channels: Channel[] } }
   | { type: 'pin'; data: { message_id: number; pinned: boolean } }
   | { type: 'delete'; data: { message_ids: number[] } }
-  | { type: 'reaction'; data: { message_id: number; reactions: Record<string, string[]> } }
-  | { type: 'activity'; data: ActivityEvent };
+  | { type: 'reaction'; data: { message_id: number; reactions: Record<string, string[]> } };

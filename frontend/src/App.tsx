@@ -15,8 +15,6 @@ import { RulesPanel } from './components/RulesPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StatsPanel } from './components/StatsPanel';
 import { SearchModal } from './components/SearchModal';
-import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
-import { ConnectionBanner } from './components/ConnectionBanner';
 
 function ChatFeed() {
   const messages = useChatStore((s) => s.messages);
@@ -191,83 +189,20 @@ function AppInner() {
   const theme = useChatStore((s) => s.settings.theme);
 
   const [showSearch, setShowSearch] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
 
   useWebSocket();
 
-  // Keyboard shortcuts
+  // Ctrl+K to open search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const ctrl = e.ctrlKey || e.metaKey;
-
-      // Ctrl+K — search
-      if (ctrl && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         setShowSearch(true);
-        return;
-      }
-
-      // Ctrl+/ — keyboard shortcuts modal
-      if (ctrl && e.key === '/') {
-        e.preventDefault();
-        setShowShortcuts((v) => !v);
-        return;
-      }
-
-      // Ctrl+N — open search modal (new channel flow)
-      if (ctrl && e.key === 'n') {
-        e.preventDefault();
-        setShowSearch(true);
-        return;
-      }
-
-      // Ctrl+1-9 — switch to channel by index
-      if (ctrl && e.key >= '1' && e.key <= '9') {
-        e.preventDefault();
-        const idx = parseInt(e.key) - 1;
-        const channels = useChatStore.getState().channels;
-        if (idx < channels.length) {
-          useChatStore.getState().setActiveChannel(channels[idx].name);
-        }
-        return;
-      }
-
-      // Alt+ArrowUp / Alt+ArrowDown — previous/next channel
-      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        e.preventDefault();
-        const channels = useChatStore.getState().channels;
-        const current = useChatStore.getState().activeChannel;
-        const idx = channels.findIndex(c => c.name === current);
-        if (idx === -1) return;
-        const next = e.key === 'ArrowUp'
-          ? (idx - 1 + channels.length) % channels.length
-          : (idx + 1) % channels.length;
-        useChatStore.getState().setActiveChannel(channels[next].name);
-        return;
-      }
-
-      // Escape — close any open panel or modal
-      if (e.key === 'Escape') {
-        if (showSearch) { setShowSearch(false); return; }
-        if (showShortcuts) { setShowShortcuts(false); return; }
-        const panel = useChatStore.getState().sidebarPanel;
-        if (panel) { useChatStore.getState().setSidebarPanel(null); return; }
-        const mobile = useChatStore.getState().mobileMenuOpen;
-        if (mobile) { useChatStore.getState().setMobileMenuOpen(false); return; }
-        return;
-      }
-
-      // Ctrl+Shift+M — toggle mute
-      if (ctrl && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
-        e.preventDefault();
-        const s = useChatStore.getState().settings;
-        useChatStore.getState().updateSettings({ notificationSounds: !s.notificationSounds });
-        return;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showSearch, showShortcuts]);
+  }, []);
 
   // Apply font size to root
   useEffect(() => {
@@ -306,8 +241,7 @@ function AppInner() {
   }, [activeChannel, setMessages, clearUnread]);
 
   return (
-    <div className="min-h-screen relative w-full">
-      <ConnectionBanner />
+    <div className="min-h-[100dvh] relative w-full">
       <div className="ambient-bg" />
 
       {/* Desktop sidebar (nav + channels only, no agents) */}
@@ -317,7 +251,7 @@ function AppInner() {
       <MobileSidebar />
 
       <main
-        className={`flex flex-col h-screen relative z-10 transition-all overflow-hidden ${
+        className={`flex flex-col h-[100dvh] relative z-10 transition-all overflow-hidden ${
           sidebarPanel ? 'lg:ml-14 lg:mr-80' : 'lg:ml-14'
         }`}
       >
@@ -352,7 +286,6 @@ function AppInner() {
       <RightPanel />
       <MobilePanel />
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
-      {showShortcuts && <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />}
     </div>
   );
 }

@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Agent, Channel, Job, Rule, Settings, ActivityEvent } from '../types';
-
-export type WSConnectionState = 'connected' | 'connecting' | 'disconnected';
+import type { Message, Agent, Channel, Job, Rule, Settings } from '../types';
 
 interface ChatState {
   // Messages
@@ -11,8 +9,6 @@ interface ChatState {
   pinMessage: (id: number, pinned: boolean) => void;
   deleteMessages: (ids: number[]) => void;
   reactMessage: (id: number, reactions: Record<string, string[]>) => void;
-  editMessage: (id: number, text: string) => void;
-  bookmarkMessage: (id: number, bookmarked: boolean) => void;
 
   // Channels
   channels: Channel[];
@@ -40,23 +36,6 @@ interface ChatState {
   // Settings
   settings: Settings;
   updateSettings: (s: Partial<Settings>) => void;
-
-  // Activities
-  activities: ActivityEvent[];
-  addActivity: (event: ActivityEvent) => void;
-  setActivities: (events: ActivityEvent[]) => void;
-
-  // Connection state
-  wsState: 'connected' | 'connecting' | 'disconnected';
-  setWsState: (state: 'connected' | 'connecting' | 'disconnected') => void;
-
-  // Failed messages
-  failedMessages: Message[];
-  addFailedMessage: (msg: Message) => void;
-  clearFailedMessages: () => void;
-
-  // Session
-  sessionStart: number;
 
   // UI state
   sidebarPanel: 'jobs' | 'rules' | 'settings' | null;
@@ -90,18 +69,6 @@ export const useChatStore = create<ChatState>((set) => ({
     set((s) => ({
       messages: s.messages.map((m) =>
         m.id === id ? { ...m, reactions } : m
-      ),
-    })),
-  editMessage: (id, text) =>
-    set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === id ? { ...m, text, edited: true } : m
-      ),
-    })),
-  bookmarkMessage: (id, bookmarked) =>
-    set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === id ? { ...m, bookmarked } : m
       ),
     })),
 
@@ -150,23 +117,6 @@ export const useChatStore = create<ChatState>((set) => ({
   },
   updateSettings: (updates) =>
     set((s) => ({ settings: { ...s.settings, ...updates } })),
-
-  activities: [],
-  addActivity: (event) =>
-    set((s) => ({
-      activities: [...s.activities, event].slice(-200),
-    })),
-  setActivities: (events) => set({ activities: events }),
-
-  wsState: 'disconnected',
-  setWsState: (wsState) => set({ wsState }),
-
-  failedMessages: [],
-  addFailedMessage: (msg) =>
-    set((s) => ({ failedMessages: [...s.failedMessages, msg] })),
-  clearFailedMessages: () => set({ failedMessages: [] }),
-
-  sessionStart: Date.now(),
 
   sidebarPanel: null,
   setSidebarPanel: (p) => set({ sidebarPanel: p }),

@@ -26,23 +26,6 @@ export function MessageInput() {
   const { suggestions, selectedIndex, setSelectedIndex, isOpen, applyMention } =
     useMentionAutocomplete(text, cursorPos);
 
-  const updateSettings = useChatStore((s) => s.updateSettings);
-  const sessionStart = useChatStore((s) => s.sessionStart);
-
-  // Helper to create system messages
-  const sysMsg = useCallback((text: string) => {
-    addMessage({
-      id: Date.now(),
-      uid: 'cmd-' + Date.now(),
-      sender: 'system',
-      text,
-      type: 'system',
-      timestamp: Date.now() / 1000,
-      time: new Date().toLocaleTimeString(),
-      channel: activeChannel,
-    });
-  }, [addMessage, activeChannel]);
-
   // Slash commands
   const slashCommands: SlashCommand[] = useMemo(() => [
     {
@@ -52,7 +35,16 @@ export function MessageInput() {
         const lines = agents.length
           ? agents.map(a => `${a.label || a.name}: ${a.state}`).join('\n')
           : 'No agents registered';
-        sysMsg(lines);
+        addMessage({
+          id: Date.now(),
+          uid: 'cmd-' + Date.now(),
+          sender: 'system',
+          text: lines,
+          type: 'system',
+          timestamp: Date.now() / 1000,
+          time: new Date().toLocaleTimeString(),
+          channel: activeChannel,
+        });
       },
     },
     {
@@ -83,99 +75,23 @@ export function MessageInput() {
       name: '/help',
       description: 'Show available commands',
       execute: () => {
-        sysMsg(
-          '/status -- show agent states\n/clear -- clear chat display\n/export -- download channel as markdown\n/help -- show this help\n' +
-          '/focus [agent] [topic] -- set agent focus\n/theme dark|light -- switch theme\n/mute -- mute notifications\n/unmute -- unmute notifications\n' +
-          '/agents -- show all agent details\n/ping [agent] -- check agent status\n/stats -- session statistics\n/role [agent] [role] -- set agent role\n' +
-          '/spawn [base] [label] -- spawn agent\n/kill [agent] -- kill agent'
-        );
+        addMessage({
+          id: Date.now(),
+          uid: 'cmd-' + Date.now(),
+          sender: 'system',
+          text: '/status — show agent states\n/clear — clear chat display\n/export — download channel as markdown\n/help — show this help',
+          type: 'system',
+          timestamp: Date.now() / 1000,
+          time: new Date().toLocaleTimeString(),
+          channel: activeChannel,
+        });
       },
     },
-    {
-      name: '/focus',
-      description: 'Set agent focus topic',
-      execute: () => { /* handled by text parsing below */ },
-    },
-    {
-      name: '/theme',
-      description: 'Switch theme (dark|light)',
-      execute: () => { /* handled by text parsing below */ },
-    },
-    {
-      name: '/mute',
-      description: 'Mute notification sounds',
-      execute: () => {
-        updateSettings({ notificationSounds: false });
-        api.saveSettings({ notificationSounds: false }).catch(() => {});
-        sysMsg('Notifications muted');
-      },
-    },
-    {
-      name: '/unmute',
-      description: 'Unmute notification sounds',
-      execute: () => {
-        updateSettings({ notificationSounds: true });
-        api.saveSettings({ notificationSounds: true }).catch(() => {});
-        sysMsg('Notifications unmuted');
-      },
-    },
-    {
-      name: '/agents',
-      description: 'Show all agent details',
-      execute: () => {
-        if (!agents.length) { sysMsg('No agents registered'); return; }
-        const lines = agents.map(a =>
-          `${a.label || a.name} | state: ${a.state} | role: ${a.role || 'none'} | base: ${a.base}`
-        ).join('\n');
-        sysMsg(lines);
-      },
-    },
-    {
-      name: '/ping',
-      description: 'Ping agent for status',
-      execute: () => { /* handled by text parsing below */ },
-    },
-    {
-      name: '/stats',
-      description: 'Show session statistics',
-      execute: () => {
-        const channelMsgs = messages.filter(m => m.channel === activeChannel);
-        const uptime = Math.round((Date.now() - sessionStart) / 1000);
-        const mins = Math.floor(uptime / 60);
-        const secs = uptime % 60;
-        const agentMsgs = channelMsgs.filter(m => agents.some(a => a.name === m.sender)).length;
-        const userMsgs = channelMsgs.length - agentMsgs;
-        sysMsg(
-          `Session stats:\n` +
-          `Uptime: ${mins}m ${secs}s\n` +
-          `Messages in #${activeChannel}: ${channelMsgs.length}\n` +
-          `User messages: ${userMsgs}\n` +
-          `Agent messages: ${agentMsgs}\n` +
-          `Active agents: ${agents.filter(a => a.state === 'active' || a.state === 'thinking').length}/${agents.length}`
-        );
-      },
-    },
-    {
-      name: '/role',
-      description: 'Set agent role (manager|worker|peer)',
-      execute: () => { /* handled by text parsing below */ },
-    },
-    {
-      name: '/spawn',
-      description: 'Spawn a new agent',
-      execute: () => { /* handled by text parsing below */ },
-    },
-    {
-      name: '/kill',
-      description: 'Kill an agent',
-      execute: () => { /* handled by text parsing below */ },
-    },
-  ], [agents, activeChannel, messages, addMessage, setMessages, sysMsg, updateSettings, sessionStart]);
+  ], [agents, activeChannel, messages, addMessage, setMessages]);
 
   const slashQuery = text.startsWith('/') && !text.includes(' ') ? text.toLowerCase() : '';
-  const uniqueCommands = slashCommands.filter((c, i, arr) => arr.findIndex(x => x.name === c.name) === i);
   const filteredCommands = slashQuery
-    ? uniqueCommands.filter(c => c.name.startsWith(slashQuery))
+    ? slashCommands.filter(c => c.name.startsWith(slashQuery))
     : [];
   const showSlash = filteredCommands.length > 0 && slashQuery.length > 0;
 
@@ -192,87 +108,7 @@ export function MessageInput() {
 
     // Check for slash command
     if (trimmed.startsWith('/')) {
-      const parts = trimmed.split(/\s+/);
-      const cmdName = parts[0].toLowerCase();
-
-      // Commands with arguments
-      if (cmdName === '/focus' && parts.length >= 3) {
-        const agentName = parts[1];
-        const topic = parts.slice(2).join(' ');
-        sysMsg(`Focus set: ${agentName} -> ${topic}`);
-        api.sendMessage('system', `@${agentName} focus on: ${topic}`, activeChannel).catch(() => {});
-        setText('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        return;
-      }
-      if (cmdName === '/theme' && parts.length >= 2) {
-        const theme = parts[1] as 'dark' | 'light';
-        if (theme === 'dark' || theme === 'light') {
-          updateSettings({ theme });
-          api.saveSettings({ theme }).catch(() => {});
-          sysMsg(`Theme set to ${theme}`);
-        } else {
-          sysMsg('Usage: /theme dark|light');
-        }
-        setText('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        return;
-      }
-      if (cmdName === '/ping' && parts.length >= 2) {
-        const target = parts[1];
-        const agent = agents.find(a => a.name === target || a.label === target);
-        if (agent) {
-          const start = performance.now();
-          api.getStatus().then(() => {
-            const elapsed = Math.round(performance.now() - start);
-            sysMsg(`${agent.label || agent.name}: ${agent.state} (${elapsed}ms)`);
-          }).catch(() => sysMsg(`${target}: unreachable`));
-        } else {
-          sysMsg(`Agent "${target}" not found`);
-        }
-        setText('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        return;
-      }
-      if (cmdName === '/role' && parts.length >= 3) {
-        const agentName = parts[1];
-        const role = parts[2];
-        if (['manager', 'worker', 'peer'].includes(role)) {
-          fetch(`/api/agents/${agentName}/role`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role }),
-          }).then(() => sysMsg(`${agentName} role set to ${role}`))
-            .catch(() => sysMsg(`Failed to set role for ${agentName}`));
-        } else {
-          sysMsg('Usage: /role [agent] [manager|worker|peer]');
-        }
-        setText('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        return;
-      }
-      if (cmdName === '/spawn' && parts.length >= 3) {
-        const base = parts[1];
-        const label = parts.slice(2).join(' ');
-        api.spawnAgent(base, label, '.', []).then((r) => {
-          sysMsg(`Spawned ${label} (${base}) — pid ${r.pid}`);
-        }).catch(() => sysMsg(`Failed to spawn ${label}`));
-        setText('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        return;
-      }
-      if (cmdName === '/kill' && parts.length >= 2) {
-        const target = parts[1];
-        api.killAgent(target).then(() => {
-          sysMsg(`Killed agent: ${target}`);
-        }).catch(() => sysMsg(`Failed to kill ${target}`));
-        setText('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        return;
-      }
-
-      // Simple commands (no arguments)
-      const cmd = slashCommands.find(c => c.name === cmdName);
+      const cmd = slashCommands.find(c => c.name === trimmed);
       if (cmd) {
         cmd.execute();
         setText('');
@@ -291,7 +127,7 @@ export function MessageInput() {
     } catch (e) {
       console.error('Send failed:', e);
     }
-  }, [text, activeChannel, settings.username, replyTo, setReplyTo, slashCommands, sysMsg, agents, updateSettings]);
+  }, [text, activeChannel, settings.username, replyTo, setReplyTo, slashCommands]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Slash command picker navigation
