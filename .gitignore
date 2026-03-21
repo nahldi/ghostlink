@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# User data (never distribute)
+backend/data/
+backend/uploads/
+frontend/dist/
+
+# OpenClaw agent config (personal, not part of the app)
+AGENTS.md
+SOUL.md
+USER.md
+TOOLS.md
+IDENTITY.md
+HEARTBEAT.md
+PIPELINE.md
+NOVA_TASK.md
+BOOTSTRAP.md
+MEMORY.md
+memory/
+
+# OS/editor
+.DS_Store
+*.log
+.openclaw/
+
+# Build artifacts
+*.tsbuildinfo

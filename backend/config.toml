@@ -1,0 +1,41 @@
+[server]
+port = 8300
+host = "127.0.0.1"
+data_dir = "./data"
+static_dir = "../frontend/dist"
+
+[routing]
+default = "none"
+max_agent_hops = 4
+
+[images]
+upload_dir = "./uploads"
+max_size_mb = 10
+
+[mcp]
+http_port = 8200
+sse_port = 8201
+
+# Add persistent agents via the Settings panel in the UI.
+# Or uncomment and configure here:
+#
+# [agents.claude]
+# command = "claude"
+# args = ["--dangerously-skip-permissions"]
+# cwd = "/path/to/your/project"
+# color = "#e8734a"
+# label = "Claude"
+#
+# [agents.codex]
+# command = "codex"
+# args = ["--sandbox", "danger-full-access", "-a", "never"]
+# cwd = "/path/to/your/project"
+# color = "#10a37f"
+# label = "Codex"
+#
+# [agents.gemini]
+# command = "gemini"
+# args = ["-y"]
+# cwd = "/path/to/your/project"
+# color = "#4285f4"
+# label = "Gemini"

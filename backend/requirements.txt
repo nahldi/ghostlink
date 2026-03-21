@@ -1,0 +1,7 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+aiosqlite>=0.20.0
+python-multipart>=0.0.18
+tomli>=2.0.0
+websockets>=14.0
+mcp>=1.0.0
