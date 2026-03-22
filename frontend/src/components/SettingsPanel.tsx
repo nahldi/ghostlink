@@ -8,6 +8,12 @@ const AGENT_PRESETS: { base: string; label: string; command: string; color: stri
   { base: 'claude', label: 'Claude', command: 'claude', color: '#e8734a', defaultArgs: ['--dangerously-skip-permissions'] },
   { base: 'codex', label: 'Codex', command: 'codex', color: '#10a37f', defaultArgs: ['--sandbox', 'danger-full-access', '-a', 'never'] },
   { base: 'gemini', label: 'Gemini', command: 'gemini', color: '#4285f4', defaultArgs: ['-y'] },
+  { base: 'grok', label: 'Grok', command: 'grok', color: '#ff6b35', defaultArgs: [] },
+  { base: 'copilot', label: 'Copilot', command: 'github-copilot', color: '#6cc644', defaultArgs: [] },
+  { base: 'aider', label: 'Aider', command: 'aider', color: '#14b8a6', defaultArgs: ['--yes'] },
+  { base: 'goose', label: 'Goose', command: 'goose', color: '#f59e0b', defaultArgs: [] },
+  { base: 'opencode', label: 'OpenCode', command: 'opencode', color: '#22c55e', defaultArgs: [] },
+  { base: 'ollama', label: 'Ollama', command: 'ollama', color: '#ffffff', defaultArgs: [] },
 ];
 
 type SettingsTab = 'general' | 'appearance' | 'agents' | 'advanced';

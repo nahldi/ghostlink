@@ -268,19 +268,8 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
             )}
           </Section>
 
-          {/* Display Name */}
-          <Section label="Display Name" hint="Optional — defaults to agent type">
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={template?.label || 'Agent'}
-              className="setting-input text-[13px]"
-            />
-          </Section>
-
           {/* Workspace */}
-          <Section label="Workspace Path" hint="Directory the agent works in">
+          <Section label="Workspace">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -300,59 +289,60 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
             </div>
           </Section>
 
-          {/* Permission Mode */}
-          {presets.length > 1 && (
-            <Section label="Permission Mode">
-              <div className="space-y-1.5">
-                {presets.map((p, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPermPreset(i)}
-                    className={`w-full text-left py-2.5 px-3 rounded-xl transition-all ${
-                      permPreset === i
-                        ? 'bg-primary/8 ring-1 ring-primary/20'
-                        : 'bg-surface-container/30 hover:bg-surface-container/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-semibold text-on-surface">{p.label}</span>
-                      {permPreset === i && (
-                        <span className="material-symbols-outlined text-primary text-[14px]">check_circle</span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-on-surface-variant/40 mt-0.5">{p.desc}</div>
-                  </button>
-                ))}
-              </div>
-            </Section>
-          )}
+          {/* Advanced Options — collapsed by default */}
+          <details className="group">
+            <summary className="text-[10px] font-semibold text-on-surface-variant/40 uppercase tracking-wider cursor-pointer hover:text-on-surface-variant/60 select-none flex items-center gap-1 py-1">
+              <span className="material-symbols-outlined text-[14px] transition-transform group-open:rotate-90">chevron_right</span>
+              Advanced Options
+            </summary>
+            <div className="space-y-4 mt-3">
+              {/* Display Name */}
+              <Section label="Display Name" hint="Optional">
+                <input type="text" value={label} onChange={(e) => setLabel(e.target.value)}
+                  placeholder={template?.label || 'Agent'} className="setting-input text-[13px]" />
+              </Section>
 
-          {/* Model Selection */}
-          {(MODEL_OPTIONS[selected] || []).length > 0 && (
-            <Section label="Model" hint={`${template?.provider || selected} models`}>
-              <div className="space-y-1.5">
-                {(MODEL_OPTIONS[selected] || []).map((m, i) => (
-                  <button
-                    key={m.value || 'default'}
-                    onClick={() => setSelectedModel(i)}
-                    className={`w-full text-left py-2.5 px-3 rounded-xl transition-all ${
-                      selectedModel === i
-                        ? 'bg-primary/8 ring-1 ring-primary/20'
-                        : 'bg-surface-container/30 hover:bg-surface-container/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-semibold text-on-surface">{m.label}</span>
-                      {selectedModel === i && (
-                        <span className="material-symbols-outlined text-primary text-[14px]">check_circle</span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-on-surface-variant/40 mt-0.5">{m.desc}</div>
-                  </button>
-                ))}
-              </div>
-            </Section>
-          )}
+              {/* Permission Mode */}
+              {presets.length > 1 && (
+                <Section label="Permission Mode">
+                  <div className="space-y-1">
+                    {presets.map((p, i) => (
+                      <button key={i} onClick={() => setPermPreset(i)}
+                        className={`w-full text-left py-2 px-3 rounded-xl transition-all ${
+                          permPreset === i ? 'bg-primary/8 ring-1 ring-primary/20' : 'bg-surface-container/30 hover:bg-surface-container/50'
+                        }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-on-surface">{p.label}</span>
+                          {permPreset === i && <span className="material-symbols-outlined text-primary text-[14px]">check_circle</span>}
+                        </div>
+                        <div className="text-[9px] text-on-surface-variant/40 mt-0.5">{p.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* Model Selection */}
+              {(MODEL_OPTIONS[selected] || []).length > 0 && (
+                <Section label="Model">
+                  <div className="space-y-1">
+                    {(MODEL_OPTIONS[selected] || []).map((m, i) => (
+                      <button key={m.value || 'default'} onClick={() => setSelectedModel(i)}
+                        className={`w-full text-left py-2 px-3 rounded-xl transition-all ${
+                          selectedModel === i ? 'bg-primary/8 ring-1 ring-primary/20' : 'bg-surface-container/30 hover:bg-surface-container/50'
+                        }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-on-surface">{m.label}</span>
+                          {selectedModel === i && <span className="material-symbols-outlined text-primary text-[14px]">check_circle</span>}
+                        </div>
+                        <div className="text-[9px] text-on-surface-variant/40 mt-0.5">{m.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </Section>
+              )}
+            </div>
+          </details>
 
           {/* Persistent toggle */}
           <div className="flex items-center justify-between py-1">
