@@ -322,6 +322,13 @@ function AppInner() {
     document.title = title || 'GhostLink';
   }, [title]);
 
+  // Help panel toggle from sidebar
+  useEffect(() => {
+    const handler = () => setShowHelp(prev => !prev);
+    window.addEventListener('ghostlink:toggle-help', handler);
+    return () => window.removeEventListener('ghostlink:toggle-help', handler);
+  }, []);
+
   // Apply theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme || 'dark');
@@ -409,14 +416,6 @@ function AppInner() {
       <ConnectionBanner />
       <OnboardingTour />
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
-      {/* Help button — fixed bottom-right */}
-      <button
-        onClick={() => setShowHelp(true)}
-        className="fixed bottom-6 right-6 z-40 w-10 h-10 rounded-full bg-primary/15 border border-primary/20 text-primary flex items-center justify-center hover:bg-primary/25 transition-all active:scale-95 shadow-lg backdrop-blur-sm"
-        title="Help & FAQ"
-      >
-        <span className="material-symbols-outlined text-lg">help</span>
-      </button>
     </div>
   );
 }

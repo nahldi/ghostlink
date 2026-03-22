@@ -129,11 +129,15 @@ export function Sidebar() {
           return (
             <button key={item.id} title={item.tip}
               onClick={() => setSidebarPanel(item.id === 'chat' ? null : item.id)}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+              className={`group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
                 isActive ? 'bg-white/10 text-white' : 'text-white/45 hover:text-white/50 hover:bg-white/5'
               }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+              {/* Tooltip */}
+              <span className="absolute left-full ml-2 px-2 py-1 rounded-md text-[10px] font-medium bg-surface-container-highest text-on-surface whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity shadow-lg z-50">
+                {item.tip}
+              </span>
             </button>
           );
         })}
@@ -146,6 +150,17 @@ export function Sidebar() {
           className="w-10 h-10 rounded-xl flex items-center justify-center text-white/45 hover:text-white/60 hover:bg-white/5 transition-all"
         >
           <span className="material-symbols-outlined text-[20px]">search</span>
+        </button>
+
+        {/* Help */}
+        <button title="Help & FAQ"
+          onClick={() => {
+            const e = new CustomEvent('ghostlink:toggle-help');
+            window.dispatchEvent(e);
+          }}
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/45 hover:text-white/60 hover:bg-white/5 transition-all"
+        >
+          <span className="material-symbols-outlined text-[20px]">help</span>
         </button>
 
         {/* User */}
