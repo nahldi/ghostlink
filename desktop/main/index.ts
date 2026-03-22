@@ -400,7 +400,8 @@ function setupWizardIPC(): void {
     // Save settings to ~/.ghostlink/settings.json
     saveSettings(settings);
 
-    // Close wizard window
+    // Close wizard window — set transitioning flag so app doesn't quit
+    isTransitioning = true;
     if (wizardWindow && !wizardWindow.isDestroyed()) {
       wizardWindow.destroy();
       wizardWindow = null;
@@ -408,6 +409,7 @@ function setupWizardIPC(): void {
 
     // Now open the launcher
     const launcher = createLauncherWindow();
+    isTransitioning = false;
     setupTray(launcher);
     setupUpdater(launcher);
     checkForUpdates().catch((err) => {
@@ -622,9 +624,12 @@ app.whenReady().then(async () => {
   }
 });
 
-// Quit the app when all windows close
+// Quit the app when all windows close — unless we're transitioning from wizard to launcher
+let isTransitioning = false;
 app.on('window-all-closed', () => {
-  app.quit();
+  if (!isTransitioning) {
+    app.quit();
+  }
 });
 
 // Graceful shutdown: stop the backend before quitting
