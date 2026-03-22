@@ -28,6 +28,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  artifactName: "GhostLink-Setup-${version}.${ext}"
 mac:
   target: dmg
   icon: assets/icon.icns
