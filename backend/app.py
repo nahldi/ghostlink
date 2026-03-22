@@ -1062,9 +1062,8 @@ async def get_hierarchy():
 
 # ── Agent soul, notes, health, config, memories ──────────────────────
 
-from agent_memory import AgentMemory, get_soul, set_soul, get_notes, set_notes
+from agent_memory import AgentMemory, get_agent_memory, get_soul, set_soul, get_notes, set_notes
 
-_agent_memory = AgentMemory(DATA_DIR / "agent_memories")
 _agent_dir = DATA_DIR / "agents"
 
 
@@ -1134,20 +1133,23 @@ async def set_agent_config(name: str, request: Request):
 
 @app.get("/api/agents/{name}/memories")
 async def list_agent_memories(name: str):
-    return {"memories": _agent_memory.get_all(name)}
+    mem = get_agent_memory(_agent_dir, name)
+    return {"memories": mem.list_all()}
 
 
 @app.get("/api/agents/{name}/memories/{key}")
-async def get_agent_memory(name: str, key: str):
-    val = _agent_memory.get(name, key)
+async def api_get_agent_memory(name: str, key: str):
+    mem = get_agent_memory(_agent_dir, name)
+    val = mem.load(key)
     if val is None:
         return JSONResponse({"error": "not found"}, 404)
     return {"key": key, "value": val}
 
 
 @app.delete("/api/agents/{name}/memories/{key}")
-async def delete_agent_memory(name: str, key: str):
-    ok = _agent_memory.delete(name, key)
+async def api_delete_agent_memory(name: str, key: str):
+    mem = get_agent_memory(_agent_dir, name)
+    ok = mem.delete(key)
     return {"ok": ok}
 
 
@@ -1239,18 +1241,23 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 # ── Serve frontend (SPA fallback) ──────────────────────────────────
 
 if STATIC_DIR.exists():
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        # Never intercept /api/ routes — let them 404 normally
-        if full_path.startswith("api/"):
-            return JSONResponse({"error": "not found"}, 404)
-        file_path = STATIC_DIR / full_path
-        if file_path.is_file():
-            return FileResponse(file_path)
-        index = STATIC_DIR / "index.html"
-        if index.exists():
-            return FileResponse(index)
-        return JSONResponse({"error": "not found"}, 404)
+    @app.middleware("http")
+    async def spa_middleware(request: Request, call_next):
+        response = await call_next(request)
+        if response.status_code == 404:
+            path = request.url.path
+            if path.startswith("/api/") or path.startswith("/uploads/") or path == "/ws":
+                return response
+                
+            file_path = STATIC_DIR / path.lstrip("/")
+            if file_path.is_file():
+                return FileResponse(file_path)
+            
+            index = STATIC_DIR / "index.html"
+            if index.exists():
+                return FileResponse(index)
+                
+        return response
 
 
 # ── Entrypoint ──────────────────────────────────────────────────────

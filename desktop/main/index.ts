@@ -7,18 +7,22 @@
  * On first run (no settings file), shows the setup wizard before the launcher.
  */
 
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
 import log from 'electron-log';
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { execSync, exec } from 'child_process';
+
+import util from 'util';
+const execAsync = util.promisify(exec);
+
 import os from 'os';
 
 import { serverManager } from './server';
 import { createLauncherWindow, getLauncherWindow } from './launcher';
 import { setupTray, updateTrayMenu } from './tray';
 import { setupUpdater, checkForUpdates, downloadUpdate, installUpdate } from './updater';
-import authManager from './auth/index';
+import { authManager, winToWsl } from './auth/index';
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -100,15 +104,13 @@ function createWizardWindow(): BrowserWindow {
     fullscreenable: false,
     backgroundColor: '#09090f',
     show: false,
-
-    ...(process.platform === 'darwin'
-      ? { titleBarStyle: 'hidden' as const }
-      : { frame: false }),
+    title: 'GhostLink Setup',
+    autoHideMenuBar: true,
+    frame: false,
 
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: true,
+      contextIsolation: false,
     },
   });
 
@@ -116,6 +118,9 @@ function createWizardWindow(): BrowserWindow {
 
   wizardWindow.once('ready-to-show', () => {
     wizardWindow?.show();
+    if (!app.isPackaged) {
+      wizardWindow?.webContents.openDevTools({ mode: 'detach' });
+    }
     log.info('Wizard window ready');
   });
 
@@ -157,6 +162,11 @@ function createChatWindow(port: number): void {
   chatWindow.once('ready-to-show', () => {
     chatWindow?.show();
     chatWindow?.focus();
+    // Hide the launcher when chat opens
+    const launcher = getLauncherWindow();
+    if (launcher && !launcher.isDestroyed()) {
+      launcher.hide();
+    }
     log.info('Chat window opened on port', port);
   });
 
@@ -198,48 +208,87 @@ function setupWizardIPC(): void {
   });
 
   // ── Python detection ──────────────────────────────────────────────────
-  ipcMain.handle('wizard:detect-python', async () => {
+  ipcMain.handle('wizard:detect-python', async (_event, wizardPlatform?: string) => {
     let pythonPath = '';
     let version = '';
     let found = false;
     let depsInstalled = false;
 
-    // Try python3 first, then python
-    const candidates = ['python3', 'python'];
-    for (const cmd of candidates) {
-      try {
-        const output = execSync(`${cmd} --version`, {
-          timeout: 10000,
-          stdio: 'pipe',
-          encoding: 'utf-8',
-        }).trim();
-        // Output is like "Python 3.10.11"
-        const match = output.match(/Python\s+([\d.]+)/);
-        if (match) {
-          const ver = match[1];
-          const parts = ver.split('.').map(Number);
-          if (parts[0] >= 3 && parts[1] >= 10) {
-            pythonPath = cmd;
-            version = ver;
-            found = true;
-            break;
-          }
-        }
-      } catch {
-        // Not found, try next
-      }
-    }
+    // Determine if we should use WSL: check wizard-provided platform,
+    // or fall back to saved settings
+    const settings = loadSettings();
+    const useWsl = wizardPlatform === 'wsl' || settings?.platform === 'wsl';
 
-    if (found && pythonPath) {
-      // Check if fastapi is installed (key dep)
-      try {
-        execSync(`${pythonPath} -c "import fastapi"`, {
-          timeout: 10000,
-          stdio: 'pipe',
-        });
-        depsInstalled = true;
-      } catch {
-        depsInstalled = false;
+    if (useWsl) {
+      // Check python3 inside WSL
+      const candidates = ['python3', 'python'];
+      for (const cmd of candidates) {
+        try {
+          const { stdout: output } = await execAsync(`wsl bash -lc "${cmd} --version"`, {
+            timeout: 10000,
+            encoding: 'utf-8',
+          });
+          const match = String(output).trim().match(/Python\s+([\d.]+)/);
+          if (match) {
+            const ver = match[1];
+            const parts = ver.split('.').map(Number);
+            if (parts[0] >= 3 && parts[1] >= 10) {
+              pythonPath = cmd;
+              version = ver;
+              found = true;
+              break;
+            }
+          }
+        } catch {
+          // Not found, try next
+        }
+      }
+
+      if (found && pythonPath) {
+        // Check if fastapi is installed in WSL
+        try {
+          await execAsync(`wsl bash -lc "${pythonPath} -c 'import fastapi'"`, {
+            timeout: 10000,
+          });
+          depsInstalled = true;
+        } catch {
+          depsInstalled = false;
+        }
+      }
+    } else {
+      // Native: try python3 first, then python
+      const candidates = ['python3', 'python'];
+      for (const cmd of candidates) {
+        try {
+          const { stdout: output } = await execAsync(`${cmd} --version`, {
+            timeout: 10000,
+            encoding: 'utf-8',
+          });
+          const match = String(output).trim().match(/Python\s+([\d.]+)/);
+          if (match) {
+            const ver = match[1];
+            const parts = ver.split('.').map(Number);
+            if (parts[0] >= 3 && parts[1] >= 10) {
+              pythonPath = cmd;
+              version = ver;
+              found = true;
+              break;
+            }
+          }
+        } catch {
+          // Not found, try next
+        }
+      }
+
+      if (found && pythonPath) {
+        try {
+          await execAsync(`${pythonPath} -c "import fastapi"`, {
+            timeout: 10000,
+          });
+          depsInstalled = true;
+        } catch {
+          depsInstalled = false;
+        }
       }
     }
 
@@ -247,8 +296,11 @@ function setupWizardIPC(): void {
   });
 
   // ── Install dependencies ──────────────────────────────────────────────
-  ipcMain.handle('wizard:install-deps', async () => {
+  ipcMain.handle('wizard:install-deps', async (_event, wizardPlatform?: string) => {
     try {
+      const settings = loadSettings();
+      const useWsl = wizardPlatform === 'wsl' || settings?.platform === 'wsl';
+
       // Find requirements.txt relative to the app
       const appDir = app.isPackaged
         ? path.join(process.resourcesPath, 'app')
@@ -257,15 +309,36 @@ function setupWizardIPC(): void {
       const reqPath = path.join(appDir, 'requirements.txt');
 
       if (!fs.existsSync(reqPath)) {
-        log.warn('requirements.txt not found at', reqPath);
-        return { success: false, error: 'requirements.txt not found' };
+        // Also try backend/requirements.txt
+        const backendReq = path.join(appDir, 'backend', 'requirements.txt');
+        if (!fs.existsSync(backendReq)) {
+          log.warn('requirements.txt not found at', reqPath, 'or', backendReq);
+          return { success: false, error: 'requirements.txt not found' };
+        }
+        // Use the backend one
+        if (useWsl) {
+          const wslReqPath = winToWsl(backendReq);
+          await execAsync(`wsl bash -lc "pip install -r '${wslReqPath}'"`, {
+            timeout: 120000,
+          });
+        } else {
+          await execAsync(`pip install -r "${backendReq}"`, {
+            timeout: 120000,
+          });
+        }
+        return { success: true };
       }
 
-      execSync(`pip install -r "${reqPath}"`, {
-        timeout: 120000,
-        stdio: 'pipe',
-        encoding: 'utf-8',
-      });
+      if (useWsl) {
+        const wslReqPath = winToWsl(reqPath);
+        await execAsync(`wsl bash -lc "pip install -r '${wslReqPath}'"`, {
+          timeout: 120000,
+        });
+      } else {
+        await execAsync(`pip install -r "${reqPath}"`, {
+          timeout: 120000,
+        });
+      }
 
       return { success: true };
     } catch (err: any) {
@@ -398,6 +471,17 @@ function setupIPC(): void {
     }
   });
 
+  ipcMain.handle('auth:install', async (_event, provider: string) => {
+    log.info('auth:install requested for provider:', provider);
+    try {
+      await authManager.install(provider);
+      return { success: true };
+    } catch (err: any) {
+      log.error('auth:install failed:', err);
+      return { success: false, error: err.message ?? String(err) };
+    }
+  });
+
   // ── Updates ───────────────────────────────────────────────────────────
   ipcMain.handle('update:check', async () => {
     try {
@@ -483,6 +567,9 @@ let isQuitting = false;
 
 app.whenReady().then(async () => {
   log.info('Electron app ready');
+
+  // Remove default menu bar (File, Edit, View, etc.)
+  Menu.setApplicationMenu(null);
 
   // Wire up IPC (always needed — both wizard and launcher use shared channels)
   setupWizardIPC();

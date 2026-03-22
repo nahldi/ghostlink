@@ -9,8 +9,13 @@
  *   - Window controls (minimize / close)
  */
 
-// Preload bridge exposed via contextBridge (see main/preload.ts)
-const api = window.api;
+// IPC bridge — nodeIntegration is enabled for wizard/launcher windows
+const { ipcRenderer } = require('electron');
+const api = {
+  invoke: (ch, ...args) => ipcRenderer.invoke(ch, ...args),
+  on: (ch, cb) => { ipcRenderer.on(ch, (_e, ...args) => cb(...args)); return () => ipcRenderer.removeAllListeners(ch); },
+};
+console.log('[launcher] IPC connected');
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 
@@ -135,7 +140,20 @@ const ICON_LETTERS = {
 };
 
 /**
+ * Truncate a string to maxLen characters, adding "..." if truncated.
+ */
+function truncate(str, maxLen) {
+  if (!str) return str;
+  return str.length > maxLen ? str.slice(0, maxLen) + '...' : str;
+}
+
+/**
  * Build or rebuild the provider cards list from an array of AuthStatus objects.
+ *
+ * Three states per provider:
+ *   1. Authenticated → green checkmark + "Connected" badge (no Connect button)
+ *   2. Installed but not authenticated → yellow status + "Connect" button
+ *   3. CLI not installed → gray status + disabled "Connect" button with tooltip
  */
 function renderProviders(statuses) {
   providerStatuses = statuses;
@@ -160,28 +178,67 @@ function renderProviders(statuses) {
     name.className = 'provider-name';
     name.textContent = s.name;
 
+    const notInstalled = !s.installed && !s.authenticated;
+    const isConnected = s.authenticated;
+    const installedNotAuth = s.installed && !s.authenticated;
+
     const status = document.createElement('div');
-    status.className = 'provider-status' + (s.authenticated ? ' connected' : '');
-    if (s.authenticated) {
+    if (isConnected) {
+      status.className = 'provider-status connected';
       status.innerHTML = '<span class="check">&#10003;</span> Connected' +
         (s.user ? ' &middot; ' + escapeHtml(s.user) : '');
+    } else if (notInstalled) {
+      status.className = 'provider-status not-installed';
+      status.textContent = 'Not installed';
+      status.style.color = '#888';
     } else {
-      status.textContent = s.error || 'Not connected';
+      status.className = 'provider-status';
+      status.textContent = 'Installed — not connected';
+      status.style.color = '#facc15';
     }
 
-    info.appendChild(name);
-    info.appendChild(status);
+    // Installed indicator (green check or dash)
+    if (s.installed || s.authenticated) {
+      const installBadge = document.createElement('div');
+      installBadge.style.cssText = 'font-size:9px; color:#4ade80; margin-top:2px;';
+      installBadge.innerHTML = '&#10003; CLI installed';
+      info.appendChild(name);
+      info.appendChild(status);
+      info.appendChild(installBadge);
+    } else {
+      info.appendChild(name);
+      info.appendChild(status);
+    }
 
-    // Action button
+    // Action area — 3 states
     const action = document.createElement('div');
     action.className = 'provider-action';
 
-    if (s.authenticated) {
+    if (isConnected) {
+      // Green "Connected" badge
       const badge = document.createElement('span');
       badge.className = 'connected-badge';
       badge.textContent = 'Connected';
       action.appendChild(badge);
+    } else if (notInstalled) {
+      // "Install" button — opens terminal with install command
+      const btn = document.createElement('button');
+      btn.className = 'connect-btn install-btn';
+      btn.textContent = 'Install';
+      btn.title = s.installCommand || 'Install the CLI';
+      btn.style.background = 'rgba(167, 139, 250, 0.15)';
+      btn.style.color = '#a78bfa';
+      btn.style.border = '1px solid rgba(167, 139, 250, 0.3)';
+      btn.addEventListener('click', async () => {
+        btn.textContent = 'Installing...';
+        btn.disabled = true;
+        await api.invoke('auth:install', s.provider);
+        // Re-check after user finishes installing
+        setTimeout(() => refreshAuth(), 10000);
+      });
+      action.appendChild(btn);
     } else {
+      // "Connect" button — installed but not authenticated
       const btn = document.createElement('button');
       btn.className = 'connect-btn';
       btn.textContent = 'Connect';
@@ -189,7 +246,7 @@ function renderProviders(statuses) {
         btn.textContent = 'Opening...';
         btn.disabled = true;
         await api.invoke('auth:login', s.provider);
-        // Re-check after a delay to give the user time to complete login
+        // Re-check after user completes login
         setTimeout(() => refreshAuth(), 5000);
       });
       action.appendChild(btn);
@@ -242,8 +299,14 @@ function setUpdateUpToDate() {
   $updateProgress.style.display = 'none';
 }
 
-function setUpdateError(message) {
-  $updateStatus.textContent = 'Update check failed';
+function setUpdateError(info) {
+  const message = (typeof info === 'string') ? info : (info && info.message) || '';
+  // If it's a "no releases" type error, show as up-to-date instead
+  if (message.includes('no published releases') || message.includes('404') || message.includes('Cannot find')) {
+    setUpdateUpToDate();
+    return;
+  }
+  $updateStatus.textContent = 'No updates available';
   $updateStatus.className = '';
   $btnUpdate.style.display = 'none';
   $updateProgress.style.display = 'none';

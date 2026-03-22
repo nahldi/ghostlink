@@ -15,6 +15,7 @@ const INVOKE_CHANNELS = [
   'auth:check',
   'auth:check-all',
   'auth:login',
+  'auth:install',
   'update:check',
   'update:download',
   'update:install',

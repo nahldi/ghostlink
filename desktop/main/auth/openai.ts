@@ -1,12 +1,19 @@
 /**
  * OpenAI / Codex CLI authentication provider.
  *
- * Check  → `codex auth status`
- * Login  → `codex auth login` in a visible terminal
+ * Install: `npm install -g @openai/codex`
+ * Auth:    `codex auth login` or OPENAI_API_KEY env var
+ * Check:   Config dirs (~/.codex/ or ~/.config/codex/) or env var
  */
 
-import { execSync, spawn } from 'child_process';
+import { exec } from 'child_process';
+
+
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import type { AuthStatus } from './index';
+import { cmd, hasCommand, isWsl, spawnInTerminal, execAsync } from './index';
 
 const PROVIDER = 'openai';
 const NAME     = 'Codex';
@@ -14,88 +21,77 @@ const COLOR    = '#10a37f';
 const COMMAND  = 'codex';
 const ICON     = 'openai';
 
-// ── Check ────────────────────────────────────────────────────────────────────
-
 export async function checkOpenAI(): Promise<AuthStatus> {
   const base: AuthStatus = {
-    provider: PROVIDER,
-    name: NAME,
-    authenticated: false,
-    icon: ICON,
-    color: COLOR,
-    command: COMMAND,
+    provider: PROVIDER, name: NAME, authenticated: false, installed: false,
+    icon: ICON, color: COLOR, command: COMMAND,
+    installCommand: 'npm install -g @openai/codex',
   };
 
-  try {
-    const output = execSync('codex auth status', {
-      encoding: 'utf-8',
-      timeout: 10_000,
-      windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    // Codex CLI prints authentication info on success
-    const match = output.match(/Logged in|authenticated|active/i);
-    if (match || output.length > 0) {
-      // Try to extract a username or email
-      const userMatch = output.match(/(?:as|user|email)\s+(\S+)/i);
-      return {
-        ...base,
-        authenticated: true,
-        user: userMatch ? userMatch[1] : undefined,
-      };
+  // Check if CLI installed
+  if (!await hasCommand('codex')) {
+    // Also check API key without CLI
+    let hasApiKey = false;
+    try {
+      if (isWsl()) {
+        const envCheck = await execAsync('wsl bash -lc "test -n \\"$OPENAI_API_KEY\\" && echo set"', {
+          encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        hasApiKey = String(envCheck).includes('set');
+      } else {
+        hasApiKey = !!process.env.OPENAI_API_KEY;
+      }
+    } catch {}
+    if (hasApiKey) {
+      return { ...base, installed: true, authenticated: true, user: 'API key' };
     }
-
-    return { ...base, error: 'Not logged in' };
-  } catch (err: any) {
-    if (isCommandNotFound(err)) {
-      return { ...base, error: 'CLI not installed' };
-    }
-    return { ...base, error: err.stderr?.toString().trim() || 'Not logged in' };
+    return { ...base, error: 'Not installed' };
   }
-}
+  base.installed = true;
 
-// ── Login ────────────────────────────────────────────────────────────────────
+  // Check auth — look for config dirs and API key
+  try {
+    if (isWsl()) {
+      const wslHome = await execAsync('wsl bash -c "echo $HOME"', {
+        encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      const checkDirs = await execAsync(
+        `wsl bash -c "test -d '${wslHome}/.codex' || test -d '${wslHome}/.config/codex' && echo found"`,
+        { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      if (String(checkDirs).includes('found')) {
+        return { ...base, authenticated: true };
+      }
+
+      const envCheck = await execAsync('wsl bash -lc "test -n \\"$OPENAI_API_KEY\\" && echo set"', {
+        encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (String(envCheck).includes('set')) {
+        return { ...base, authenticated: true, user: 'API key' };
+      }
+    } else {
+      const home = os.homedir();
+      const configDirs = [
+        path.join(home, '.codex'),
+        path.join(home, '.config', 'codex'),
+      ];
+      for (const dir of configDirs) {
+        if (fs.existsSync(dir)) return { ...base, authenticated: true };
+      }
+      if (process.env.OPENAI_API_KEY) {
+        return { ...base, authenticated: true, user: 'API key' };
+      }
+    }
+  } catch {}
+
+  return { ...base, error: 'Not connected' };
+}
 
 export async function loginOpenAI(): Promise<void> {
   spawnInTerminal('codex auth login');
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isCommandNotFound(err: any): boolean {
-  const msg = (err.message ?? '') + (err.stderr?.toString() ?? '');
-  return (
-    msg.includes('not found') ||
-    msg.includes('not recognized') ||
-    msg.includes('ENOENT') ||
-    err.code === 'ENOENT'
-  );
-}
-
-function spawnInTerminal(cmd: string): void {
-  const platform = process.platform;
-  if (platform === 'win32') {
-    spawn('cmd.exe', ['/c', 'start', 'cmd.exe', '/k', cmd], {
-      shell: true,
-      detached: true,
-      stdio: 'ignore',
-    }).unref();
-  } else if (platform === 'darwin') {
-    spawn('osascript', [
-      '-e', `tell application "Terminal" to do script "${cmd}"`,
-      '-e', `tell application "Terminal" to activate`,
-    ], { stdio: 'ignore' }).unref();
-  } else {
-    const terminals = ['x-terminal-emulator', 'gnome-terminal', 'xterm'];
-    for (const term of terminals) {
-      try {
-        spawn(term, ['-e', cmd], {
-          detached: true,
-          stdio: 'ignore',
-        }).unref();
-        return;
-      } catch { /* try next */ }
-    }
-  }
+export async function installOpenAI(): Promise<void> {
+  spawnInTerminal('npm install -g @openai/codex && echo "Done! Now run: codex auth login"');
 }

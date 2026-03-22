@@ -1,12 +1,14 @@
 /**
  * GhostLink — Setup Wizard Renderer
- *
- * Multi-step first-run wizard that detects the user's platform,
- * shell, Python environment, and workspace before saving settings
- * and handing off to the launcher.
  */
 
-const api = window.api;
+// IPC bridge — nodeIntegration is enabled for wizard/launcher windows
+const { ipcRenderer } = require('electron');
+const api = {
+  invoke: (ch, ...args) => ipcRenderer.invoke(ch, ...args),
+  on: (ch, cb) => { ipcRenderer.on(ch, (_e, ...args) => cb(...args)); return () => ipcRenderer.removeAllListeners(ch); },
+};
+console.log('[wizard] IPC connected');
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -35,11 +37,11 @@ const $dots = document.querySelectorAll('.step-dot');
 
 // ── Titlebar controls ────────────────────────────────────────────────────────
 
-document.getElementById('btn-minimize').addEventListener('click', () => {
+document.getElementById('btn-minimize')?.addEventListener('click', () => {
   api.invoke('window:minimize');
 });
 
-document.getElementById('btn-close').addEventListener('click', () => {
+document.getElementById('btn-close')?.addEventListener('click', () => {
   api.invoke('window:close');
 });
 
@@ -101,9 +103,11 @@ document.querySelectorAll('.btn-back').forEach(btn => {
 
 // ── Screen 0: Welcome ────────────────────────────────────────────────────────
 
-document.getElementById('btn-welcome-next').addEventListener('click', () => {
+document.getElementById('btn-welcome-next')?.addEventListener('click', () => {
+  console.log('Next clicked, going to step 1');
   nextStep();
-  detectPlatform();
+  // Detect platform async (don't block navigation)
+  detectPlatform().catch(err => console.warn('Platform detect error:', err));
 });
 
 // ── Screen 1: Platform Selection ─────────────────────────────────────────────
@@ -146,7 +150,7 @@ document.querySelectorAll('#platform-radios .radio-card').forEach(card => {
   });
 });
 
-document.getElementById('btn-platform-next').addEventListener('click', () => {
+document.getElementById('btn-platform-next')?.addEventListener('click', () => {
   if (!settings.platform) return;
 
   // If WSL selected, default shell to ubuntu
@@ -184,7 +188,7 @@ document.querySelectorAll('#shell-radios .radio-card').forEach(card => {
   });
 });
 
-document.getElementById('btn-shell-next').addEventListener('click', () => {
+document.getElementById('btn-shell-next')?.addEventListener('click', () => {
   nextStep();
 });
 
@@ -210,7 +214,7 @@ async function runPythonCheck() {
   pythonOk = false;
 
   try {
-    const result = await api.invoke('wizard:detect-python');
+    const result = await api.invoke('wizard:detect-python', settings.platform);
 
     if (result && result.found) {
       settings.pythonPath = result.pythonPath || 'python';
@@ -275,7 +279,7 @@ api.on('wizard:deps-progress', (percent) => {
   $depsProgressText.textContent = Math.round(percent) + '%';
 });
 
-document.getElementById('btn-python-next').addEventListener('click', () => {
+document.getElementById('btn-python-next')?.addEventListener('click', () => {
   nextStep();
 });
 
@@ -283,7 +287,7 @@ document.getElementById('btn-python-next').addEventListener('click', () => {
 
 const $workspacePath = document.getElementById('workspace-path');
 
-document.getElementById('btn-browse').addEventListener('click', async () => {
+document.getElementById('btn-browse')?.addEventListener('click', async () => {
   const folder = await api.invoke('wizard:pick-folder');
   if (folder) {
     $workspacePath.value = folder;
@@ -291,7 +295,7 @@ document.getElementById('btn-browse').addEventListener('click', async () => {
   }
 });
 
-$workspacePath.addEventListener('input', () => {
+$workspacePath?.addEventListener('input', () => {
   settings.workspace = $workspacePath.value;
 });
 
@@ -301,7 +305,7 @@ api.on('wizard:folder-picked', (path) => {
   settings.workspace = path;
 });
 
-document.getElementById('btn-workspace-next').addEventListener('click', () => {
+document.getElementById('btn-workspace-next')?.addEventListener('click', () => {
   settings.workspace = $workspacePath.value;
   nextStep();
 });
@@ -339,7 +343,7 @@ function renderSummary() {
   ).join('');
 }
 
-document.getElementById('btn-finish').addEventListener('click', async () => {
+document.getElementById('btn-finish')?.addEventListener('click', async () => {
   const $btn = document.getElementById('btn-finish');
   $btn.textContent = 'Starting...';
   $btn.disabled = true;

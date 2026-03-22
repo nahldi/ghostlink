@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start the GhostLink server (backend only)
+# Start the AI Chattr server (backend only)
 set -e
 cd "$(dirname "$0")/backend"
 source ../.venv/bin/activate

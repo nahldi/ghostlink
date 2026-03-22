@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start GhostLink server + Claude agent wrapper
+# Start AI Chattr server + Claude agent wrapper
 set -e
 cd "$(dirname "$0")/backend"
 source ../.venv/bin/activate

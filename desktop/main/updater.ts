@@ -6,7 +6,7 @@
  * so the UI can display progress and prompt the user.
  */
 
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { autoUpdater, UpdateInfo } from 'electron-updater';
 import log from 'electron-log';
 
@@ -65,6 +65,24 @@ export function setupUpdater(launcherWindow: BrowserWindow): void {
 
   autoUpdater.on('error', (err: Error) => {
     log.error('Auto-updater error:', err.message);
+
+    // When there are no GitHub releases yet, treat it as "up to date"
+    // rather than showing a scary error to the user.
+    const msg = err.message ?? '';
+    if (
+      msg.includes('no published releases') ||
+      msg.includes('HttpError: 404') ||
+      msg.includes('Cannot find latest.yml') ||
+      msg.includes('net::ERR_') ||
+      msg.includes('ENOTFOUND')
+    ) {
+      log.info('No releases found — treating as up to date');
+      sendToLauncher('update:not-available', {
+        version: app.getVersion(),
+      });
+      return;
+    }
+
     sendToLauncher('update:error', {
       message: err.message,
     });

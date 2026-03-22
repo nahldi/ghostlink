@@ -32,6 +32,3 @@ memory/
 
 # Claude Code
 .claude/
-
-# Status/handoff (internal only)
-STATUS.md

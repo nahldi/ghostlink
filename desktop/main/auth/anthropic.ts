@@ -1,12 +1,16 @@
 /**
- * Anthropic / Claude CLI authentication provider.
+ * Anthropic / Claude Code CLI authentication provider.
  *
- * Check  → `claude auth status`
- * Login  → `claude auth login` in a visible terminal
+ * Install: `npm install -g @anthropic-ai/claude-code`
+ * Auth:    `claude auth login` (browser OAuth) or ANTHROPIC_API_KEY env var
+ * Check:   `claude auth status` or check ~/.claude/ directory
  */
 
-import { execSync, spawn } from 'child_process';
+import { exec } from 'child_process';
+
+
 import type { AuthStatus } from './index';
+import { execCmd, isWsl, isCommandNotFound, spawnInTerminal, hasClaudeCli, execAsync } from './index';
 
 const PROVIDER = 'anthropic';
 const NAME     = 'Claude';
@@ -14,92 +18,70 @@ const COLOR    = '#e8734a';
 const COMMAND  = 'claude';
 const ICON     = 'anthropic';
 
-// ── Check ────────────────────────────────────────────────────────────────────
-
 export async function checkAnthropic(): Promise<AuthStatus> {
   const base: AuthStatus = {
-    provider: PROVIDER,
-    name: NAME,
-    authenticated: false,
-    icon: ICON,
-    color: COLOR,
-    command: COMMAND,
+    provider: PROVIDER, name: NAME, authenticated: false, installed: false,
+    icon: ICON, color: COLOR, command: COMMAND,
+    installCommand: 'npm install -g @anthropic-ai/claude-code',
   };
 
+  // Check installed — claude binary or via npx
+  const installed = await hasClaudeCli();
+
+  // Also check API key as alternative
+  let hasApiKey = false;
   try {
-    const output = execSync('claude auth status', {
-      encoding: 'utf-8',
-      timeout: 10_000,
-      windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    // Claude CLI prints "Logged in as <user>" on success
-    const match = output.match(/Logged in as\s+(.+)/i);
-    if (match) {
-      return { ...base, authenticated: true, user: match[1].trim() };
+    if (isWsl()) {
+      const envCheck = await execAsync('wsl bash -lc "test -n \\"$ANTHROPIC_API_KEY\\" && echo set"', {
+        encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5_000,
+      });
+      hasApiKey = String(envCheck).includes('set');
+    } else {
+      hasApiKey = !!process.env.ANTHROPIC_API_KEY;
     }
+  } catch {}
 
-    // Exit code 0 but no recognizable line — treat as authenticated
-    if (output.length > 0) {
-      return { ...base, authenticated: true, user: output.split('\n')[0] };
-    }
-
-    return { ...base, error: 'Not logged in' };
-  } catch (err: any) {
-    // "command not found" or similar
-    if (isCommandNotFound(err)) {
-      return { ...base, error: 'CLI not installed' };
-    }
-    // Non-zero exit likely means not authenticated
-    return { ...base, error: err.stderr?.toString().trim() || 'Not logged in' };
+  if (!installed && !hasApiKey) {
+    return { ...base, error: 'Not installed' };
   }
-}
+  base.installed = true;
 
-// ── Login ────────────────────────────────────────────────────────────────────
+  if (hasApiKey) {
+    return { ...base, authenticated: true, user: 'API key' };
+  }
+
+  // Check auth status via CLI
+  try {
+    const output = await execCmd('claude auth status');
+    if (/logged in|authenticated|active/i.test(output)) {
+      const userMatch = output.match(/(?:as|user|email|account)\s+(\S+)/i);
+      return { ...base, authenticated: true, user: userMatch ? userMatch[1] : '(session)' };
+    }
+  } catch (err: any) {
+    if (isCommandNotFound(err)) {
+      // Shouldn't happen if hasClaudeCli passed, but handle gracefully
+    }
+  }
+
+  // Check ~/.claude/ directory (indicates prior auth session)
+  try {
+    if (isWsl()) {
+      const result = await execAsync('wsl bash -lc "test -d ~/.claude && ls ~/.claude/ 2>/dev/null | head -1"', {
+        encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5_000,
+      });
+      if (String(result).length > 0) {
+        return { ...base, authenticated: true, user: '(session)' };
+      }
+    }
+  } catch {}
+
+  return { ...base, error: 'Not connected' };
+}
 
 export async function loginAnthropic(): Promise<void> {
   spawnInTerminal('claude auth login');
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isCommandNotFound(err: any): boolean {
-  const msg = (err.message ?? '') + (err.stderr?.toString() ?? '');
-  return (
-    msg.includes('not found') ||
-    msg.includes('not recognized') ||
-    msg.includes('ENOENT') ||
-    err.code === 'ENOENT'
-  );
-}
-
-function spawnInTerminal(cmd: string): void {
-  const platform = process.platform;
-  if (platform === 'win32') {
-    // Open a visible cmd.exe window
-    spawn('cmd.exe', ['/c', 'start', 'cmd.exe', '/k', cmd], {
-      shell: true,
-      detached: true,
-      stdio: 'ignore',
-    }).unref();
-  } else if (platform === 'darwin') {
-    // macOS: open Terminal.app with the command
-    spawn('osascript', [
-      '-e', `tell application "Terminal" to do script "${cmd}"`,
-      '-e', `tell application "Terminal" to activate`,
-    ], { stdio: 'ignore' }).unref();
-  } else {
-    // Linux: try common terminal emulators
-    const terminals = ['x-terminal-emulator', 'gnome-terminal', 'xterm'];
-    for (const term of terminals) {
-      try {
-        spawn(term, ['-e', cmd], {
-          detached: true,
-          stdio: 'ignore',
-        }).unref();
-        return;
-      } catch { /* try next */ }
-    }
-  }
+export async function installAnthropic(): Promise<void> {
+  spawnInTerminal('npm install -g @anthropic-ai/claude-code && echo "Done! Now run: claude auth login"');
 }

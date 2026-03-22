@@ -4,6 +4,9 @@
  * Handles finding the correct Python interpreter, resolving the backend
  * directory for both dev and packaged environments, spawning the process,
  * health-checking until the server is ready, and graceful shutdown.
+ *
+ * When the user's platform setting is "wsl", all Python commands run
+ * inside WSL and paths are translated from Windows to WSL format.
  */
 
 import { ChildProcess, spawn, execSync } from 'child_process';
@@ -12,6 +15,7 @@ import path from 'path';
 import fs from 'fs';
 import http from 'http';
 import log from 'electron-log';
+import os from 'os';
 
 interface ServerStatus {
   running: boolean;
@@ -23,6 +27,35 @@ interface StartResult {
   success: boolean;
   port?: number;
   error?: string;
+}
+
+// ── Platform helpers ─────────────────────────────────────────────────────────
+
+function getSettings(): Record<string, any> | null {
+  try {
+    const settingsPath = path.join(os.homedir(), '.ghostlink', 'settings.json');
+    if (!fs.existsSync(settingsPath)) return null;
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function isWsl(): boolean {
+  const settings = getSettings();
+  return settings?.platform === 'wsl';
+}
+
+/**
+ * Convert a Windows path like C:\Users\foo\bar to WSL path /mnt/c/Users/foo/bar.
+ */
+function winToWsl(windowsPath: string): string {
+  let p = windowsPath.replace(/\\/g, '/');
+  const driveMatch = p.match(/^([A-Za-z]):\//);
+  if (driveMatch) {
+    p = `/mnt/${driveMatch[1].toLowerCase()}/${p.slice(3)}`;
+  }
+  return p;
 }
 
 class ServerManager {
@@ -42,6 +75,15 @@ class ServerManager {
       return { success: true, port: this.port };
     }
 
+    const useWsl = isWsl();
+    const backendPath = this.getBackendPath();
+
+    if (useWsl) {
+      return this.startViaWsl(backendPath);
+    }
+
+    // ---- Native path ----
+
     const pythonPath = this.getPythonPath();
     if (!pythonPath) {
       const msg = 'Could not find a Python interpreter. Please install Python 3.10+.';
@@ -49,7 +91,6 @@ class ServerManager {
       return { success: false, error: msg };
     }
 
-    const backendPath = this.getBackendPath();
     if (!fs.existsSync(backendPath)) {
       const msg = `Backend directory not found: ${backendPath}`;
       log.error(msg);
@@ -84,30 +125,10 @@ class ServerManager {
           PYTHONUNBUFFERED: '1',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
-        // On Windows, detach so the child survives briefly during shutdown
         detached: process.platform !== 'win32',
       });
 
-      // Pipe stdout / stderr to electron-log
-      this.process.stdout?.on('data', (data: Buffer) => {
-        log.info('[backend]', data.toString().trimEnd());
-      });
-
-      this.process.stderr?.on('data', (data: Buffer) => {
-        log.warn('[backend:err]', data.toString().trimEnd());
-      });
-
-      this.process.on('exit', (code, signal) => {
-        log.info('Backend process exited — code=%s signal=%s', code, signal);
-        this.process = null;
-      });
-
-      this.process.on('error', (err) => {
-        log.error('Backend process error:', err);
-        this.process = null;
-      });
-
-      // Wait for the health endpoint to respond
+      this.attachProcessHandlers();
       await this.waitForReady();
       log.info('Backend server is ready on port %d', this.port);
       return { success: true, port: this.port };
@@ -116,6 +137,196 @@ class ServerManager {
       await this.stop();
       return { success: false, error: err.message ?? String(err) };
     }
+  }
+
+  /**
+   * Start the backend through WSL.
+   * Spawns: wsl bash -c "cd <wslPath> && source ../.venv/bin/activate && python app.py"
+   */
+  private async startViaWsl(backendPath: string): Promise<StartResult> {
+    let wslBackend = winToWsl(backendPath);
+
+    // Check Python is available in WSL
+    try {
+      execSync('wsl bash -lc "python3 --version"', { stdio: 'pipe', timeout: 10_000 });
+    } catch {
+      return { success: false, error: 'Python3 not found in WSL. Install Python 3.10+ in your WSL distro.' };
+    }
+
+    // OneDrive / cloud paths often aren't fully accessible from WSL
+    // Test by actually trying to read a file, not just checking if dir exists
+    let pathAccessible = false;
+    try {
+      const result = execSync(
+        `wsl bash -c "cat '${wslBackend}/app.py' > /dev/null 2>&1 && echo ok"`,
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 }
+      ).trim();
+      pathAccessible = result.includes('ok');
+    } catch {}
+
+    // Also check if the path contains OneDrive — these are always problematic
+    if (wslBackend.toLowerCase().includes('onedrive')) {
+      log.info('OneDrive path detected — will copy to /tmp/ for WSL compatibility');
+      pathAccessible = false;
+    }
+
+    if (!pathAccessible) {
+      log.info('Backend path not accessible from WSL (%s) — copying to /tmp/ghostlink-backend/', wslBackend);
+      try {
+        // Copy via Windows -> WSL using PowerShell + wsl cp
+        const winBackend = backendPath.replace(/\//g, '\\');
+        execSync(`powershell.exe -Command "if (Test-Path '/tmp/ghostlink-backend' -PathType Container) { Remove-Item '/tmp/ghostlink-backend' -Recurse -Force -ErrorAction SilentlyContinue }"`, { stdio: 'ignore', timeout: 10_000 });
+
+        // Create dir and copy files using wsl
+        execSync('wsl bash -c "rm -rf /tmp/ghostlink-backend && mkdir -p /tmp/ghostlink-backend"', { stdio: 'pipe', timeout: 5_000 });
+
+        // Copy each Python file individually via wsl
+        const filesToCopy = fs.readdirSync(backendPath).filter(f => f.endsWith('.py') || f.endsWith('.txt') || f.endsWith('.toml'));
+        for (const file of filesToCopy) {
+          const src = path.join(backendPath, file);
+          const content = fs.readFileSync(src, 'utf-8');
+          // Write via wsl bash to avoid path issues
+          execSync(`wsl bash -c "cat > /tmp/ghostlink-backend/${file}"`, {
+            input: content,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: 5_000,
+          });
+        }
+
+        // Copy frontend dist — check both packaged layout (frontend/) and dev layout (frontend/dist/)
+        let frontendSrc = path.resolve(backendPath, '..', 'frontend', 'dist');
+        if (!fs.existsSync(frontendSrc) || !fs.existsSync(path.join(frontendSrc, 'index.html'))) {
+          // Packaged app: electron-builder copies dist contents directly to frontend/
+          frontendSrc = path.resolve(backendPath, '..', 'frontend');
+        }
+
+        if (fs.existsSync(frontendSrc) && fs.existsSync(path.join(frontendSrc, 'index.html'))) {
+          log.info('Copying frontend from %s to /tmp/ghostlink-frontend/', frontendSrc);
+          execSync('wsl bash -c "rm -rf /tmp/ghostlink-frontend && mkdir -p /tmp/ghostlink-frontend"', { stdio: 'pipe', timeout: 5_000 });
+          const copyFrontend = (dir: string, wslDir: string) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const fullPath = path.join(dir, entry.name);
+              const wslPath = `${wslDir}/${entry.name}`;
+              if (entry.isDirectory()) {
+                execSync(`wsl bash -c "mkdir -p '${wslPath}'"`, { stdio: 'pipe', timeout: 5_000 });
+                copyFrontend(fullPath, wslPath);
+              } else {
+                const buf = fs.readFileSync(fullPath);
+                execSync(`wsl bash -c "cat > '${wslPath}'"`, {
+                  input: buf,
+                  stdio: ['pipe', 'pipe', 'pipe'],
+                  timeout: 10_000,
+                });
+              }
+            }
+          };
+          copyFrontend(frontendSrc, '/tmp/ghostlink-frontend');
+          // Update config to point to the copied frontend (not in a /dist subfolder)
+          execSync(`wsl bash -c "sed -i 's|static_dir.*|static_dir = \\\"/tmp/ghostlink-frontend\\\"|' /tmp/ghostlink-backend/config.toml"`, { stdio: 'pipe', timeout: 5_000 });
+          log.info('Frontend copied to /tmp/ghostlink-frontend/');
+        } else {
+          log.warn('Frontend dist not found at %s — chat UI will not be available', frontendSrc);
+        }
+
+        wslBackend = '/tmp/ghostlink-backend';
+        log.info('Backend copied to %s', wslBackend);
+      } catch (copyErr: any) {
+        log.error('Failed to copy backend to WSL:', copyErr.message);
+        return { success: false, error: 'Cannot access backend from WSL (OneDrive path). Try installing to a local folder instead.' };
+      }
+    }
+
+    // Check if ALL required deps are installed
+    const requiredModules = ['fastapi', 'uvicorn', 'aiosqlite', 'mcp', 'tomli', 'websockets'];
+    let depsOk = true;
+    for (const mod of requiredModules) {
+      try {
+        execSync(`wsl bash -lc "python3 -c \\"import ${mod}\\""`, { stdio: 'pipe', timeout: 10_000 });
+      } catch {
+        depsOk = false;
+        break;
+      }
+    }
+
+    if (!depsOk) {
+      log.info('Python deps missing in WSL — creating venv and installing...');
+      try {
+        // Create a venv at the backend location (avoids PEP 668 restrictions)
+        execSync(`wsl bash -lc "python3 -m venv '${wslBackend}/.venv' 2>&1"`, { stdio: 'pipe', timeout: 30_000 });
+        log.info('Created venv at %s/.venv', wslBackend);
+
+        // Install deps into the venv
+        const pipCmd = `source '${wslBackend}/.venv/bin/activate' && pip install fastapi uvicorn aiosqlite python-multipart mcp tomli websockets 2>&1`;
+        execSync(`wsl bash -lc "${pipCmd}"`, { stdio: 'pipe', timeout: 120_000 });
+        log.info('WSL Python deps installed into venv');
+      } catch (pipErr: any) {
+        log.error('pip install failed in WSL:', pipErr.message);
+        // Try with --break-system-packages as last resort
+        try {
+          execSync('wsl bash -lc "pip3 install --break-system-packages fastapi uvicorn aiosqlite python-multipart mcp tomli websockets 2>&1"', { stdio: 'pipe', timeout: 120_000 });
+          log.info('WSL Python deps installed (system-wide with --break-system-packages)');
+        } catch (fallbackErr: any) {
+          log.error('All pip install methods failed:', fallbackErr.message);
+          return { success: false, error: 'Failed to install Python deps. Open Ubuntu terminal and run:\nsudo apt update && sudo apt install -y python3-venv python3-pip\npython3 -m venv ~/.ghostlink-venv && source ~/.ghostlink-venv/bin/activate && pip install fastapi uvicorn aiosqlite python-multipart mcp tomli websockets' };
+        }
+      }
+    }
+
+    // Build the activation + run command — check venv at backend dir first (we may have just created it)
+    const venvActivate = [
+      `${wslBackend}/.venv/bin/activate`,
+      `${wslBackend}/../.venv/bin/activate`,
+    ];
+
+    let bashCmd = `cd '${wslBackend}' && `;
+    const venvChecks = venvActivate.map(v =>
+      `if [ -f '${v}' ]; then source '${v}'; fi`
+    ).join('; ');
+
+    bashCmd += `${venvChecks}; PORT=${this.port} PYTHONUNBUFFERED=1 python3 app.py`;
+
+    log.info('Starting backend via WSL — bash -lc "%s"', bashCmd);
+
+    try {
+      this.process = spawn('wsl', ['bash', '-lc', bashCmd], {
+        env: { ...process.env },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      this.attachProcessHandlers();
+      await this.waitForReady();
+      log.info('Backend server is ready on port %d (via WSL)', this.port);
+      return { success: true, port: this.port };
+    } catch (err: any) {
+      log.error('Failed to start backend via WSL:', err);
+      await this.stop();
+      return { success: false, error: err.message ?? String(err) };
+    }
+  }
+
+  /**
+   * Attach stdout/stderr logging and exit/error handlers to the spawned process.
+   */
+  private attachProcessHandlers(): void {
+    if (!this.process) return;
+
+    this.process.stdout?.on('data', (data: Buffer) => {
+      log.info('[backend]', data.toString().trimEnd());
+    });
+
+    this.process.stderr?.on('data', (data: Buffer) => {
+      log.warn('[backend:err]', data.toString().trimEnd());
+    });
+
+    this.process.on('exit', (code, signal) => {
+      log.info('Backend process exited — code=%s signal=%s', code, signal);
+      this.process = null;
+    });
+
+    this.process.on('error', (err) => {
+      log.error('Backend process error:', err);
+      this.process = null;
+    });
   }
 
   /**
@@ -190,7 +401,7 @@ class ServerManager {
   }
 
   /**
-   * Resolve the absolute path to the backend directory.
+   * Resolve the absolute path to the backend directory (Windows path).
    * In dev mode it lives at ../backend relative to the desktop folder.
    * In a packaged build it is in process.resourcesPath/backend.
    */
@@ -203,7 +414,7 @@ class ServerManager {
   }
 
   /**
-   * Locate a working Python interpreter.
+   * Locate a working Python interpreter (native — not WSL).
    * Priority:
    *   1. Virtual-env python inside the backend directory
    *   2. `python3` on PATH
@@ -307,7 +518,10 @@ class ServerManager {
    */
   private killTmuxSessions(): void {
     try {
-      execSync("tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {}", {
+      const tmuxCmd = isWsl()
+        ? "wsl bash -c \"tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {}\""
+        : "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {}";
+      execSync(tmuxCmd, {
         stdio: 'ignore',
         timeout: 5000,
       });

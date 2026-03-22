@@ -38,9 +38,8 @@ export function createLauncherWindow(): BrowserWindow {
       : { frame: false }),
 
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: true,
+      contextIsolation: false,
     },
   });
 
