@@ -107,10 +107,35 @@
       </div>
     </div>
 
+    <!-- Agents section -->
+    <div class="section" id="agents-section">
+      <div class="section-header clickable" id="agents-toggle">
+        <span class="section-title">Supported Agents</span>
+        <span id="agents-arrow" class="arrow">&#x25BC;</span>
+      </div>
+      <div id="agents-body" style="display:none">
+        <div class="agent-row"><span class="agent-dot" style="background:#e8734a"></span><span class="agent-name">Claude</span><span class="agent-provider">Anthropic</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#10a37f"></span><span class="agent-name">Codex</span><span class="agent-provider">OpenAI</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#4285f4"></span><span class="agent-name">Gemini</span><span class="agent-provider">Google</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#ff6b35"></span><span class="agent-name">Grok</span><span class="agent-provider">xAI</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#6cc644"></span><span class="agent-name">Copilot</span><span class="agent-provider">GitHub</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#14b8a6"></span><span class="agent-name">Aider</span><span class="agent-provider">Aider</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#f59e0b"></span><span class="agent-name">Goose</span><span class="agent-provider">Block</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#22c55e"></span><span class="agent-name">OpenCode</span><span class="agent-provider">OpenCode</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#ffffff"></span><span class="agent-name">Ollama</span><span class="agent-provider">Local</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#8b5cf6"></span><span class="agent-name">Pi</span><span class="agent-provider">Inflection</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#7c3aed"></span><span class="agent-name">Cursor</span><span class="agent-provider">Cursor</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#ff5543"></span><span class="agent-name">Cody</span><span class="agent-provider">Sourcegraph</span></div>
+        <div class="agent-row"><span class="agent-dot" style="background:#0ea5e9"></span><span class="agent-name">Continue</span><span class="agent-provider">Continue</span></div>
+        <div class="agents-hint">Install the CLI for any agent, then add it via Settings in the chat UI</div>
+      </div>
+    </div>
+
     <!-- Update section -->
     <div class="section" id="update-section">
       <div class="section-header">
         <span class="section-title">Updates</span>
+        <button id="btn-check-update" class="check-update-btn" title="Check for updates">&#x21BB;</button>
       </div>
       <div class="section-body">
         <div id="update-status">Checking...</div>

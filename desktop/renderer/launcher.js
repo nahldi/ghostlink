@@ -454,3 +454,32 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Check for updates
   api.invoke('update:check');
 });
+
+// ── Agents toggle ─────────────────────────────────────────────────────────
+
+const $agentsToggle = document.getElementById('agents-toggle');
+const $agentsBody = document.getElementById('agents-body');
+const $agentsArrow = document.getElementById('agents-arrow');
+
+if ($agentsToggle && $agentsBody && $agentsArrow) {
+  $agentsToggle.addEventListener('click', () => {
+    const isOpen = $agentsBody.style.display !== 'none';
+    $agentsBody.style.display = isOpen ? 'none' : 'block';
+    $agentsArrow.classList.toggle('open', !isOpen);
+  });
+}
+
+// ── Manual check for updates ──────────────────────────────────────────────
+
+const $btnCheckUpdate = document.getElementById('btn-check-update');
+if ($btnCheckUpdate) {
+  $btnCheckUpdate.addEventListener('click', async () => {
+    $btnCheckUpdate.classList.add('spinning');
+    $updateStatus.textContent = 'Checking...';
+    $updateStatus.className = '';
+    try {
+      await api.invoke('update:check');
+    } catch {}
+    setTimeout(() => $btnCheckUpdate.classList.remove('spinning'), 1000);
+  });
+}

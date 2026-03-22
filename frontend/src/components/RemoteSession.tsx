@@ -51,7 +51,7 @@ export function RemoteSession() {
         title="Start Remote Session"
         className="flex items-center gap-1 px-2 py-1 rounded-lg text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container transition-colors"
       >
-        <span className="material-symbols-rounded text-[20px]">phone_iphone</span>
+        <span className="material-symbols-outlined text-[20px]">phone_iphone</span>
       </button>
     );
   }
@@ -60,7 +60,7 @@ export function RemoteSession() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 px-2 py-1 rounded-lg text-on-surface-variant/60" title="Starting tunnel...">
-        <span className="material-symbols-rounded text-[20px] animate-spin">progress_activity</span>
+        <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
         <span className="text-xs">Starting...</span>
       </div>
     );
@@ -81,7 +81,7 @@ export function RemoteSession() {
         title={copied ? 'Copied!' : 'Copy URL'}
         className="flex items-center px-1 py-0.5 rounded text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container-high transition-colors"
       >
-        <span className="material-symbols-rounded text-[16px]">
+        <span className="material-symbols-outlined text-[16px]">
           {copied ? 'check' : 'content_copy'}
         </span>
       </button>
@@ -91,7 +91,7 @@ export function RemoteSession() {
         title="Stop Remote Session"
         className="flex items-center px-1 py-0.5 rounded text-on-surface-variant/60 hover:text-red-400 hover:bg-surface-container-high transition-colors"
       >
-        <span className="material-symbols-rounded text-[16px]">close</span>
+        <span className="material-symbols-outlined text-[16px]">close</span>
       </button>
     </div>
   );

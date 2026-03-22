@@ -175,29 +175,100 @@ body {
 
 /* ── Message entrance ── */
 @keyframes msg-slide-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.msg-enter { animation: msg-slide-in 0.2s ease-out both; }
+.msg-enter { animation: msg-slide-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-/* ── Glass surfaces ── */
+/* ── Panel entrance ── */
+@keyframes panel-slide-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes panel-fade-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes float-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Glass surfaces — liquid glass effect ── */
 .glass {
-  background: rgba(14, 14, 22, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(14, 14, 22, 0.88);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
 }
 
 .glass-strong {
-  background: rgba(12, 12, 18, 0.95);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(12, 12, 18, 0.92);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+/* ── Liquid glass card effect ── */
+.liquid-glass {
+  background: rgba(18, 18, 28, 0.55);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+}
+.liquid-glass:hover {
+  border-color: rgba(124, 58, 237, 0.15);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
 }
 
 /* ── Chat bubble glow on hover ── */
+.bubble-glow {
+  transition: box-shadow 0.3s, transform 0.2s;
+}
 .bubble-glow:hover {
-  box-shadow: 0 0 20px rgba(124, 58, 237, 0.08);
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.1), 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-0.5px);
+}
+
+/* ── Smooth transitions for interactive elements ── */
+button, a, input, select, textarea {
+  transition: all 0.15s ease;
+}
+
+/* ── Sidebar panel entrance animation ── */
+.sidebar-panel {
+  animation: panel-slide-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Modal backdrop ── */
+.modal-backdrop {
+  animation: panel-fade-in 0.15s ease-out both;
+}
+
+/* ── Channel tab active indicator ── */
+.channel-active {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.channel-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  animation: tab-indicator 0.2s ease-out both;
+}
+@keyframes tab-indicator {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 /* ── Markdown ── */

@@ -585,3 +585,107 @@ select.setting-input-sm option {
 .toggle:checked::after {
   transform: translateX(16px);
 }
+
+/* ── Agent list ────────────────────────────────────────────────────── */
+
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.15s;
+}
+.agent-row:hover {
+  background: rgba(255,255,255,0.02);
+}
+.agent-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.agent-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e4e4ec;
+  flex: 1;
+}
+.agent-provider {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+}
+.agents-hint {
+  padding: 10px 16px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  text-align: center;
+}
+#agents-section { animation-delay: 0.17s; }
+
+/* ── Check update button ───────────────────────────────────────────── */
+
+.check-update-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.4);
+  font-size: 14px;
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-app-region: no-drag;
+}
+.check-update-btn:hover {
+  background: rgba(167,139,250,0.1);
+  border-color: rgba(167,139,250,0.3);
+  color: #a78bfa;
+}
+.check-update-btn.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Liquid glass effect on sections ───────────────────────────────── */
+
+.section {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(18, 18, 28, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.section:hover {
+  border-color: rgba(124, 58, 237, 0.15);
+  box-shadow: 0 4px 24px rgba(124, 58, 237, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── Ambient background ────────────────────────────────────────────── */
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 50% 40% at 20% 20%, rgba(124, 58, 237, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 80% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
+}
+
+/* ── Server button glow when running ───────────────────────────────── */
+
+.primary-btn.running-glow {
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.35);
+  animation: btn-pulse 2s ease-in-out infinite;
+}
+
+@keyframes btn-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(124, 58, 237, 0.35); }
+  50% { box-shadow: 0 0 24px rgba(124, 58, 237, 0.5); }
+}
