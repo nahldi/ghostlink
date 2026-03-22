@@ -31,6 +31,7 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  allowSilentUpdate: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   artifactName: "GhostLink-Setup-${version}.${ext}"

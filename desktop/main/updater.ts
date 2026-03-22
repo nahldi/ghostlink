@@ -177,7 +177,9 @@ export async function downloadUpdate(): Promise<void> {
  */
 export function installUpdate(): void {
   log.info('Installing update — quitting and restarting...');
-  autoUpdater.quitAndInstall();
+  // isSilent=true: run installer without UI
+  // isForceRunAfter=true: relaunch app after install
+  autoUpdater.quitAndInstall(true, true);
 }
 
 // ---------- helpers ----------
