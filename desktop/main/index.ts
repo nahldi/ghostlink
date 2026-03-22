@@ -643,8 +643,18 @@ app.on('before-quit', async (event) => {
     } catch (err) {
       log.error('Error stopping server during quit:', err);
     }
-    // Clean up temp files copied for WSL compatibility
-    // Uses hardcoded safe paths only — no user input in command
+    // Kill any remaining ghostlink processes (tmux sessions, python)
+    try {
+      const { execFileSync } = require('child_process');
+      // Kill tmux sessions
+      execFileSync('wsl', ['bash', '-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null; pkill -f 'python.*app.py' 2>/dev/null || true"], {
+        stdio: 'ignore',
+        timeout: 5000,
+      });
+    } catch {
+      // Best-effort
+    }
+    // Clean up temp files
     try {
       const { execFileSync } = require('child_process');
       execFileSync('wsl', ['bash', '-c', 'rm -rf /tmp/ghostlink-backend /tmp/ghostlink-frontend'], {
@@ -654,6 +664,7 @@ app.on('before-quit', async (event) => {
     } catch {
       // Best-effort cleanup
     }
-    app.quit();
+    log.info('Cleanup complete — exiting');
+    app.exit(0);
   }
 });
