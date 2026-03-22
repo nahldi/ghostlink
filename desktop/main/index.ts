@@ -613,6 +613,7 @@ function setupIPC(): void {
 // App lifecycle
 // ---------------------------------------------------------------------------
 let isQuitting = false;
+let isTransitioning = false;
 
 app.whenReady().then(async () => {
   log.info('Electron app ready');
@@ -640,7 +641,6 @@ app.whenReady().then(async () => {
 });
 
 // Quit the app when all windows close — unless we're transitioning from wizard to launcher
-let isTransitioning = false;
 app.on('window-all-closed', () => {
   if (!isTransitioning) {
     app.quit();

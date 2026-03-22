@@ -377,7 +377,7 @@ After each phase, verify:
 - [ ] `npx tsc -b --noEmit` — zero TypeScript errors
 - [ ] `npx vite build` — successful frontend build
 - [ ] `python -c "import app"` — backend imports clean
-- [ ] No personal data in `ghostlink/` (grep for skull, Finn, nahlidify)
+- [ ] No personal data in `ghostlink/` (grep for owner usernames, hardcoded paths)
 - [ ] All tests pass (fail → fix → smoke → stress)
 - [ ] Visual check: desktop + mobile + light mode
 - [ ] Commit and push to GitHub
