@@ -183,6 +183,8 @@ def _resolve_identity(
     if token and _registry:
         inst = _registry.resolve_token(token)
         if inst:
+            if inst.is_token_expired():
+                return "", "Error: token expired. Send a heartbeat to rotate."
             _touch_presence(inst.name)
             return inst.name, None
         return "", "Error: stale or unknown token. Re-register and retry."

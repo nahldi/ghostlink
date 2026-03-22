@@ -62,7 +62,7 @@
 
 ### ~~BUG-010: "Update check failed" error on every launch~~ FIXED
 **Status:** FIXED (v1.0.0)
-**Fix:** electron-builder.yml already pointed to correct repo `nahldi/aichttr`. Updater error handler now gracefully suppresses network errors, 404s, missing releases, and DNS failures — shows "Up to date" instead of scary error text.
+**Fix:** electron-builder.yml pointed to correct repo `nahldi/ghostlink`. Updater error handler now gracefully suppresses network errors, 404s, missing releases, and DNS failures — shows "Up to date" instead of scary error text.
 
 ### BUG-011: Frontend dist path mismatch in packaged app
 **Severity:** Medium — frontend won't load if /tmp copy fails

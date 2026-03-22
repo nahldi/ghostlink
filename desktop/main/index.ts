@@ -658,26 +658,24 @@ app.on('before-quit', async (event) => {
     } catch (err) {
       log.error('Error stopping server during quit:', err);
     }
-    // Kill any remaining ghostlink processes (tmux sessions, python)
-    try {
-      const { execFileSync } = require('child_process');
-      // Kill tmux sessions
-      execFileSync('wsl', ['bash', '-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null; pkill -f 'python.*app.py' 2>/dev/null || true"], {
-        stdio: 'ignore',
-        timeout: 5000,
-      });
-    } catch {
-      // Best-effort
-    }
-    // Clean up temp files
-    try {
-      const { execFileSync } = require('child_process');
-      execFileSync('wsl', ['bash', '-c', 'rm -rf /tmp/ghostlink-backend /tmp/ghostlink-frontend'], {
-        stdio: 'ignore',
-        timeout: 5000,
-      });
-    } catch {
-      // Best-effort cleanup
+    // Platform-specific cleanup
+    if (process.platform === 'win32') {
+      // WSL cleanup: kill tmux sessions and python, remove temp files
+      // These commands use only hardcoded safe strings — no user input
+      try {
+        const { execFileSync: efs } = require('child_process');
+        efs('wsl', ['bash', '-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null || true"], { stdio: 'ignore', timeout: 5000 });
+      } catch { /* best-effort */ }
+      try {
+        const { execFileSync: efs } = require('child_process');
+        efs('wsl', ['bash', '-c', 'rm -rf /tmp/ghostlink-backend /tmp/ghostlink-frontend'], { stdio: 'ignore', timeout: 5000 });
+      } catch { /* best-effort */ }
+    } else {
+      // macOS / Linux: kill tmux sessions directly
+      try {
+        const { execFileSync: efs } = require('child_process');
+        efs('bash', ['-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null || true"], { stdio: 'ignore', timeout: 5000 });
+      } catch { /* tmux not installed or no sessions */ }
     }
     log.info('Cleanup complete — exiting');
     app.exit(0);

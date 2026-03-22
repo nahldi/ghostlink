@@ -173,9 +173,20 @@ class SkillsRegistry:
         }, indent=2), "utf-8")
 
     def get_all_skills(self) -> list[dict]:
-        """Return all available skills (builtin + installed)."""
+        """Return all available skills (builtin + custom installed)."""
         skills = list(BUILTIN_SKILLS)
-        # TODO: scan skills_dir for custom installed skills
+        # Scan skills_dir for custom installed skills
+        if self.skills_dir.exists():
+            for f in sorted(self.skills_dir.glob("*.json")):
+                try:
+                    import json as _json
+                    skill = _json.loads(f.read_text("utf-8"))
+                    if isinstance(skill, dict) and "id" in skill:
+                        skill["builtin"] = False
+                        skill.setdefault("source", "custom")
+                        skills.append(skill)
+                except Exception:
+                    pass
         return skills
 
     def get_agent_skills(self, agent_name: str) -> list[str]:

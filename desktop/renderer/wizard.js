@@ -8,7 +8,7 @@ const api = {
   invoke: (ch, ...args) => ipcRenderer.invoke(ch, ...args),
   on: (ch, cb) => { ipcRenderer.on(ch, (_e, ...args) => cb(...args)); return () => ipcRenderer.removeAllListeners(ch); },
 };
-console.log('[wizard] IPC connected');
+// IPC ready
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -104,7 +104,6 @@ document.querySelectorAll('.btn-back').forEach(btn => {
 // ── Screen 0: Welcome ────────────────────────────────────────────────────────
 
 document.getElementById('btn-welcome-next')?.addEventListener('click', () => {
-  console.log('Next clicked, going to step 1');
   nextStep();
   // Detect platform async (don't block navigation)
   detectPlatform().catch(err => console.warn('Platform detect error:', err));

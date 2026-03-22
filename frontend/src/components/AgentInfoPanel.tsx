@@ -3,6 +3,7 @@ import type { Agent } from '../types';
 import { AgentIcon } from './AgentIcon';
 import { api } from '../lib/api';
 import { useChatStore } from '../stores/chatStore';
+import { timeAgo } from '../lib/timeago';
 
 interface AgentInfoPanelProps {
   agent: Agent;
@@ -18,15 +19,6 @@ interface SkillItem {
   enabled: boolean;
 }
 
-function timeAgo(ts: number): string {
-  const now = Date.now() / 1000;
-  const diff = now - ts;
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
 export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
   const isActive = agent.state === 'active' || agent.state === 'idle' || agent.state === 'thinking';
   const isPaused = agent.state === 'paused';
@@ -40,8 +32,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
 
   useEffect(() => {
     if (tab === 'skills') {
-      fetch(`/api/skills/agent/${agent.name}`)
-        .then(r => r.json())
+      api.getAgentSkills(agent.name)
         .then(d => setSkills(d.skills || []))
         .catch(() => {});
     }
@@ -49,11 +40,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
 
   const toggleSkill = async (skillId: string, enabled: boolean) => {
     try {
-      await fetch(`/api/skills/agent/${agent.name}/toggle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skillId, enabled }),
-      });
+      await api.toggleAgentSkill(agent.name, skillId, enabled);
       setSkills(prev => prev.map(s => s.id === skillId ? { ...s, enabled } : s));
     } catch {}
   };
@@ -330,17 +317,17 @@ function HierarchySection({ agent }: { agent: Agent }) {
   return null;
 }
 
-// Model context window sizes (approximate)
-const MODEL_CONTEXT: Record<string, { tokens: number; label: string }> = {
-  claude: { tokens: 200000, label: '200K tokens' },
-  codex: { tokens: 200000, label: '200K tokens' },
-  gemini: { tokens: 1000000, label: '1M tokens' },
-  grok: { tokens: 131072, label: '131K tokens' },
-  copilot: { tokens: 128000, label: '128K tokens' },
-  aider: { tokens: 128000, label: '128K tokens' },
-  goose: { tokens: 128000, label: '128K tokens' },
-  opencode: { tokens: 128000, label: '128K tokens' },
-  ollama: { tokens: 32768, label: '32K tokens' },
+// Model context window sizes and pricing (approximate)
+const MODEL_CONTEXT: Record<string, { tokens: number; label: string; costPerMTok: number }> = {
+  claude: { tokens: 200000, label: '200K tokens', costPerMTok: 3 },
+  codex: { tokens: 200000, label: '200K tokens', costPerMTok: 2.5 },
+  gemini: { tokens: 1000000, label: '1M tokens', costPerMTok: 0 },
+  grok: { tokens: 131072, label: '131K tokens', costPerMTok: 5 },
+  copilot: { tokens: 128000, label: '128K tokens', costPerMTok: 0 },
+  aider: { tokens: 128000, label: '128K tokens', costPerMTok: 0 },
+  goose: { tokens: 128000, label: '128K tokens', costPerMTok: 0 },
+  opencode: { tokens: 128000, label: '128K tokens', costPerMTok: 0 },
+  ollama: { tokens: 32768, label: '32K tokens', costPerMTok: 0 },
 };
 
 function ContextPanel({ agent }: { agent: Agent }) {
@@ -367,7 +354,7 @@ function ContextPanel({ agent }: { agent: Agent }) {
     ? Math.floor((Date.now() / 1000 - agent.registered_at) / 60)
     : 0;
   const sessionDisplay = sessionMinutes < 60 ? `${sessionMinutes}m` : `${Math.floor(sessionMinutes / 60)}h ${sessionMinutes % 60}m`;
-  const estimatedCost = (estimatedTokens / 1_000_000) * 3;
+  const estimatedCost = (estimatedTokens / 1_000_000) * contextInfo.costPerMTok;
 
   const handleSaveSoul = async () => {
     setSaving(true);

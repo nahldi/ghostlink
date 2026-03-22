@@ -15,7 +15,7 @@ const api = {
   invoke: (ch, ...args) => ipcRenderer.invoke(ch, ...args),
   on: (ch, cb) => { ipcRenderer.on(ch, (_e, ...args) => cb(...args)); return () => ipcRenderer.removeAllListeners(ch); },
 };
-console.log('[launcher] IPC connected');
+// IPC ready
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 

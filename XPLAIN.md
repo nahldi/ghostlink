@@ -126,7 +126,7 @@ Responsive design — use it from your phone through a Cloudflare tunnel or loca
 ## Quick Start
 
 ```bash
-git clone https://github.com/nahldi/aichttr.git
+git clone https://github.com/nahldi/ghostlink.git
 cd ghostlink
 
 # Backend
