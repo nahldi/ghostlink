@@ -880,12 +880,20 @@ async def spawn_agent(request: Request):
     spawn_args = [venv_python, wrapper_path, base, "--headless"]
     if label:
         spawn_args.extend(["--label", label])
+    # Pass agent-specific args (e.g. --dangerously-skip-permissions for claude)
+    # These go after "--" so wrapper passes them through to the CLI
+    if extra_args:
+        spawn_args.append("--")
+        spawn_args.extend(extra_args)
 
     try:
+        spawn_env = os.environ.copy()
+        if cwd:
+            spawn_env["GHOSTLINK_AGENT_CWD"] = cwd
         proc = subprocess.Popen(
             spawn_args,
             cwd=str(BASE_DIR),
-            env=os.environ.copy(),
+            env=spawn_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )

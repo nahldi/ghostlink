@@ -487,7 +487,7 @@ def main():
     # Fall back to agent name as command if not in config
     command = agent_cfg.get("command", agent)
     agent_args = agent_cfg.get("args", [])
-    cwd = agent_cfg.get("cwd", ".")
+    cwd = os.environ.get("GHOSTLINK_AGENT_CWD") or agent_cfg.get("cwd", ".")
     color = agent_cfg.get("color", "")
     label = args.label or agent_cfg.get("label", "")
     data_dir = ROOT / config.get("server", {}).get("data_dir", "./data")
