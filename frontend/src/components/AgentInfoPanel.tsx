@@ -319,7 +319,7 @@ function HierarchySection({ agent }: { agent: Agent }) {
 
 // Model context window sizes and pricing (approximate)
 const MODEL_CONTEXT: Record<string, { tokens: number; label: string; costPerMTok: number }> = {
-  claude: { tokens: 200000, label: '200K tokens', costPerMTok: 3 },
+  claude: { tokens: 1000000, label: '1M tokens', costPerMTok: 15 },
   codex: { tokens: 200000, label: '200K tokens', costPerMTok: 2.5 },
   gemini: { tokens: 1000000, label: '1M tokens', costPerMTok: 0 },
   grok: { tokens: 131072, label: '131K tokens', costPerMTok: 5 },

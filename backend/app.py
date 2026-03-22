@@ -1655,10 +1655,10 @@ async def set_agent_config(name: str, request: Request):
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
     body = await request.json()
-    for key in ("label", "color", "role", "workspace"):
+    for key in ("label", "color", "role", "workspace", "responseMode"):
         if key in body:
             setattr(inst, key, body[key])
-    if "role" in body:
+    if "role" in body or "responseMode" in body:
         await broadcast("status", {"agents": _get_full_agent_list()})
     return {"ok": True}
 
