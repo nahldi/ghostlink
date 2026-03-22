@@ -65,15 +65,22 @@ class AgentRegistry:
         if not color:
             color = _COLORS.get(base, "#d2bbff")
 
-        slot = self._slot_counters.get(base, 0) + 1
-        self._slot_counters[base] = slot
+        # Reuse the base name if no agent with that name is currently registered
+        if base not in self._instances:
+            name = base
+            slot = 1
+        else:
+            # Multiple instances — find next available slot
+            slot = self._slot_counters.get(base, 1) + 1
+            name = f"{base}-{slot}"
+            # If this is the second instance, rename the first to base-1
+            if slot == 2 and base in self._instances:
+                old = self._instances.pop(base)
+                old.name = f"{base}-1"
+                old.slot = 1
+                self._instances[old.name] = old
 
-        name = base if slot == 1 else f"{base}-{slot}"
-        if slot == 2 and base in self._instances:
-            old = self._instances.pop(base)
-            old.name = f"{base}-1"
-            old.slot = 1
-            self._instances[old.name] = old
+        self._slot_counters[base] = slot
 
         inst = AgentInstance(
             name=name, base=base, label=label, color=color, slot=slot, state="active"
@@ -82,7 +89,14 @@ class AgentRegistry:
         return inst
 
     def deregister(self, name: str) -> bool:
-        return self._instances.pop(name, None) is not None
+        inst = self._instances.pop(name, None)
+        if inst:
+            # If no more instances of this base, reset the counter
+            remaining = [i for i in self._instances.values() if i.base == inst.base]
+            if not remaining:
+                self._slot_counters.pop(inst.base, None)
+            return True
+        return False
 
     def get(self, name: str) -> AgentInstance | None:
         return self._instances.get(name)

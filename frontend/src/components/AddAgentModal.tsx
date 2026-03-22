@@ -254,6 +254,12 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
             </div>
           </Section>
 
+          {/* Display Name */}
+          <Section label="Name" hint="Give your agent a custom name">
+            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)}
+              placeholder={template?.label || 'Agent'} className="setting-input text-[13px]" />
+          </Section>
+
           {/* Workspace */}
           <Section label="Workspace">
             <div className="flex gap-2">
@@ -282,11 +288,6 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
               Advanced Options
             </summary>
             <div className="space-y-4 mt-3">
-              {/* Display Name */}
-              <Section label="Display Name" hint="Optional">
-                <input type="text" value={label} onChange={(e) => setLabel(e.target.value)}
-                  placeholder={template?.label || 'Agent'} className="setting-input text-[13px]" />
-              </Section>
 
               {/* Permission Mode */}
               {presets.length > 1 && (
