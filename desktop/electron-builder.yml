@@ -49,4 +49,4 @@ linux:
 publish:
   provider: github
   owner: nahldi
-  repo: aichttr
+  repo: ghostlink

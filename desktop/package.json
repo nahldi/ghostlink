@@ -17,7 +17,7 @@
     "email": "ghostlink@users.noreply.github.com"
   },
   "license": "MIT",
-  "homepage": "https://github.com/nahldi/aichttr",
+  "homepage": "https://github.com/nahldi/ghostlink",
   "devDependencies": {
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",

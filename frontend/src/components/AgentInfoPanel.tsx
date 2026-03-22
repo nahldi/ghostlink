@@ -32,7 +32,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
   const isPaused = agent.state === 'paused';
   const [killing, setKilling] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [tab, setTab] = useState<'info' | 'skills'>('info');
+  const [tab, setTab] = useState<'info' | 'context' | 'skills'>('info');
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [skillSearch, setSkillSearch] = useState('');
   const [skillFilter, setSkillFilter] = useState('');
@@ -123,7 +123,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
 
           {/* Tabs */}
           <div className="flex gap-1 mt-4">
-            {(['info', 'skills'] as const).map(t => (
+            {(['info', 'context', 'skills'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -131,7 +131,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
                   tab === t ? 'bg-primary/10 text-primary' : 'text-on-surface-variant/40 hover:text-on-surface-variant/60'
                 }`}
               >
-                {t === 'info' ? '📋 Info' : `🧩 Skills ${skills.length > 0 ? `(${skills.filter(s => s.enabled).length})` : ''}`}
+                {t === 'info' ? 'Info' : t === 'context' ? 'Context' : `Skills ${skills.length > 0 ? `(${skills.filter(s => s.enabled).length})` : ''}`}
               </button>
             ))}
           </div>
@@ -154,6 +154,8 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
               {/* Response Mode */}
               <ResponseModeSelector agent={agent} />
             </div>
+          ) : tab === 'context' ? (
+            <ContextPanel agent={agent} onClose={onClose} />
           ) : (
             <div>
               {/* Search + filter */}
@@ -328,7 +330,167 @@ function HierarchySection({ agent }: { agent: Agent }) {
   return null;
 }
 
+// Model context window sizes (approximate)
+const MODEL_CONTEXT: Record<string, { tokens: number; label: string }> = {
+  claude: { tokens: 200000, label: '200K tokens' },
+  codex: { tokens: 200000, label: '200K tokens' },
+  gemini: { tokens: 1000000, label: '1M tokens' },
+  grok: { tokens: 131072, label: '131K tokens' },
+  copilot: { tokens: 128000, label: '128K tokens' },
+  aider: { tokens: 128000, label: '128K tokens' },
+  goose: { tokens: 128000, label: '128K tokens' },
+  opencode: { tokens: 128000, label: '128K tokens' },
+  ollama: { tokens: 32768, label: '32K tokens' },
+};
+
+function ContextPanel({ agent, onClose }: { agent: Agent; onClose: () => void }) {
+  const messages = useChatStore(s => s.messages);
+  const setAgents = useChatStore(s => s.setAgents);
+  const [soul, setSoul] = useState('');
+  const [notes, setNotes] = useState('');
+  const [memories, setMemories] = useState<{ key: string; size: number }[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  // Load soul, notes, memories
+  useEffect(() => {
+    api.getAgentSoul(agent.name).then(r => setSoul(r.soul || '')).catch(() => {});
+    api.getAgentNotes(agent.name).then(r => setNotes(r.notes || '')).catch(() => {});
+    api.getAgentMemories(agent.name).then(r => setMemories(r.memories || [])).catch(() => {});
+  }, [agent.name]);
+
+  const agentMsgs = messages.filter(m => m.sender === agent.name);
+  const totalChars = agentMsgs.reduce((s, m) => s + m.text.length, 0);
+  const estimatedTokens = Math.round(totalChars / 4);
+  const contextInfo = MODEL_CONTEXT[agent.base] || { tokens: 128000, label: '128K tokens' };
+  const usagePct = Math.min(100, (estimatedTokens / contextInfo.tokens) * 100);
+  const sessionMinutes = agent.registered_at
+    ? Math.floor((Date.now() / 1000 - agent.registered_at) / 60)
+    : 0;
+  const sessionDisplay = sessionMinutes < 60 ? `${sessionMinutes}m` : `${Math.floor(sessionMinutes / 60)}h ${sessionMinutes % 60}m`;
+  const estimatedCost = (estimatedTokens / 1_000_000) * 3;
+
+  const handleSaveSoul = async () => {
+    setSaving(true);
+    await api.setAgentSoul(agent.name, soul).catch(() => {});
+    setSaving(false);
+  };
+
+  const handleSaveNotes = async () => {
+    setSaving(true);
+    await api.setAgentNotes(agent.name, notes).catch(() => {});
+    setSaving(false);
+  };
+
+  const handleNewSession = async () => {
+    // Kill and re-spawn
+    await api.killAgent(agent.name).catch(() => {});
+    setTimeout(async () => {
+      await api.spawnAgent(agent.base, agent.label, agent.workspace || '.', agent.args || []).catch(() => {});
+      setTimeout(async () => {
+        const r = await api.getStatus();
+        setAgents(r.agents);
+      }, 3000);
+    }, 1000);
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Context Usage */}
+      <div className="py-3 px-3 rounded-xl bg-surface-container/30 border border-outline-variant/4">
+        <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-2">Context Window</div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] text-on-surface-variant/50">~{estimatedTokens > 1000 ? `${(estimatedTokens / 1000).toFixed(1)}K` : estimatedTokens} tokens used</span>
+          <span className="text-[11px] text-on-surface-variant/40">{contextInfo.label} max</span>
+        </div>
+        <div className="h-2 rounded-full bg-surface-container-highest/30 overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${usagePct}%`,
+              backgroundColor: usagePct > 80 ? '#ef4444' : usagePct > 50 ? '#f59e0b' : agent.color,
+            }}
+          />
+        </div>
+        <div className="flex items-center justify-between mt-2 text-[10px] text-on-surface-variant/35">
+          <span>{usagePct.toFixed(1)}% used</span>
+          <span>~{((contextInfo.tokens - estimatedTokens) / 1000).toFixed(0)}K remaining</span>
+        </div>
+      </div>
+
+      {/* Session Stats */}
+      <div className="py-3 px-3 rounded-xl bg-surface-container/30 border border-outline-variant/4">
+        <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-2">Session</div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="text-center py-2 px-2 rounded-lg bg-surface-container/40">
+            <div className="text-lg font-bold" style={{ color: agent.color }}>{agentMsgs.length}</div>
+            <div className="text-[9px] text-on-surface-variant/40">Messages</div>
+          </div>
+          <div className="text-center py-2 px-2 rounded-lg bg-surface-container/40">
+            <div className="text-lg font-bold" style={{ color: agent.color }}>{sessionDisplay}</div>
+            <div className="text-[9px] text-on-surface-variant/40">Uptime</div>
+          </div>
+          <div className="text-center py-2 px-2 rounded-lg bg-surface-container/40">
+            <div className="text-lg font-bold" style={{ color: agent.color }}>${estimatedCost.toFixed(4)}</div>
+            <div className="text-[9px] text-on-surface-variant/40">Est. Cost</div>
+          </div>
+          <div className="text-center py-2 px-2 rounded-lg bg-surface-container/40">
+            <div className="text-lg font-bold" style={{ color: agent.color }}>{memories.length}</div>
+            <div className="text-[9px] text-on-surface-variant/40">Memories</div>
+          </div>
+        </div>
+      </div>
+
+      {/* SOUL Identity */}
+      <div className="py-3 px-3 rounded-xl bg-surface-container/30 border border-outline-variant/4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider">SOUL Identity</div>
+          <button onClick={handleSaveSoul} disabled={saving} className="text-[9px] text-primary hover:text-primary/80 font-medium">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+        <textarea
+          value={soul}
+          onChange={e => setSoul(e.target.value)}
+          placeholder="Define this agent's personality and behavior..."
+          rows={3}
+          className="setting-input w-full text-[11px] resize-none"
+        />
+      </div>
+
+      {/* Notes */}
+      <div className="py-3 px-3 rounded-xl bg-surface-container/30 border border-outline-variant/4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider">Working Notes</div>
+          <button onClick={handleSaveNotes} disabled={saving} className="text-[9px] text-primary hover:text-primary/80 font-medium">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Scratch pad for this agent..."
+          rows={3}
+          className="setting-input w-full text-[11px] resize-none"
+        />
+      </div>
+
+      {/* Session Actions */}
+      {(agent.state === 'active' || agent.state === 'thinking') && (
+        <div className="flex gap-2">
+          <button
+            onClick={handleNewSession}
+            className="flex-1 py-2 rounded-lg text-xs font-medium text-on-surface-variant/50 hover:text-on-surface hover:bg-surface-container-high border border-outline-variant/10 transition-all flex items-center justify-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[14px]">refresh</span>
+            New Session
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function providerName(base: string): string {
-  const map: Record<string, string> = { claude: 'Anthropic', codex: 'OpenAI', gemini: 'Google DeepMind', grok: 'xAI', copilot: 'GitHub' };
+  const map: Record<string, string> = { claude: 'Anthropic', codex: 'OpenAI', gemini: 'Google DeepMind', grok: 'xAI', copilot: 'GitHub', aider: 'Aider', goose: 'Block', ollama: 'Ollama (Local)', opencode: 'OpenCode', cody: 'Sourcegraph', cursor: 'Cursor', continue: 'Continue', pi: 'Inflection' };
   return map[base] || base.charAt(0).toUpperCase() + base.slice(1);
 }

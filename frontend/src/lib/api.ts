@@ -274,4 +274,30 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(config),
     }),
+
+  // Agent soul, notes, memories
+  getAgentSoul: (name: string) =>
+    request<{ soul: string }>(`/api/agents/${encodeURIComponent(name)}/soul`),
+
+  setAgentSoul: (name: string, content: string) =>
+    request(`/api/agents/${encodeURIComponent(name)}/soul`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+
+  getAgentNotes: (name: string) =>
+    request<{ notes: string }>(`/api/agents/${encodeURIComponent(name)}/notes`),
+
+  setAgentNotes: (name: string, content: string) =>
+    request(`/api/agents/${encodeURIComponent(name)}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+
+  getAgentMemories: (name: string) =>
+    request<{ memories: { key: string; size: number }[] }>(`/api/agents/${encodeURIComponent(name)}/memories`),
+
+  // Share
+  shareConversation: (channel: string) =>
+    request<{ html: string; filename: string; message_count: number }>(`/api/share?channel=${encodeURIComponent(channel)}`),
 };

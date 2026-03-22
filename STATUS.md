@@ -3,7 +3,7 @@
 **Last updated:** 2026-03-22
 **Version:** v1.0.4
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
-**GitHub:** https://github.com/nahldi/aichttr (public)
+**GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
 
 ---
