@@ -114,12 +114,20 @@ body {
 }
 
 [data-theme="light"] .agent-chip {
-  background: color-mix(in srgb, var(--agent-color, #7c3aed) 15%, rgba(255, 255, 255, 0.95));
-  border: 1px solid color-mix(in srgb, var(--agent-color, #7c3aed) 30%, rgba(0, 0, 0, 0.1));
+  background: color-mix(in srgb, var(--agent-color, #7c3aed) 18%, rgba(240, 240, 248, 0.98));
+  border: 1px solid color-mix(in srgb, var(--agent-color, #7c3aed) 35%, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 [data-theme="light"] .agent-chip:hover {
-  background: color-mix(in srgb, var(--agent-color, #7c3aed) 22%, rgba(255, 255, 255, 0.98));
-  border-color: color-mix(in srgb, var(--agent-color, #7c3aed) 40%, rgba(0, 0, 0, 0.15));
+  background: color-mix(in srgb, var(--agent-color, #7c3aed) 25%, rgba(240, 240, 248, 1));
+  border-color: color-mix(in srgb, var(--agent-color, #7c3aed) 50%, rgba(0, 0, 0, 0.18));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .agent-chip .text-on-surface-variant {
+  color: #4a4a60;
+}
+[data-theme="light"] .agent-chip-thinking {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--agent-color) 30%, transparent);
 }
 
 .agent-pill-active {

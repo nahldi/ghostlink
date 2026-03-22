@@ -1,7 +1,7 @@
 # GhostLink — Known Bugs & Issues
 
 **Last updated:** 2026-03-22
-**Version:** v1.0.0
+**Version:** v1.0.4
 **Source:** Full codebase audit + bug fix pass
 
 ---
@@ -12,13 +12,9 @@
 **Status:** FIXED
 **Fix:** Replaced catch-all `@app.get("/{full_path:path}")` with `@app.middleware("http")` `spa_middleware` that only fires on 404 responses and explicitly skips `/ws`, `/api/`, and `/uploads/` paths.
 
-### BUG-002: Server startup fails on first run (missing Python deps)
-**Severity:** Critical on first install
-**Where:** Desktop app → Start Server
-**Symptom:** "Backend process exited before becoming ready"
-**Root cause:** WSL Ubuntu 24.04 uses Python 3.12 with PEP 668 which blocks `pip install` system-wide. Server creates venv and installs deps, but venv creation can fail if `python3-venv` package is not installed.
-**Status:** Partially fixed — creates venv and installs deps. May still fail if `python3-venv` not installed in WSL.
-**Workaround:** Run `sudo apt install python3-venv` in WSL before first launch.
+### ~~BUG-002: Server startup fails on first run (missing Python deps)~~ FIXED
+**Status:** FIXED (v1.0.4)
+**Fix:** Server now auto-detects missing python3-venv and attempts `sudo apt-get install -y python3-venv` automatically. Falls back to `--break-system-packages` as last resort. Clear error message if all methods fail.
 
 ### ~~BUG-003: `AgentMemory.__init__()` missing argument~~ FIXED
 **Status:** FIXED
@@ -81,21 +77,21 @@
 
 ## LOW — Polish issues
 
-### BUG-013: Cloudflare tunnel button not visible in desktop app
-**Severity:** Low — feature exists but may not render on smaller screens
-**File:** `frontend/src/App.tsx`
+### ~~BUG-013: Cloudflare tunnel button not visible in desktop app~~ FIXED
+**Status:** FIXED (v1.0.4)
+**Fix:** Agent bar now uses `flex-1 min-w-0 overflow-hidden` container, tunnel button stays visible with `ml-3 shrink-0`.
 
 ### BUG-014: Ghost logo shows as broken image
 **Severity:** Low — cosmetic
 **Root cause:** `/ghostlink.png` path works in dev but may not in packaged app if static serving path differs.
 
-### BUG-015: Stats panel text partially cut off on right edge
-**Severity:** Low — cosmetic on smaller screens
-**File:** `frontend/src/components/StatsPanel.tsx`
+### ~~BUG-015: Stats panel text partially cut off on right edge~~ FIXED
+**Status:** FIXED (v1.0.4)
+**Fix:** Added `overflow-x-hidden` to panel container and `overflow-hidden text-right` to stat rows.
 
-### BUG-016: Light mode agent chips barely visible
-**Severity:** Low — cosmetic in light mode only
-**Root cause:** Agent chip `color-mix` at low opacity invisible on light backgrounds.
+### ~~BUG-016: Light mode agent chips barely visible~~ FIXED
+**Status:** FIXED (v1.0.4)
+**Fix:** Light mode chip styles now use stronger color mixing (18% bg, 35% border), added `box-shadow`, and explicit text colors for contrast.
 
 ### BUG-017: Electron app installed to OneDrive Desktop by default
 **Severity:** Low — causes BUG-007

@@ -36,6 +36,13 @@
 - [x] **Agent presets** — 6 one-click presets: Code Reviewer, PM, DevOps, Creative Writer, Research Analyst, Test Engineer
 - [x] **Auto-route toggle** — settings toggle: agents receive ALL messages vs only @mentioned
 - [x] **Agent feedback** — thumbs up/down on agent messages, stored in agent memory
+- [x] **Voice input** — push-to-talk via Web Speech API, transcribes to message input
+- [x] **Share conversations** — export as self-contained styled HTML page
+- [x] **API rate limiting** — 120 req/min per IP on all /api/ endpoints
+- [x] **Token expiration** — agent tokens auto-rotate on heartbeat (1-hour TTL)
+- [x] **Skill safety scanning** — content validation blocks dangerous patterns (eval, exec, shell injection)
+- [x] **ARIA accessibility** — role/aria-label on main UI regions, reduced motion support
+- [x] **Config schema validation** — helpful errors on missing/malformed config.toml sections
 
 ### Observability
 - [x] **Activity timeline** — GET /api/activity, real-time feed via WebSocket

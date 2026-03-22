@@ -10,10 +10,54 @@ as the registry — no external hosting needed. Users can:
 
 import json
 import logging
+import re
 import time
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+
+# ── Skill Safety / Content Scanning ──────────────────────────────────────
+
+# Dangerous patterns that custom skills should NEVER contain
+_DANGEROUS_PATTERNS = [
+    (re.compile(r'\bos\.system\b'), "Direct shell execution via os.system"),
+    (re.compile(r'\b__import__\b'), "Dynamic import (potential code injection)"),
+    (re.compile(r'\beval\s*\('), "eval() call (code injection risk)"),
+    (re.compile(r'\bexec\s*\('), "exec() call (code injection risk)"),
+    (re.compile(r'\brm\s+-rf\s+\/'), "Recursive deletion of root filesystem"),
+    (re.compile(r'\bimport\s+ctypes\b'), "Low-level ctypes access"),
+]
+
+# Suspicious patterns that trigger warnings (not blocking)
+_WARNING_PATTERNS = [
+    (re.compile(r'\brequests\.(get|post|put|delete)\b'), "HTTP requests to external services"),
+    (re.compile(r'\bsmtplib\b'), "Email sending capability"),
+    (re.compile(r'\bshutil\.rmtree\b'), "Recursive directory deletion"),
+    (re.compile(r'\bos\.environ\b'), "Environment variable access"),
+]
+
+
+def scan_skill_content(content: str) -> dict:
+    """Scan skill implementation content for dangerous patterns.
+
+    Returns dict with safe (bool), errors (list), warnings (list).
+    """
+    errors = []
+    warnings = []
+
+    for pattern, reason in _DANGEROUS_PATTERNS:
+        if pattern.search(content):
+            errors.append({"pattern": pattern.pattern, "reason": reason})
+
+    for pattern, reason in _WARNING_PATTERNS:
+        if pattern.search(content):
+            warnings.append({"pattern": pattern.pattern, "reason": reason})
+
+    return {
+        "safe": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings,
+    }
 
 # Community skills catalog — stored locally, can be refreshed from GitHub
 _COMMUNITY_SKILLS: list[dict] = []
@@ -80,6 +124,19 @@ def setup(app, store=None, registry=None, mcp_bridge=None):
         if not name:
             return JSONResponse({"error": "name required"}, 400)
 
+        impl_content = (body.get("impl_content", "") or "").strip()
+        impl_type = body.get("impl_type", "prompt")
+
+        # Safety scan for script-type implementations
+        scan_result = None
+        if impl_type in ("script", "mcp") and impl_content:
+            scan_result = scan_skill_content(impl_content)
+            if not scan_result["safe"]:
+                return JSONResponse({
+                    "error": "Skill content failed safety scan",
+                    "scan": scan_result,
+                }, 400)
+
         skill = {
             "id": f"custom-{name.lower().replace(' ', '-')}",
             "name": name,
@@ -90,9 +147,11 @@ def setup(app, store=None, registry=None, mcp_bridge=None):
             "source": "custom",
             "author": (body.get("author", "") or "").strip(),
             "created_at": time.time(),
+            "scanned": True,
+            "scan_warnings": scan_result["warnings"] if scan_result else [],
             "implementation": {
-                "type": body.get("impl_type", "prompt"),  # prompt, script, mcp
-                "content": (body.get("impl_content", "") or "").strip(),
+                "type": impl_type,
+                "content": impl_content,
             },
         }
 
@@ -121,13 +180,37 @@ def setup(app, store=None, registry=None, mcp_bridge=None):
 
     @app.post("/api/marketplace/import")
     async def import_skill(request: Request):
-        """Import a skill from JSON."""
+        """Import a skill from JSON with safety scanning."""
         body = await request.json()
         skill_id = body.get("id", "")
         if not skill_id:
             return JSONResponse({"error": "skill must have an id"}, 400)
+
+        # Safety scan imported skill content
+        impl = body.get("implementation", {})
+        impl_content = impl.get("content", "")
+        impl_type = impl.get("type", "prompt")
+        if impl_type in ("script", "mcp") and impl_content:
+            scan_result = scan_skill_content(impl_content)
+            if not scan_result["safe"]:
+                return JSONResponse({
+                    "error": "Imported skill failed safety scan",
+                    "scan": scan_result,
+                }, 400)
+            body["scanned"] = True
+            body["scan_warnings"] = scan_result["warnings"]
+
         skill_file = custom_dir / f"{skill_id}.json"
         skill_file.write_text(json.dumps(body, indent=2), "utf-8")
         return {"ok": True, "id": skill_id}
+
+    @app.post("/api/marketplace/scan")
+    async def scan_skill(request: Request):
+        """Scan skill content for safety without saving."""
+        body = await request.json()
+        content = (body.get("content", "") or "").strip()
+        if not content:
+            return {"safe": True, "errors": [], "warnings": []}
+        return scan_skill_content(content)
 
     log.info("Skills marketplace plugin loaded")

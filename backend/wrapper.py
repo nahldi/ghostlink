@@ -64,8 +64,8 @@ def _write_json_mcp_settings(config_file: Path, url: str, transport: str = "http
     if config_file.exists():
         try:
             existing = json.loads(config_file.read_text("utf-8"))
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"  Warning: failed to read existing MCP settings: {e}")
     servers = existing.get("mcpServers", {})
     if transport in ("http", "streamable-http"):
         entry: dict = {"type": "http", "httpUrl": url, "trust": True}
@@ -220,8 +220,9 @@ def _deregister(server_port: int, name: str, token: str = ""):
     )
     try:
         urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).debug("Deregister %s failed: %s", name, e)
 
 
 def _auth_headers(token: str, *, include_json: bool = False) -> dict[str, str]:
@@ -409,9 +410,17 @@ def _queue_watcher(get_identity_fn, inject_fn, *, server_port: int = 8300,
         try:
             name, queue_file = get_identity_fn()
             if queue_file.exists() and queue_file.stat().st_size > 0:
-                with open(queue_file, "r", encoding="utf-8") as f:
+                # Atomic read-and-clear: rename to .processing, read, delete.
+                # New writes go to the original filename, so no triggers are lost.
+                processing_file = queue_file.with_suffix(".processing")
+                try:
+                    queue_file.rename(processing_file)
+                except (OSError, FileNotFoundError):
+                    time.sleep(1)
+                    continue
+                with open(processing_file, "r", encoding="utf-8") as f:
                     lines = f.readlines()
-                queue_file.write_text("", "utf-8")
+                processing_file.unlink(missing_ok=True)
 
                 channel = "general"
                 has_trigger = False
@@ -622,18 +631,25 @@ def main():
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     resp_data = json.loads(resp.read())
                 server_name = resp_data.get("name", current_name)
-                if server_name != current_name:
-                    set_runtime_identity(server_name)
+                new_token = resp_data.get("token")
+                if server_name != current_name or new_token:
+                    set_runtime_identity(
+                        server_name if server_name != current_name else None,
+                        new_token,
+                    )
             except urllib.error.HTTPError as exc:
                 if exc.code == 409:
                     try:
                         replacement = _register(server_port, agent, label)
                         set_runtime_identity(replacement["name"], replacement["token"])
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).debug("Re-registration failed: %s", e)
                 time.sleep(5)
                 continue
-            except Exception:
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).debug("Heartbeat failed: %s", e)
                 time.sleep(5)
                 continue
             time.sleep(5)
@@ -691,8 +707,9 @@ def main():
                     urllib.request.urlopen(req, timeout=5)
                     last_active = active
                     last_report_time = now
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).debug("Activity monitor error: %s", e)
 
     threading.Thread(target=_activity_monitor, daemon=True).start()
 

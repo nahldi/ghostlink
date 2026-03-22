@@ -75,7 +75,7 @@ class MessageStore:
             await self._db.executescript(MIGRATION_REACTIONS)
             await self._db.commit()
         except Exception:
-            pass  # Column already exists
+            pass  # Column already exists — expected on subsequent runs
         # FTS5 full-text search index
         try:
             await self._db.executescript(FTS_SCHEMA)
@@ -89,8 +89,9 @@ class MessageStore:
             if fts_count == 0 and msg_count > 0:
                 await self._db.execute("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')")
                 await self._db.commit()
-        except Exception:
-            pass  # FTS not available on this SQLite build
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).info("FTS5 not available (non-critical): %s", e)
 
     async def close(self):
         if self._db:

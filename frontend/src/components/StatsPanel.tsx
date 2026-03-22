@@ -35,7 +35,7 @@ export function StatsPanel() {
     .slice(0, 5);
 
   return (
-    <div className="w-56 min-w-0 shrink-0 hidden xl:flex flex-col gap-4 py-4 px-3 overflow-y-auto border-l border-outline-variant/8">
+    <div className="w-56 min-w-0 shrink-0 hidden xl:flex flex-col gap-4 py-4 px-3 overflow-y-auto overflow-x-hidden border-l border-outline-variant/8">
       {/* Session overview */}
       {sections.session && (
         <StatCard title="Session">
@@ -130,9 +130,9 @@ function StatCard({ title, children }: { title: string; children: React.ReactNod
 
 function StatRow({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-1 min-w-0">
+    <div className="flex items-center justify-between gap-2 py-1 min-w-0 overflow-hidden">
       <span className="text-[11px] text-on-surface-variant/50 shrink-0">{label}</span>
-      <span className="text-[11px] font-semibold truncate" style={{ color }}>{value}</span>
+      <span className="text-[11px] font-semibold truncate text-right" style={{ color }}>{value}</span>
     </div>
   );
 }

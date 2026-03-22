@@ -1,7 +1,49 @@
-import { useState, useRef, useCallback, useMemo, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
 import { api } from '../lib/api';
+
+// ── Voice Input (Web Speech API) ───────────────────────────────────
+
+const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+const VOICE_AVAILABLE = !!SpeechRecognition;
+
+function useVoiceInput(onTranscript: (text: string) => void) {
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const start = useCallback(() => {
+    if (!VOICE_AVAILABLE || listening) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      onTranscript(transcript);
+      setListening(false);
+    };
+
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }, [listening, onTranscript]);
+
+  const stop = useCallback(() => {
+    recognitionRef.current?.stop();
+    setListening(false);
+  }, []);
+
+  useEffect(() => {
+    return () => { recognitionRef.current?.abort(); };
+  }, []);
+
+  return { listening, start, stop, available: VOICE_AVAILABLE };
+}
 
 interface SlashCommand {
   name: string;
@@ -44,6 +86,11 @@ export function MessageInput() {
 
   const { suggestions, selectedIndex, setSelectedIndex, isOpen, applyMention } =
     useMentionAutocomplete(text, cursorPos);
+
+  // Voice input
+  const voice = useVoiceInput(useCallback((transcript: string) => {
+    setText(prev => prev ? `${prev} ${transcript}` : transcript);
+  }, []));
 
   // Slash commands
   const slashCommands: SlashCommand[] = useMemo(() => [
@@ -734,6 +781,21 @@ export function MessageInput() {
           rows={1}
           className="flex-1 bg-surface-container/60 rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/30 resize-none max-h-40 outline-none border border-outline-variant/8 focus:border-primary/25 focus:shadow-[0_0_16px_rgba(167,139,250,0.08)] transition-all"
         />
+        {voice.available && (
+          <button
+            onClick={voice.listening ? voice.stop : voice.start}
+            className={`p-2 rounded-lg transition-all active:scale-95 shrink-0 ${
+              voice.listening
+                ? 'bg-red-500/20 text-red-400 animate-pulse'
+                : 'text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container-high'
+            }`}
+            title={voice.listening ? 'Stop recording' : 'Voice input'}
+          >
+            <span className="material-symbols-outlined text-xl">
+              {voice.listening ? 'mic_off' : 'mic'}
+            </span>
+          </button>
+        )}
         <button
           onClick={handleSend}
           disabled={!text.trim()}

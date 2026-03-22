@@ -62,6 +62,20 @@ except Exception as e:
     print(f"ERROR: Failed to parse config.toml: {e}")
     sys.exit(1)
 
+# Validate required config sections
+_REQUIRED_SECTIONS = {
+    "server": ["port", "data_dir"],
+}
+for section, keys in _REQUIRED_SECTIONS.items():
+    if section not in CONFIG:
+        print(f"ERROR: config.toml missing [{section}] section.")
+        print(f"Required keys: {', '.join(keys)}")
+        print("See README.md for config.toml format.")
+        sys.exit(1)
+    for key in keys:
+        if key not in CONFIG[section]:
+            print(f"WARNING: config.toml [{section}] missing '{key}' — using default.")
+
 SERVER = CONFIG.get("server", {})
 PORT = int(os.environ.get("PORT", SERVER.get("port", 8300)))
 HOST = os.environ.get("HOST", SERVER.get("host", "127.0.0.1"))
@@ -311,26 +325,26 @@ async def lifespan(_app: FastAPI):
                             try:
                                 with open(queue_file, "a") as f:
                                     f.write(json.dumps({"channel": channel, "scheduled": True}) + "\n")
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                log.warning("Schedule queue write failed for %s: %s", agent, e)
                             # Post a system message about the trigger
                             try:
                                 asyncio.run_coroutine_threadsafe(
                                     store.add(sender="system", text=f"Scheduled: @{agent} — {command}", msg_type="system", channel=channel),
                                     asyncio.get_event_loop(),
                                 ).result(timeout=5)
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                log.warning("Schedule message post failed: %s", e)
                         # Mark as run
                         try:
                             asyncio.run_coroutine_threadsafe(
                                 schedule_store.mark_run(sched["id"]),
                                 asyncio.get_event_loop(),
                             ).result(timeout=5)
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+                        except Exception as e:
+                            log.warning("Schedule mark_run failed for %s: %s", sched["id"], e)
+            except Exception as e:
+                log.warning("Schedule checker error: %s", e)
             _schedule_stop.wait(60)
 
     sched_thread = threading.Thread(target=_schedule_checker, daemon=True)
@@ -347,7 +361,43 @@ async def lifespan(_app: FastAPI):
     await db.close()
 
 
+# ── Rate Limiting ──────────────────────────────────────────────────
+
+import collections
+
+_rate_limits: dict[str, collections.deque] = {}
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 120  # requests per window per IP
+
+
+@asynccontextmanager
+async def _rate_limit_lifespan(_app: FastAPI):
+    async with lifespan(_app):
+        yield
+
+
 app = FastAPI(title="GhostLink", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Simple IP-based rate limiting for API endpoints."""
+    if request.url.path.startswith("/api/"):
+        client_ip = request.client.host if request.client else "unknown"
+        now = time.time()
+        if client_ip not in _rate_limits:
+            _rate_limits[client_ip] = collections.deque()
+        dq = _rate_limits[client_ip]
+        # Remove old entries
+        while dq and dq[0] < now - _RATE_LIMIT_WINDOW:
+            dq.popleft()
+        if len(dq) >= _RATE_LIMIT_MAX:
+            return JSONResponse(
+                {"error": "Rate limit exceeded. Try again later."},
+                status_code=429,
+            )
+        dq.append(now)
+    return await call_next(request)
 
 
 # ── WebSocket endpoint ──────────────────────────────────────────────
@@ -855,8 +905,8 @@ async def kill_agent(name: str):
             ["tmux", "kill-session", "-t", session_name],
             capture_output=True, timeout=5,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("tmux kill-session for %s: %s", name, e)
 
     # Only kill the wrapper process for THIS agent
     async with _agent_lock:
@@ -864,8 +914,8 @@ async def kill_agent(name: str):
     if proc:
         try:
             proc.terminate()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Process terminate for %s: %s", name, e)
 
     if ok:
         await broadcast("status", {"agents": _get_full_agent_list()})
@@ -882,7 +932,8 @@ async def cleanup_stale():
         result = subprocess.run(["tmux", "list-sessions", "-F", "#{session_name}"],
                                 capture_output=True, text=True, timeout=5)
         sessions = [s.strip() for s in result.stdout.strip().split("\n") if s.strip().startswith("ghostlink-")]
-    except Exception:
+    except Exception as e:
+        log.debug("tmux list-sessions: %s", e)
         sessions = []
 
     # Check which sessions have no registered agent
@@ -893,8 +944,8 @@ async def cleanup_stale():
             try:
                 subprocess.run(["tmux", "kill-session", "-t", session], capture_output=True, timeout=5)
                 cleaned.append(session)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Failed to kill stale session %s: %s", session, e)
 
     # Kill orphaned wrapper processes
     async with _agent_lock:
@@ -903,8 +954,8 @@ async def cleanup_stale():
                 if proc.poll() is not None:  # Process already exited
                     _agent_processes.pop(key, None)
                     cleaned.append(f"process:{key}")
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Process cleanup for %s: %s", key, e)
 
     return {"ok": True, "cleaned": cleaned, "count": len(cleaned)}
 
@@ -921,14 +972,14 @@ async def shutdown_server():
                 proc = _agent_processes.get(inst.name)
                 if proc and proc.poll() is None:
                     proc.terminate()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Shutdown: failed to terminate %s: %s", inst.name, e)
 
     # Broadcast shutdown notice to all connected WebSocket clients
     try:
         await broadcast("system", {"event": "server_shutdown", "message": "Server is shutting down"})
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("Shutdown broadcast failed: %s", e)
 
     # Schedule the actual shutdown after response is sent
     async def _do_shutdown():
@@ -1064,7 +1115,12 @@ async def heartbeat(agent_name: str, request: Request):
         # Broadcast state change so frontend sees thinking glow
         if inst.state != old_state:
             await broadcast("status", {"agents": _get_full_agent_list()})
-        return {"ok": True, "name": inst.name}
+        result: dict = {"ok": True, "name": inst.name}
+        # Return rotated token if it changed
+        if inst.is_token_expired():
+            new_token = inst.rotate_token()
+            result["token"] = new_token
+        return result
     return JSONResponse({"error": "not found"}, 404)
 
 
@@ -1426,6 +1482,49 @@ async def export_channel(channel: str = "general", format: str = "markdown"):
         return {"markdown": md, "filename": f"{channel}-export.md"}
 
 
+@app.get("/api/share")
+async def share_conversation(channel: str = "general"):
+    """Generate a self-contained shareable HTML page for a conversation."""
+    if store._db is None:
+        raise RuntimeError("Database not initialized.")
+    cursor = await store._db.execute(
+        "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC", [channel],
+    )
+    rows = await cursor.fetchall()
+    msgs = [store._row_to_dict(r) for r in rows]
+    agent_colors = {inst.name: inst.color for inst in registry.get_all()}
+
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GhostLink — #{channel}</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#09090f;color:#e0dff0;font-family:'Inter',system-ui,sans-serif;padding:2rem;max-width:800px;margin:0 auto}}
+h1{{font-size:1.5rem;margin-bottom:1.5rem;color:#a78bfa}}
+.msg{{margin:0.75rem 0;padding:1rem;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05)}}
+.sender{{font-weight:700;font-size:0.875rem;margin-bottom:0.25rem}}
+.time{{color:#666;font-size:0.75rem;margin-left:0.5rem;font-weight:400}}
+.text{{font-size:0.875rem;line-height:1.6;white-space:pre-wrap;word-wrap:break-word}}
+.footer{{margin-top:2rem;text-align:center;color:#444;font-size:0.75rem}}
+pre{{background:rgba(0,0,0,0.3);padding:0.75rem;border-radius:8px;overflow-x:auto;font-size:0.8rem}}
+code{{font-family:'JetBrains Mono',monospace}}
+</style></head><body>
+<h1>#{channel}</h1>
+"""
+
+    for m in msgs:
+        color = agent_colors.get(m["sender"], "#38bdf8")
+        text_escaped = (m["text"]
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;"))
+        html += f'<div class="msg"><div class="sender" style="color:{color}">{m["sender"]}<span class="time">{m.get("time","")}</span></div><div class="text">{text_escaped}</div></div>\n'
+
+    html += f'<div class="footer">Exported from GhostLink — {len(msgs)} messages</div></body></html>'
+
+    return {"html": html, "filename": f"{channel}-share.html", "message_count": len(msgs)}
+
+
 # ── Hierarchy ────────────────────────────────────────────────────────
 
 @app.get("/api/hierarchy")
@@ -1582,8 +1681,8 @@ async def open_terminal(name: str):
     try:
         import shutil as _shutil
         # Try Windows Terminal (wt.exe) first
-        wt = _shutil.which("wt.exe") or "/mnt/c/Users/skull/AppData/Local/Microsoft/WindowsApps/wt.exe"
-        if Path(wt).exists() or _shutil.which("wt.exe"):
+        wt = _shutil.which("wt.exe")
+        if wt:
             subprocess.Popen(
                 ["wt.exe", "wsl", "tmux", "attach-session", "-t", session_name],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

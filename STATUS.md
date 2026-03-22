@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-22
-**Version:** v1.0.3
+**Version:** v1.0.4
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/aichttr (public)
 **License:** MIT
@@ -66,12 +66,12 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v1.0.3)
+## CURRENT STATE (v1.0.4)
 
 ### Numbers
-- **76 completed features** (see FEATURES.md for full list)
+- **80+ completed features** (see FEATURES.md for full list)
 - **37 React components**
-- **77+ API endpoints**
+- **80+ API endpoints**
 - **10 MCP tools** (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim)
 - **13 known AI agents** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)
 - **9 themes** (dark, light, cyberpunk, terminal, ocean, sunset, midnight, rosegold, arctic)
@@ -103,14 +103,19 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 - Auto-update from GitHub releases
 - Dashboard analytics API (message stats, token usage, costs)
 - Agent feedback (thumbs up/down stored in memory)
+- Voice input (Web Speech API push-to-talk)
+- Share conversations as self-contained HTML
+- Skill safety scanning (content validation for custom skills)
+- API rate limiting (120 req/min per IP)
+- Token expiration with auto-rotation on heartbeat
 
 ### What's Not Done Yet
 - Native Windows support without WSL (wrapper rewrite needed)
-- Skill safety/sandboxing for community skills (content scanning, validation)
 - Supermemory.ai integration (persistent cross-session agent memory)
-- Rate limiting on API endpoints
-- Accessibility (ARIA labels, high contrast, reduced motion — CSS media query exists but no ARIA)
 - OAuth token storage in OS keychain
+- Multi-project workspace switching without restart
+- IDE extensions (VS Code, Cursor panels)
+- Mobile app (React Native or PWA)
 
 ---
 
@@ -210,17 +215,20 @@ Paid agents (Claude, Codex, Grok) require their respective subscriptions but all
 - **Agent isolation** — per-agent memory directories, file locking (threading.RLock)
 - **Config validation** — helpful errors on missing/malformed config.toml
 - **No "system" impersonation** — removed from allowed human names
+- **Token expiration** — agent tokens auto-rotate on heartbeat (1-hour TTL)
+- **Rate limiting** — 120 requests/min per IP on all API endpoints
+- **Skill safety scanning** — content validation blocks dangerous patterns in custom skills
+- **ARIA labels** — accessibility attributes on main UI regions
+- **Reduced motion** — CSS `prefers-reduced-motion` media query support
 
 ### Not yet implemented:
-- Rate limiting on API endpoints
 - OS keychain for OAuth tokens
-- Skill content scanning/sandboxing for community skills
 
 ---
 
 ## DESKTOP APP FLOW
 
-1. **Install** — run `GhostLink Setup 1.0.3.exe` (79MB NSIS installer)
+1. **Install** — run `GhostLink Setup 1.0.4.exe` (79MB NSIS installer)
 2. **First run** — setup wizard: platform detection → Python check → deps install → workspace selection → done
 3. **Launcher** — shows server status, auth connections (Claude/Codex/Gemini/GitHub), settings, update check
 4. **Start Server** — launches Python backend via WSL (handles OneDrive path detection, venv creation, dep installation)

@@ -173,12 +173,11 @@ class ServerManager {
     if (!pathAccessible) {
       log.info('Backend path not accessible from WSL (%s) — copying to /tmp/ghostlink-backend/', wslBackend);
       try {
-        // Copy via Windows -> WSL using PowerShell + wsl cp
-        const winBackend = backendPath.replace(/\//g, '\\');
-        execSync(`powershell.exe -Command "if (Test-Path '/tmp/ghostlink-backend' -PathType Container) { Remove-Item '/tmp/ghostlink-backend' -Recurse -Force -ErrorAction SilentlyContinue }"`, { stdio: 'ignore', timeout: 10_000 });
+        // Clean up stale temp files from previous runs before copying
+        execSync('wsl bash -c "rm -rf /tmp/ghostlink-backend /tmp/ghostlink-frontend"', { stdio: 'pipe', timeout: 5_000 });
 
         // Create dir and copy files using wsl
-        execSync('wsl bash -c "rm -rf /tmp/ghostlink-backend && mkdir -p /tmp/ghostlink-backend"', { stdio: 'pipe', timeout: 5_000 });
+        execSync('wsl bash -c "mkdir -p /tmp/ghostlink-backend"', { stdio: 'pipe', timeout: 5_000 });
 
         // Copy each Python file individually via wsl
         const filesToCopy = fs.readdirSync(backendPath).filter(f => f.endsWith('.py') || f.endsWith('.txt') || f.endsWith('.toml'));
@@ -251,8 +250,22 @@ class ServerManager {
     if (!depsOk) {
       log.info('Python deps missing in WSL — creating venv and installing...');
       try {
+        // First, check if python3-venv is available. If not, try to install it.
+        try {
+          execSync('wsl bash -lc "python3 -m venv --help >/dev/null 2>&1"', { stdio: 'pipe', timeout: 10_000 });
+        } catch {
+          log.info('python3-venv not available — attempting to install...');
+          try {
+            execSync('wsl bash -lc "sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv 2>&1"', { stdio: 'pipe', timeout: 60_000 });
+            log.info('python3-venv installed successfully');
+          } catch (venvInstallErr: any) {
+            log.warn('Could not auto-install python3-venv: %s', venvInstallErr.message);
+          }
+        }
+
         // Create a venv at the backend location (avoids PEP 668 restrictions)
-        execSync(`wsl bash -lc "python3 -m venv '${wslBackend}/.venv' 2>&1"`, { stdio: 'pipe', timeout: 30_000 });
+        const venvCmd = `python3 -m venv '${wslBackend}/.venv' 2>&1`;
+        execSync(`wsl bash -lc "${venvCmd}"`, { stdio: 'pipe', timeout: 30_000 });
         log.info('Created venv at %s/.venv', wslBackend);
 
         // Install deps into the venv

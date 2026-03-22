@@ -359,6 +359,8 @@ function AppInner() {
       <MobileSidebar />
 
       <main
+        role="main"
+        aria-label="Chat area"
         className={`flex flex-col h-[100dvh] relative z-10 transition-all overflow-hidden ${
           sidebarPanel ? 'lg:ml-14 lg:mr-80' : 'lg:ml-14'
         }`}
@@ -366,9 +368,11 @@ function AppInner() {
         {/* Top bar: agents + channels */}
         <header className="sticky top-0 z-20 glass max-lg:mt-14">
           {/* Agent bar — desktop only */}
-          <div className="hidden lg:flex items-center px-6 py-2.5 border-b border-outline-variant/6 w-full">
-            <AgentBar />
-            <div className="ml-auto shrink-0">
+          <div className="hidden lg:flex items-center px-6 py-2.5 border-b border-outline-variant/6 w-full min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <AgentBar />
+            </div>
+            <div className="ml-3 shrink-0">
               <RemoteSession />
             </div>
           </div>
