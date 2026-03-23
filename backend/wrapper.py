@@ -159,7 +159,7 @@ def _apply_mcp_inject(
     launch_args: list[str] = []
     inject_env: dict[str, str] = {}
     settings_path: Path | None = None
-    config_dir = data_dir / "provider-config"
+    config_dir = (data_dir / "provider-config").resolve()
     transport = inject_cfg.get("mcp_transport", "http")
     server_url = _get_server_url(mcp_cfg or {}, transport)
 
@@ -181,7 +181,7 @@ def _apply_mcp_inject(
             config_dir / f"{instance_name}-mcp.json",
             server_url, token=token, project_servers=project_servers,
         )
-        launch_args = [flag, str(settings_path)]
+        launch_args = [flag, str(settings_path.resolve())]
 
     elif mode == "proxy_flag":
         template = inject_cfg.get("mcp_proxy_flag_template",
