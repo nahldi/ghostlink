@@ -513,6 +513,7 @@ function MarketplaceSection() {
   const [plugins, setPlugins] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [installing, setInstalling] = useState('');
+  const [uninstalling, setUninstalling] = useState('');
 
   useEffect(() => {
     api.browseMarketplace('', search).then(r => setPlugins(r.plugins || [])).catch((e) => console.warn('Marketplace browse:', e instanceof Error ? e.message : String(e)));
@@ -528,10 +529,12 @@ function MarketplaceSection() {
   };
 
   const handleUninstall = async (id: string) => {
+    setUninstalling(id);
     try {
       await api.uninstallMarketplacePlugin(id);
       api.browseMarketplace('', search).then(r => setPlugins(r.plugins || [])).catch((e) => console.warn('Marketplace refresh:', e instanceof Error ? e.message : String(e)));
     } catch (e) { console.warn('Uninstall plugin:', e instanceof Error ? e.message : String(e)); }
+    setUninstalling('');
   };
 
   return (
@@ -553,7 +556,7 @@ function MarketplaceSection() {
               <div className="text-[8px] text-on-surface-variant/30 mt-0.5">{p.author} &middot; v{p.version} &middot; {p.category}</div>
             </div>
             {p.installed ? (
-              <button onClick={() => handleUninstall(p.id)} className="px-2 py-1 rounded text-[9px] font-medium text-red-400/70 hover:bg-red-400/10 transition-colors">Remove</button>
+              <button onClick={() => handleUninstall(p.id)} disabled={uninstalling === p.id} className="px-2 py-1 rounded text-[9px] font-medium text-red-400/70 hover:bg-red-400/10 transition-colors disabled:opacity-40">{uninstalling === p.id ? 'Removing...' : 'Remove'}</button>
             ) : (
               <button onClick={() => handleInstall(p.id)} disabled={installing === p.id}
                 className="px-2 py-1 rounded text-[9px] font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-40">
@@ -615,6 +618,7 @@ function HooksSection() {
   const [hooks, setHooks] = useState<any[]>([]);
   const [events, setEvents] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [event, setEvent] = useState('');
   const [action, setAction] = useState('message');
@@ -625,12 +629,14 @@ function HooksSection() {
   useEffect(() => { load(); }, []);
 
   const handleCreate = async () => {
-    if (!name.trim() || !event) return;
+    if (!name.trim() || !event || creating) return;
+    setCreating(true);
     try {
       await api.createHook(name.trim(), event, action);
       setName(''); setEvent(''); setAdding(false);
       load();
     } catch (e) { console.warn('Create hook:', e instanceof Error ? e.message : String(e)); }
+    setCreating(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -660,7 +666,7 @@ function HooksSection() {
             <option value="notify">Log notification</option>
             <option value="trigger">Trigger agent</option>
           </select>
-          <button onClick={handleCreate} disabled={!name.trim() || !event} className="w-full py-1.5 rounded-lg bg-primary/15 text-primary text-[11px] font-semibold hover:bg-primary/25 transition-colors disabled:opacity-40">Create Hook</button>
+          <button onClick={handleCreate} disabled={!name.trim() || !event || creating} className="w-full py-1.5 rounded-lg bg-primary/15 text-primary text-[11px] font-semibold hover:bg-primary/25 transition-colors disabled:opacity-40">{creating ? 'Creating...' : 'Create Hook'}</button>
         </div>
       )}
 

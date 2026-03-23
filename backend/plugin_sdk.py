@@ -31,9 +31,11 @@ class EventBus:
         self._lock = threading.Lock()
 
     def on(self, event: str, handler: Callable):
-        """Register a handler for an event."""
+        """Register a handler for an event (no duplicates)."""
         with self._lock:
-            self._handlers.setdefault(event, []).append(handler)
+            handlers = self._handlers.setdefault(event, [])
+            if handler not in handlers:
+                handlers.append(handler)
 
     def off(self, event: str, handler: Callable):
         """Remove a handler."""
@@ -543,10 +545,39 @@ class HookManager:
 
         action = hook.get("action", "")
         config = hook.get("config", {})
-        hook_id = hook["id"]
 
-        def handler(data, _hook=hook, _config=config):
+        def handler(data, _hook=hook, _action=action, _config=config):
             _hook["trigger_count"] = _hook.get("trigger_count", 0) + 1
-            log.info("Hook triggered: %s (event: %s)", _hook["name"], _hook["event"])
+            log.info("Hook triggered: %s (event: %s, action: %s)", _hook["name"], _hook["event"], _action)
+
+            if _action == "message":
+                # Send a message to a channel
+                import urllib.request
+                channel = _config.get("channel", "general")
+                text = _config.get("text", f"Hook '{_hook['name']}' triggered")
+                try:
+                    body = json.dumps({"sender": "system", "text": text, "channel": channel, "type": "system"}).encode()
+                    req = urllib.request.Request(
+                        f"http://127.0.0.1:8300/api/send",
+                        data=body, method="POST",
+                        headers={"Content-Type": "application/json"},
+                    )
+                    urllib.request.urlopen(req, timeout=5)
+                except Exception as e:
+                    log.debug("Hook message send failed: %s", e)
+
+            elif _action == "notify":
+                log.info("Hook notification [%s]: %s — data: %s", _hook["name"], _config.get("text", ""), data)
+
+            elif _action == "trigger":
+                # Write to agent's queue file to trigger them
+                agent = _config.get("agent", "")
+                if agent:
+                    queue_file = self._data_dir / f"{agent}_queue.jsonl"
+                    try:
+                        with open(queue_file, "a", encoding="utf-8") as f:
+                            f.write(json.dumps({"channel": _config.get("channel", "general"), "hook": _hook["name"]}) + "\n")
+                    except Exception as e:
+                        log.debug("Hook trigger write failed: %s", e)
 
         event_bus.on(hook["event"], handler)

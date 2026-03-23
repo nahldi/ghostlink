@@ -478,6 +478,11 @@ async def lifespan(_app: FastAPI):
         code = body.get("code", "")
         if not name or not code:
             return JSONResponse({"error": "name and code required"}, 400)
+        # AST-based safety scan before install
+        issues = SafetyScanner.scan(code)
+        critical = [i for i in issues if i["severity"] == "critical"]
+        if critical:
+            return JSONResponse({"error": f"Safety scan failed: {critical[0]['message']}", "issues": issues}, 400)
         result = plugin_loader.install_plugin(name, code, body.get("description", ""), body.get("version", "1.0.0"))
         return result
 
@@ -2086,6 +2091,8 @@ async def create_hook(request: Request):
 
     if not name or not event:
         return JSONResponse({"error": "name and event required"}, 400)
+    if action not in ("message", "notify", "trigger"):
+        return JSONResponse({"error": f"Invalid action: {action}. Must be message, notify, or trigger"}, 400)
 
     result = hook_manager.create_hook(name, event, action, config)
     if result.get("ok"):
