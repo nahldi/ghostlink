@@ -76,6 +76,16 @@ class ServerManager {
       return { success: true, port: this.port };
     }
 
+    // Kill any stale processes on our ports to prevent "address already in use"
+    try {
+      if (isWsl()) {
+        execSync(`wsl bash -c "kill \\$(lsof -ti:${this.port}) 2>/dev/null; kill \\$(lsof -ti:8200) 2>/dev/null; kill \\$(lsof -ti:8201) 2>/dev/null" 2>/dev/null`, { stdio: 'ignore', timeout: 5_000 });
+      } else {
+        execSync(`kill $(lsof -ti:${this.port}) 2>/dev/null`, { stdio: 'ignore', timeout: 5_000 });
+      }
+      log.info('Cleared stale processes on port %d', this.port);
+    } catch { /* no stale processes — normal */ }
+
     const useWsl = isWsl();
     const backendPath = this.getBackendPath();
 

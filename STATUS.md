@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-23
-**Version:** v2.1.0
+**Version:** v2.1.1
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -118,6 +118,16 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 - Server config viewer in Settings > Advanced
 - Persistent agent editor — edit label, args, color, workspace from UI
 - Webhook signature verification (HMAC-SHA256)
+- GhostHub plugin marketplace — browse, install, uninstall community plugins
+- AST-based plugin safety scanner (replaces string matching)
+- EventBus with 13 standard events for plugin hooks
+- 5 skill packs (Developer, Research, Creative, DevOps, Communication)
+- Hook system — event-driven automation (on_message, on_agent_join, etc.)
+- Encrypted secrets manager for API keys and tokens
+- Per-agent exec approval hardening (command allowlist/blocklist)
+- GDPR data export (ZIP), deletion (with confirmation), retention policies
+- Security audit log with rotation and thread-safe writes
+- Settings has 7 tabs: General, Look, Agents, AI, Bridges, Security, Advanced
 
 ### What's Not Done Yet
 - Native Windows support without WSL (wrapper rewrite needed)
