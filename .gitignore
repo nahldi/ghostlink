@@ -7,6 +7,7 @@ __pycache__/
 # User data (never distribute)
 backend/data/
 backend/uploads/
+backend/plugins/manifest.json
 frontend/dist/
 
 # OpenClaw agent config (personal, not part of the app)
