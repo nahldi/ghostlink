@@ -42,7 +42,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
     try {
       await api.toggleAgentSkill(agent.name, skillId, enabled);
       setSkills(prev => prev.map(s => s.id === skillId ? { ...s, enabled } : s));
-    } catch (e) { console.warn('Toggle skill:', (e as any)?.message || e); }
+    } catch (e) { console.warn('Toggle skill:', e instanceof Error ? e.message : String(e)); }
   };
 
   const handleLaunch = async () => {
@@ -50,10 +50,10 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
     try {
       await api.spawnAgent(agent.base, agent.label, agent.workspace || '.', agent.args || []);
       setTimeout(async () => {
-        try { const r = await api.getStatus(); setAgents(r.agents); } catch (e) { console.warn('Status fetch after launch:', (e as any)?.message || e); }
+        try { const r = await api.getStatus(); setAgents(r.agents); } catch (e) { console.warn('Status fetch after launch:', e instanceof Error ? e.message : String(e)); }
         onClose();
       }, 3000);
-    } catch (e) { console.warn('Agent launch:', (e as any)?.message || e); setLaunching(false); }
+    } catch (e) { console.warn('Agent launch:', e instanceof Error ? e.message : String(e)); setLaunching(false); }
   };
 
   const handleKill = async () => {
@@ -63,7 +63,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
       const r = await api.getStatus();
       setAgents(r.agents);
       onClose();
-    } catch (e) { console.warn('Agent kill:', (e as any)?.message || e); setKilling(false); }
+    } catch (e) { console.warn('Agent kill:', e instanceof Error ? e.message : String(e)); setKilling(false); }
   };
 
   const filteredSkills = skills.filter(s => {

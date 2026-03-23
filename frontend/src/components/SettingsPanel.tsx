@@ -533,9 +533,9 @@ function IntegrationsTab() {
   const handleToggle = async (platform: string, enabled: boolean) => {
     await api.configureBridge(platform, { enabled });
     if (enabled) {
-      try { await api.startBridge(platform); } catch (e) { console.warn('Start bridge:', (e as any)?.message || e); }
+      try { await api.startBridge(platform); } catch (e) { console.warn('Start bridge:', e instanceof Error ? e.message : String(e)); }
     } else {
-      try { await api.stopBridge(platform); } catch (e) { console.warn('Stop bridge:', (e as any)?.message || e); }
+      try { await api.stopBridge(platform); } catch (e) { console.warn('Stop bridge:', e instanceof Error ? e.message : String(e)); }
     }
     loadBridges();
   };
@@ -737,7 +737,7 @@ function ServerLogsSection() {
           const r = await fetch(`/api/logs?limit=100${filter ? `&level=${filter}` : ''}`);
           const d = await r.json();
           if (!cancelled) setLogs(d.logs || []);
-        } catch (e) { console.warn('Logs poll:', (e as any)?.message || e); }
+        } catch (e) { console.warn('Logs poll:', e instanceof Error ? e.message : String(e)); }
         await new Promise(r => setTimeout(r, 3000));
       }
     };
@@ -826,7 +826,7 @@ function ProvidersTab() {
       setSaved(provider);
       setTimeout(() => { setSaved(''); setTestResult(null); }, 3000);
       api.getProviders().then(setStatus).catch((e) => console.warn('Providers fetch:', e.message || e));
-    } catch (e) { console.warn('Save provider key:', (e as any)?.message || e); }
+    } catch (e) { console.warn('Save provider key:', e instanceof Error ? e.message : String(e)); }
   };
 
   if (!status) return <div className="text-xs text-on-surface-variant/40 text-center py-8">Loading providers...</div>;
@@ -1171,7 +1171,7 @@ function PersistentAgentsSection() {
     try {
       const r = await api.pickFolder();
       setNewCwd(r.path);
-    } catch (e) { console.warn('Pick folder:', (e as any)?.message || e); }
+    } catch (e) { console.warn('Pick folder:', e instanceof Error ? e.message : String(e)); }
     setPickingFolder(false);
   };
 

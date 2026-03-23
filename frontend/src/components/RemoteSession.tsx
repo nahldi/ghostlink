@@ -88,7 +88,7 @@ export function RemoteSession() {
   const stop = useCallback(async () => {
     try {
       await api.stopTunnel();
-    } catch (e) { console.warn('Stop tunnel:', (e as any)?.message || e); }
+    } catch (e) { console.warn('Stop tunnel:', e instanceof Error ? e.message : String(e)); }
     setActive(false);
     setUrl(null);
     setShowQR(false);

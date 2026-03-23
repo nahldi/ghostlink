@@ -79,7 +79,7 @@ export function TerminalPeek({ agentName, agentColor, onClose }: TerminalPeekPro
             >
               Auto-scroll
             </button>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant/30">
+            <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant/30" aria-label="Close terminal">
               <span className="material-symbols-outlined text-sm">close</span>
             </button>
           </div>

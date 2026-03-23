@@ -181,7 +181,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
           {!selectMode && <>
             <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
-            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard.writeText(message.text).catch(() => {})} />
+            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard?.writeText(message.text).catch(() => { /* clipboard unavailable */ })} />
             <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
             <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
             <MsgAction icon="delete" title="Select to delete" danger onClick={() => { setSelectMode(true); toggleSelected(message.id); }} />
@@ -313,7 +313,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 mt-0.5">
             <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
             <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
-            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard.writeText(message.text).catch(() => {})} />
+            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard?.writeText(message.text).catch(() => { /* clipboard unavailable */ })} />
             <MsgAction icon="push_pin" title={message.pinned ? 'Unpin' : 'Pin'} active={message.pinned} onClick={handlePin} />
             <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
             <MsgAction icon="delete" title="Select to delete" danger onClick={() => { setSelectMode(true); toggleSelected(message.id); }} />

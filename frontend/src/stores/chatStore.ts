@@ -89,6 +89,9 @@ interface ChatState {
   clearSelection: () => void;
 }
 
+const MAX_MESSAGES = 2000;
+const TRIM_TO = 1500;
+
 export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   addMessage: (msg) =>
@@ -96,8 +99,8 @@ export const useChatStore = create<ChatState>((set) => ({
       // Prevent duplicate messages (from reconnect refetch)
       if (s.messages.some((m) => m.id === msg.id)) return s;
       const updated = [...s.messages, msg];
-      // Cap at 2000 messages to prevent memory leak in long sessions
-      return { messages: updated.length > 2000 ? updated.slice(-1500) : updated };
+      // Cap messages to prevent memory leak in long sessions
+      return { messages: updated.length > MAX_MESSAGES ? updated.slice(-TRIM_TO) : updated };
     }),
   setMessages: (messages) => set({ messages }),
   pinMessage: (id, pinned) =>

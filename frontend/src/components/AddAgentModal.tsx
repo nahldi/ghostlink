@@ -123,7 +123,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
     try {
       const r = await api.pickFolder();
       setCwd(r.path);
-    } catch (e) { console.warn('Pick folder:', (e as any)?.message || e); }
+    } catch (e) { console.warn('Pick folder:', e instanceof Error ? e.message : String(e)); }
     setPickingFolder(false);
   };
 
@@ -166,7 +166,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
         try {
           const r = await api.getStatus();
           setAgents(r.agents);
-        } catch (e) { console.warn('Status fetch after spawn:', (e as any)?.message || e); }
+        } catch (e) { console.warn('Status fetch after spawn:', e instanceof Error ? e.message : String(e)); }
         onClose();
       }, 3000);
     } catch (e) {
