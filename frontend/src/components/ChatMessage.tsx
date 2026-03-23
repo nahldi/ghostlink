@@ -101,6 +101,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const pinMessage = useChatStore((s) => s.pinMessage);
   const bookmarkMessage = useChatStore((s) => s.bookmarkMessage);
   const editMessageInStore = useChatStore((s) => s.editMessage);
+  const selectMode = useChatStore((s) => s.selectMode);
+  const selectedIds = useChatStore((s) => s.selectedIds);
+  const toggleSelected = useChatStore((s) => s.toggleSelected);
+  const setSelectMode = useChatStore((s) => s.setSelectMode);
+  const isSelected = selectedIds.has(message.id);
   const agent = agents.find((a) => a.name === message.sender);
   const agentNames = new Set(agents.map(a => a.name));
   // Build color map for @mention highlighting (avoid module-level mutation)
@@ -163,13 +168,22 @@ export function ChatMessage({ message }: ChatMessageProps) {
   if (isUser) {
     // ── USER MESSAGE (right side) ──
     return (
-      <div className="group flex justify-end gap-2 py-1.5 msg-enter">
+      <div className={`group flex justify-end gap-2 py-1.5 msg-enter ${selectMode ? 'pl-2' : ''} ${isSelected ? 'bg-red-500/5' : ''}`}>
+        {selectMode && (
+          <button onClick={() => toggleSelected(message.id)} className="shrink-0 self-center">
+            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-red-500 border-red-500' : 'border-outline-variant/30 hover:border-red-400'}`}>
+              {isSelected && <span className="material-symbols-outlined text-white text-[11px]">check</span>}
+            </div>
+          </button>
+        )}
         <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
-          <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
-          <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard.writeText(message.text).catch(() => {})} />
-          <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
-          <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
-          <MsgAction icon="delete" title="Delete" danger onClick={async () => { try { await api.deleteMessage(message.id); } catch {} }} />
+          {!selectMode && <>
+            <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
+            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard.writeText(message.text).catch(() => {})} />
+            <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
+            <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
+            <MsgAction icon="delete" title="Select to delete" danger onClick={() => { setSelectMode(true); toggleSelected(message.id); }} />
+          </>}
           {showPicker && <ReactionPicker onPick={handleReact} onClose={() => setShowPicker(false)} />}
         </div>
         <div className="max-w-[70%] lg:max-w-[55%]">
@@ -232,7 +246,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   // ── AGENT MESSAGE (left side) ──
   return (
-    <div className="group flex gap-3 py-1.5 msg-enter">
+    <div className={`group flex gap-3 py-1.5 msg-enter ${isSelected ? 'bg-red-500/5' : ''}`}>
+      {selectMode && (
+        <button onClick={() => toggleSelected(message.id)} className="shrink-0 self-center">
+          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-red-500 border-red-500' : 'border-outline-variant/30 hover:border-red-400'}`}>
+            {isSelected && <span className="material-symbols-outlined text-white text-[11px]">check</span>}
+          </div>
+        </button>
+      )}
       <div className="shrink-0 mt-1">
         <AgentIcon base={agent?.base || message.sender} color={agentColor} size={34} />
       </div>
@@ -286,15 +307,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
 
         {/* Actions */}
-        <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 mt-0.5">
-          <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
-          <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
-          <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard.writeText(message.text).catch(() => {})} />
-          <MsgAction icon="push_pin" title={message.pinned ? 'Unpin' : 'Pin'} active={message.pinned} onClick={handlePin} />
-          <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
-          <MsgAction icon="delete" title="Delete" danger onClick={async () => { try { await api.deleteMessage(message.id); } catch {} }} />
-          {showPicker && <ReactionPicker onPick={handleReact} onClose={() => setShowPicker(false)} />}
-        </div>
+        {!selectMode && (
+          <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 mt-0.5">
+            <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
+            <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
+            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard.writeText(message.text).catch(() => {})} />
+            <MsgAction icon="push_pin" title={message.pinned ? 'Unpin' : 'Pin'} active={message.pinned} onClick={handlePin} />
+            <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
+            <MsgAction icon="delete" title="Select to delete" danger onClick={() => { setSelectMode(true); toggleSelected(message.id); }} />
+            {showPicker && <ReactionPicker onPick={handleReact} onClose={() => setShowPicker(false)} />}
+          </div>
+        )}
       </div>
     </div>
   );

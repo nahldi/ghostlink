@@ -1,7 +1,7 @@
 # GhostLink — Known Bugs & Issues
 
-**Last updated:** 2026-03-22
-**Version:** v1.0.18
+**Last updated:** 2026-03-23
+**Version:** v1.2.0
 **Source:** Full codebase audit + bug fix pass
 
 ---
@@ -24,13 +24,9 @@
 
 ## HIGH — Major UX problems
 
-### BUG-004: Setup wizard doesn't show on fresh install (when settings.json persists)
-**Severity:** High — first-run experience broken if reinstalling
-**Where:** Desktop app first launch after reinstall
-**Symptom:** Wizard skipped, goes straight to launcher
-**Root cause:** `~/.ghostlink/settings.json` persists across uninstall. If it exists with `setupComplete: true` and matching version, wizard is skipped.
-**Status:** Partially mitigated — wizard re-shows on major.minor version bumps. Full fix requires NSIS uninstaller cleanup.
-**Workaround:** Delete `~/.ghostlink/settings.json` before reinstalling.
+### ~~BUG-004: Setup wizard doesn't show on fresh install (when settings.json persists)~~ FIXED
+**Status:** FIXED (v1.2.0)
+**Fix:** NSIS uninstaller now deletes `~/.ghostlink/settings.json` on uninstall, so the wizard runs on reinstall. Other user data preserved.
 
 ### ~~BUG-005: Wizard "Next" button doesn't work~~ FIXED
 **Status:** FIXED
@@ -50,11 +46,9 @@
 
 ## MEDIUM — Functional issues
 
-### BUG-008: No agents appear in the agent bar (fresh desktop install)
-**Severity:** Medium — misleading empty state
-**Where:** Chat window agent bar
-**Root cause:** config.toml bundled with app has all agent entries commented out. Agents only appear if configured or added via Settings.
-**Workaround:** Click "+" in agent bar to add agents, or add them in Settings > Persistent Agents.
+### ~~BUG-008: No agents appear in the agent bar (fresh desktop install)~~ FIXED
+**Status:** FIXED (v1.2.0)
+**Fix:** Setup wizard now auto-detects installed CLIs (claude, codex, gemini) and pre-populates persistent agents on completion.
 
 ### ~~BUG-009: Launcher doesn't hide when chat window opens~~ FIXED
 **Status:** FIXED (v1.0.0)

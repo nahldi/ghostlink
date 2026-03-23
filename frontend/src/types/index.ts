@@ -113,6 +113,7 @@ export interface Settings {
   timezone?: string;
   timeFormat?: '12h' | '24h';
   voiceLanguage?: string;
+  agentSounds?: Record<string, string>;
 }
 
 export interface AgentTemplate {
@@ -165,4 +166,5 @@ export type WSEvent =
   | { type: 'reaction'; data: { message_id: number; reactions: Record<string, string[]> } }
   | { type: 'activity'; data: ActivityEvent }
   | { type: 'approval_response'; data: { agent: string; response: string; message_id: number } }
+  | { type: 'session_update'; data: { channel: string; session: Record<string, unknown> } }
   | { type: 'system'; data: Record<string, unknown> };

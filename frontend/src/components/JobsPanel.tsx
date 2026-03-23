@@ -9,7 +9,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   archived: { label: 'Closed', color: '#958da1' },
 };
 
-function JobCard({ job }: { job: Job }) {
+function JobCard({ job, onDragStart }: { job: Job; onDragStart: (e: React.DragEvent, job: Job) => void }) {
   const priorityColor =
     job.type === 'high' ? 'border-l-tertiary' :
     job.type === 'medium' ? 'border-l-secondary' :
@@ -17,7 +17,9 @@ function JobCard({ job }: { job: Job }) {
 
   return (
     <div
-      className={`glass-card rounded-xl p-4 border-l-2 ${priorityColor} cursor-pointer hover:brightness-110 transition-all`}
+      draggable
+      onDragStart={(e) => onDragStart(e, job)}
+      className={`glass-card rounded-xl p-4 border-l-2 ${priorityColor} cursor-grab hover:brightness-110 transition-all active:cursor-grabbing`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="text-sm font-bold text-on-surface leading-tight">
@@ -55,6 +57,7 @@ export function JobsPanel() {
   const settings = useChatStore((s) => s.settings);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
 
   const columns = ['open', 'done', 'archived'] as const;
 
@@ -66,6 +69,34 @@ export function JobsPanel() {
       useChatStore.getState().setJobs(res.jobs);
       setTitle('');
       setShowForm(false);
+    } catch {}
+  };
+
+  const handleDragStart = (e: React.DragEvent, job: Job) => {
+    e.dataTransfer.setData('application/ghostlink-job', String(job.id));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, status: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStatus(status);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStatus(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setDragOverStatus(null);
+    const jobId = Number(e.dataTransfer.getData('application/ghostlink-job'));
+    if (!jobId) return;
+    const job = jobs.find(j => j.id === jobId);
+    if (!job || job.status === targetStatus) return;
+    try {
+      await api.updateJob(jobId, { status: targetStatus as Job['status'] });
+      useChatStore.getState().updateJob({ ...job, status: targetStatus as Job['status'] });
     } catch {}
   };
 
@@ -106,8 +137,15 @@ export function JobsPanel() {
         {columns.map((status) => {
           const col = STATUS_LABELS[status];
           const items = jobs.filter((j) => j.status === status);
+          const isOver = dragOverStatus === status;
           return (
-            <div key={status}>
+            <div
+              key={status}
+              onDragOver={(e) => handleDragOver(e, status)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, status)}
+              className={`rounded-xl transition-all ${isOver ? 'ring-2 ring-primary/30 bg-primary/5' : ''}`}
+            >
               <div className="flex items-center gap-2 mb-3">
                 <div
                   className="w-2 h-2 rounded-full"
@@ -118,13 +156,15 @@ export function JobsPanel() {
                 </span>
                 <span className="text-[10px] text-outline">{items.length}</span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-h-[40px]">
                 {items.length === 0 ? (
-                  <div className="text-xs text-outline-variant text-center py-4">
-                    No jobs
+                  <div className={`text-xs text-center py-4 rounded-lg border border-dashed transition-colors ${
+                    isOver ? 'border-primary/30 text-primary/50' : 'border-outline-variant/10 text-outline-variant'
+                  }`}>
+                    {isOver ? 'Drop here' : 'No jobs'}
                   </div>
                 ) : (
-                  items.map((job) => <JobCard key={job.id} job={job} />)
+                  items.map((job) => <JobCard key={job.id} job={job} onDragStart={handleDragStart} />)
                 )}
               </div>
             </div>

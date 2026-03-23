@@ -144,6 +144,10 @@ export function useWebSocket() {
               updateMessageMeta(parsed.data.message_id, { responded: parsed.data.response });
             }
             break;
+          case 'session_update':
+            // Dispatch custom event for SessionBar to pick up
+            window.dispatchEvent(new CustomEvent('ghostlink:session-update', { detail: parsed.data }));
+            break;
         }
 
         // Update favicon badge with total unread count

@@ -76,6 +76,13 @@ interface ChatState {
   setChatAtBottom: (v: boolean) => void;
   newMsgCount: number;
   setNewMsgCount: (v: number | ((n: number) => number)) => void;
+
+  // Multi-select deletion
+  selectMode: boolean;
+  selectedIds: Set<number>;
+  setSelectMode: (on: boolean) => void;
+  toggleSelected: (id: number) => void;
+  clearSelection: () => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -206,4 +213,16 @@ export const useChatStore = create<ChatState>((set) => ({
   setChatAtBottom: (v) => set({ chatAtBottom: v }),
   newMsgCount: 0,
   setNewMsgCount: (v) => set((s) => ({ newMsgCount: typeof v === 'function' ? v(s.newMsgCount) : v })),
+
+  // Multi-select deletion
+  selectMode: false,
+  selectedIds: new Set<number>(),
+  setSelectMode: (on) => set({ selectMode: on, selectedIds: new Set() }),
+  toggleSelected: (id) =>
+    set((s) => {
+      const next = new Set(s.selectedIds);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return { selectedIds: next };
+    }),
+  clearSelection: () => set({ selectMode: false, selectedIds: new Set() }),
 }));

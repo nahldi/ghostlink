@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
 import { AgentIcon } from './AgentIcon';
+import { SoundManager, SOUND_OPTIONS } from '../lib/sounds';
 import type { Settings, PersistentAgent, StatsSections } from '../types';
 
 const AGENT_PRESETS: { base: string; label: string; command: string; color: string; defaultArgs: string[] }[] = [
@@ -297,6 +298,9 @@ function GeneralTab({
         checked={!!display.notificationSounds}
         onChange={() => applyInstant({ notificationSounds: !settings.notificationSounds })}
       />
+
+      {/* Per-Agent Sound Selection */}
+      {display.notificationSounds && <AgentSoundPicker settings={settings} applyInstant={applyInstant} />}
 
       {/* Desktop Notifications */}
       <Toggle
@@ -852,6 +856,57 @@ function InfoPanelSectionsToggle({ sections, onChange }: { sections: StatsSectio
           </label>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ── AgentSoundPicker ─────────────────────────────────────────────── */
+
+function AgentSoundPicker({ settings, applyInstant }: { settings: Settings; applyInstant: (u: Partial<Settings>) => void }) {
+  const agents = useChatStore((s) => s.agents);
+  const agentSounds = settings.agentSounds || {};
+
+  // Get unique agent bases from connected agents + presets
+  const bases = Array.from(new Set([
+    ...agents.map(a => a.base),
+    ...AGENT_PRESETS.map(p => p.base),
+  ])).slice(0, 9);
+
+  const handleChange = (base: string, soundId: string) => {
+    const updated = { ...agentSounds, [base]: soundId };
+    SoundManager.setCustomSounds(updated);
+    applyInstant({ agentSounds: updated });
+    if (soundId !== 'none') SoundManager.preview(soundId);
+  };
+
+  return (
+    <div className="pl-1">
+      <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-2">
+        Agent Notification Sounds
+      </div>
+      <div className="space-y-1.5">
+        {bases.map(base => {
+          const preset = AGENT_PRESETS.find(p => p.base === base);
+          const color = preset?.color || '#a78bfa';
+          const currentSound = SoundManager.getSoundForAgent(base);
+          return (
+            <div key={base} className="flex items-center gap-2">
+              <AgentIcon base={base} color={color} size={20} />
+              <span className="text-[10px] font-medium w-14 truncate" style={{ color }}>{preset?.label || base}</span>
+              <select
+                value={agentSounds[base] || currentSound}
+                onChange={(e) => handleChange(base, e.target.value)}
+                className="flex-1 bg-surface-container/40 border border-outline-variant/10 rounded-md px-2 py-1 text-[10px] text-on-surface outline-none focus:border-primary/30"
+              >
+                {SOUND_OPTIONS.map(s => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[9px] text-on-surface-variant/30 mt-1.5">Choose a unique sound for each agent</p>
     </div>
   );
 }

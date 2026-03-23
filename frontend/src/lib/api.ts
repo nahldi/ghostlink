@@ -91,6 +91,12 @@ export const api = {
   deleteMessage: (msgId: number) =>
     request('/api/messages/' + msgId, { method: 'DELETE' }),
 
+  deleteMessages: (msgIds: number[]) =>
+    request<{ ok: boolean; deleted: number[] }>('/api/messages/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids: msgIds }),
+    }),
+
   pickFolder: () =>
     request<{ windowsPath: string; path: string }>('/api/pick-folder', { method: 'POST' }),
 
@@ -302,4 +308,40 @@ export const api = {
   // Share
   shareConversation: (channel: string) =>
     request<{ html: string; filename: string; message_count: number }>(`/api/share?channel=${encodeURIComponent(channel)}`),
+
+  // Sessions
+  getSessionTemplates: () =>
+    request<{ templates: any[] }>('/api/session-templates'),
+
+  getSession: (channel: string) =>
+    request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}`),
+
+  startSession: (channel: string, templateId: string, cast: Record<string, string>, topic?: string) =>
+    request<any>(`/api/sessions/${encodeURIComponent(channel)}/start`, {
+      method: 'POST',
+      body: JSON.stringify({ template_id: templateId, cast, topic }),
+    }),
+
+  advanceSession: (channel: string) =>
+    request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}/advance`, { method: 'POST' }),
+
+  endSession: (channel: string) =>
+    request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}/end`, { method: 'POST' }),
+
+  pauseSession: (channel: string) =>
+    request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}/pause`, { method: 'POST' }),
+
+  resumeSession: (channel: string) =>
+    request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}/resume`, { method: 'POST' }),
+
+  getChannelSummary: (channel: string) =>
+    request<{
+      channel: string;
+      summary: string;
+      message_count: number;
+      participants: { name: string; count: number }[];
+      topics: string[];
+      first_message?: number;
+      last_message?: number;
+    }>(`/api/channels/${encodeURIComponent(channel)}/summary`),
 };

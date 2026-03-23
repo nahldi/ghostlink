@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { useChatStore } from '../stores/chatStore';
+import { ChannelSummary } from './ChannelSummary';
 
 export function ChannelTabs() {
   const channels = useChatStore((s) => s.channels);
   const active = useChatStore((s) => s.activeChannel);
   const setActive = useChatStore((s) => s.setActiveChannel);
   const clearUnread = useChatStore((s) => s.clearUnread);
+  const [showSummary, setShowSummary] = useState(false);
 
   return (
-    <div className="flex items-center gap-1.5 px-4 overflow-x-auto">
+    <div className="relative flex items-center gap-1.5 px-4 overflow-x-auto">
       {channels.map((ch) => (
         <button
           key={ch.name}
@@ -29,6 +32,16 @@ export function ChannelTabs() {
           )}
         </button>
       ))}
+      <button
+        onClick={() => setShowSummary(!showSummary)}
+        className={`p-1 rounded-md transition-colors shrink-0 ${
+          showSummary ? 'text-primary bg-primary/10' : 'text-on-surface-variant/25 hover:text-on-surface-variant/50 hover:bg-surface-container-high/30'
+        }`}
+        title="Channel summary"
+      >
+        <span className="material-symbols-outlined text-[14px]">summarize</span>
+      </button>
+      {showSummary && <ChannelSummary channel={active} onClose={() => setShowSummary(false)} />}
     </div>
   );
 }

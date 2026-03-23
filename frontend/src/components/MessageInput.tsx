@@ -773,6 +773,13 @@ export function MessageInput() {
       {/* Input area */}
       <div className="w-full flex items-end gap-2 p-3 lg:px-6 lg:py-4 safe-bottom">
         <button
+          onClick={() => window.dispatchEvent(new CustomEvent('ghostlink:open-session-launcher'))}
+          className="p-2 rounded-lg text-on-surface-variant/40 hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+          title="Start a session"
+        >
+          <span className="material-symbols-outlined text-xl">play_circle</span>
+        </button>
+        <button
           onClick={handleFileUpload}
           className="p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors shrink-0"
           title="Upload image"

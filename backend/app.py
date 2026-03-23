@@ -42,6 +42,7 @@ from jobs import JobStore
 from rules import RuleStore
 from skills import SkillsRegistry
 from schedules import ScheduleStore, cron_matches
+from sessions import SessionManager
 import mcp_bridge
 import plugin_loader
 
@@ -113,6 +114,7 @@ skills_registry: SkillsRegistry
 job_store: JobStore
 schedule_store: ScheduleStore
 rule_store: RuleStore
+session_manager: SessionManager
 registry = AgentRegistry()
 router = MessageRouter(max_hops=MAX_HOPS, default_routing=DEFAULT_ROUTING)
 
@@ -257,7 +259,7 @@ async def broadcast(event_type: str, data: dict):
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global store, job_store, rule_store, schedule_store, skills_registry
+    global store, job_store, rule_store, schedule_store, skills_registry, session_manager
 
     _load_settings()
     _settings["_server_start"] = time.time()
@@ -275,6 +277,7 @@ async def lifespan(_app: FastAPI):
     schedule_store = ScheduleStore(db)
     await schedule_store.init()
     skills_registry = SkillsRegistry(DATA_DIR)
+    session_manager = SessionManager(DATA_DIR)
 
     # Broadcast new messages via WebSocket
     async def on_msg(msg: dict):
@@ -560,6 +563,24 @@ async def delete_message(msg_id: int):
     return JSONResponse({"error": "not found"}, 404)
 
 
+@app.post("/api/messages/bulk-delete")
+async def bulk_delete_messages(request: Request):
+    body = await request.json()
+    ids = body.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        return JSONResponse({"error": "ids must be a non-empty list"}, 400)
+    if len(ids) > 200:
+        return JSONResponse({"error": "max 200 messages per request"}, 400)
+    # Sanitize: ensure all IDs are integers
+    safe_ids = [int(i) for i in ids if isinstance(i, (int, float))]
+    if not safe_ids:
+        return JSONResponse({"error": "no valid ids"}, 400)
+    deleted = await store.delete(safe_ids)
+    if deleted:
+        await broadcast("delete", {"message_ids": deleted})
+    return {"ok": True, "deleted": deleted or []}
+
+
 @app.post("/api/upload")
 async def upload_image(file: UploadFile = File(...)):
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -690,6 +711,58 @@ async def rename_channel(name: str, request: Request):
     await store._db.commit()
     await broadcast("channel_update", {"channels": [{"name": c, "unread": 0} for c in channels]})
     return {"channels": channels}
+
+
+@app.get("/api/channels/{name}/summary")
+async def channel_summary(name: str):
+    """Generate a summary of recent channel activity."""
+    channels = _settings.get("channels", ["general"])
+    if name not in channels:
+        return JSONResponse({"error": "channel not found"}, 404)
+    if store._db is None:
+        raise RuntimeError("database not initialized")
+    cursor = await store._db.execute(
+        "SELECT sender, text, timestamp FROM messages WHERE channel = ? ORDER BY id DESC LIMIT 100",
+        (name,),
+    )
+    rows = await cursor.fetchall()
+    if not rows:
+        return {"channel": name, "summary": "No messages yet.", "message_count": 0, "participants": [], "topics": []}
+    rows.reverse()
+
+    participants: dict[str, int] = {}
+    words: dict[str, int] = {}
+    for sender, text, _ts in rows:
+        participants[sender] = participants.get(sender, 0) + 1
+        for word in text.lower().split():
+            clean = word.strip(".,!?@#()[]{}\"'`*_~")
+            if len(clean) > 3 and clean not in {"this", "that", "with", "from", "have", "been", "will", "they", "their", "what", "when", "your", "just", "about", "like", "would", "could", "should", "there", "here", "some", "also", "more", "than", "very"}:
+                words[clean] = words.get(clean, 0) + 1
+
+    top_participants = sorted(participants.items(), key=lambda x: -x[1])[:5]
+    top_topics = sorted(words.items(), key=lambda x: -x[1])[:10]
+    topic_words = [w for w, _ in top_topics]
+
+    first_ts = rows[0][2]
+    last_ts = rows[-1][2]
+    summary_parts = [
+        f"{len(rows)} messages in #{name}",
+        f"from {len(participants)} participant{'s' if len(participants) != 1 else ''}.",
+    ]
+    if top_participants:
+        summary_parts.append(f"Most active: {', '.join(p for p, _ in top_participants[:3])}.")
+    if topic_words:
+        summary_parts.append(f"Key topics: {', '.join(topic_words[:5])}.")
+
+    return {
+        "channel": name,
+        "summary": " ".join(summary_parts),
+        "message_count": len(rows),
+        "participants": [{"name": p, "count": c} for p, c in top_participants],
+        "topics": topic_words,
+        "first_message": first_ts,
+        "last_message": last_ts,
+    }
 
 
 # ── Agent Registry ──────────────────────────────────────────────────
@@ -1362,6 +1435,101 @@ async def update_schedule(sched_id: int, request: Request):
 async def delete_schedule(sched_id: int):
     ok = await schedule_store.delete(sched_id)
     return {"ok": ok}
+
+
+# ── Sessions ───────────────────────────────────────────────────────────
+
+@app.get("/api/session-templates")
+async def get_session_templates():
+    return {"templates": session_manager.get_templates()}
+
+
+@app.post("/api/session-templates")
+async def save_session_template(request: Request):
+    body = await request.json()
+    template = session_manager.save_template(body)
+    return template
+
+
+@app.delete("/api/session-templates/{tpl_id}")
+async def delete_session_template(tpl_id: str):
+    ok = session_manager.delete_template(tpl_id)
+    return {"ok": ok}
+
+
+@app.get("/api/sessions/{channel}")
+async def get_session(channel: str):
+    session = session_manager.get_session(channel)
+    return {"session": session}
+
+
+@app.post("/api/sessions/{channel}/start")
+async def start_session(channel: str, request: Request):
+    body = await request.json()
+    template_id = body.get("template_id")
+    cast = body.get("cast", {})
+    topic = body.get("topic", "")
+    if not template_id:
+        return JSONResponse({"error": "template_id required"}, 400)
+    try:
+        session = session_manager.start_session(channel, template_id, cast, topic)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, 404)
+    # Broadcast session start as system message
+    phase = session["phases"][0] if session["phases"] else {}
+    msg_text = f"Session started: **{session['template_name']}**"
+    if topic:
+        msg_text += f" — {topic}"
+    await store.add("system", msg_text, "system", channel)
+    if phase:
+        await store.add("system", f"**Phase 1: {phase['name']}** — {phase.get('prompt', '')}", "system", channel)
+    await broadcast("session_update", {"channel": channel, "session": session})
+    return session
+
+
+@app.post("/api/sessions/{channel}/advance")
+async def advance_session(channel: str):
+    prev = session_manager.get_session(channel)
+    if not prev:
+        return JSONResponse({"error": "no active session"}, 404)
+    prev_phase = prev["current_phase"]
+    session = session_manager.advance_turn(channel)
+    if session and session["status"] == "completed":
+        await store.add("system", f"Session completed: **{session['template_name']}**", "system", channel)
+    elif session and session["current_phase"] != prev_phase:
+        phase = session["phases"][session["current_phase"]]
+        await store.add("system", f"**Phase {session['current_phase'] + 1}: {phase['name']}** — {phase.get('prompt', '')}", "system", channel)
+    await broadcast("session_update", {"channel": channel, "session": session})
+    return {"session": session}
+
+
+@app.post("/api/sessions/{channel}/end")
+async def end_session(channel: str):
+    session = session_manager.end_session(channel)
+    if session:
+        await store.add("system", f"Session ended: **{session['template_name']}**", "system", channel)
+        await broadcast("session_update", {"channel": channel, "session": session})
+    return {"session": session}
+
+
+@app.post("/api/sessions/{channel}/pause")
+async def pause_session(channel: str):
+    session = session_manager.pause_session(channel)
+    await broadcast("session_update", {"channel": channel, "session": session})
+    return {"session": session}
+
+
+@app.post("/api/sessions/{channel}/resume")
+async def resume_session(channel: str):
+    session = session_manager.resume_session(channel)
+    await broadcast("session_update", {"channel": channel, "session": session})
+    return {"session": session}
+
+
+@app.get("/api/sessions/{channel}/prompt")
+async def get_session_prompt(channel: str):
+    prompt = session_manager.get_current_prompt(channel)
+    return {"prompt": prompt}
 
 
 # ── Activity ──────────────────────────────────────────────────────────

@@ -399,6 +399,46 @@ function setupWizardIPC(): void {
     settings.setupComplete = true;
     settings.appVersion = app.getVersion();
 
+    // Pre-populate default persistent agents so the agent bar isn't empty
+    if (!settings.persistentAgents || settings.persistentAgents.length === 0) {
+      const defaultAgents = [];
+      const workspace = settings.workspace || '.';
+
+      // Check which CLIs are available and add them as defaults
+      const agentDefs = [
+        { base: 'claude', label: 'Claude', command: 'claude', color: '#e8734a', args: ['--dangerously-skip-permissions'] },
+        { base: 'codex', label: 'Codex', command: 'codex', color: '#10a37f', args: ['--sandbox', 'danger-full-access', '-a', 'never'] },
+        { base: 'gemini', label: 'Gemini', command: 'gemini', color: '#4285f4', args: ['-y'] },
+      ];
+
+      const useWsl = settings.platform === 'wsl';
+      for (const def of agentDefs) {
+        try {
+          const checkCmd = useWsl
+            ? `wsl bash -lc "which ${def.command}"`
+            : process.platform === 'win32'
+              ? `where ${def.command}`
+              : `which ${def.command}`;
+          await execAsync(checkCmd, { timeout: 5000 });
+          defaultAgents.push({
+            base: def.base,
+            label: def.label,
+            command: def.command,
+            args: def.args,
+            cwd: workspace,
+            color: def.color,
+          });
+        } catch {
+          // CLI not found — skip
+        }
+      }
+
+      if (defaultAgents.length > 0) {
+        settings.persistentAgents = defaultAgents;
+        log.info(`Pre-populated ${defaultAgents.length} default agent(s):`, defaultAgents.map(a => a.base).join(', '));
+      }
+    }
+
     // Save settings to ~/.ghostlink/settings.json
     saveSettings(settings);
 

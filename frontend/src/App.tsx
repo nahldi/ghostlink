@@ -20,6 +20,10 @@ import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { RemoteSession } from './components/RemoteSession';
 import { OnboardingTour } from './components/OnboardingTour';
 import { HelpPanel } from './components/HelpPanel';
+import { BulkDeleteBar } from './components/BulkDeleteBar';
+import { SoundManager } from './lib/sounds';
+import { SessionBar } from './components/SessionBar';
+import { SessionLauncher } from './components/SessionLauncher';
 
 const CONVERSATION_STARTERS = [
   { text: 'Ask @claude to review your code', icon: 'code' },
@@ -242,6 +246,7 @@ function AppInner() {
   const [showSearch, setShowSearch] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showSessionLauncher, setShowSessionLauncher] = useState(false);
 
   useWebSocket();
 
@@ -300,8 +305,9 @@ function AppInner() {
         api.saveSettings({ notificationSounds: !current }).catch(() => {});
         return;
       }
-      // Escape — close panels
+      // Escape — close panels / exit select mode
       if (e.key === 'Escape') {
+        if (useChatStore.getState().selectMode) { useChatStore.getState().clearSelection(); return; }
         if (showSearch) { setShowSearch(false); return; }
         if (showShortcuts) { setShowShortcuts(false); return; }
         const panel = useChatStore.getState().sidebarPanel;
@@ -329,6 +335,13 @@ function AppInner() {
     return () => window.removeEventListener('ghostlink:toggle-help', handler);
   }, []);
 
+  // Session launcher toggle
+  useEffect(() => {
+    const handler = () => setShowSessionLauncher(prev => !prev);
+    window.addEventListener('ghostlink:open-session-launcher', handler);
+    return () => window.removeEventListener('ghostlink:open-session-launcher', handler);
+  }, []);
+
   // Apply theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme || 'dark');
@@ -345,7 +358,10 @@ function AppInner() {
     api.getChannels().then((r) =>
       setChannels(r.channels.map((name) => ({ name, unread: 0 })))
     ).catch(() => {});
-    api.getSettings().then((s) => updateSettings(s)).catch(() => {});
+    api.getSettings().then((s) => {
+      updateSettings(s);
+      if (s.agentSounds) SoundManager.setCustomSounds(s.agentSounds);
+    }).catch(() => {});
   }, [setAgents, setJobs, setRules, setChannels, updateSettings]);
 
   useEffect(() => {
@@ -394,12 +410,15 @@ function AppInner() {
         </div>
         {/* Mobile spacer for fixed header */}
         <div className="lg:hidden h-14" />
+        {/* Session bar — shows during active sessions */}
+        <SessionBar />
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <div className="flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
             <ChatFeed />
             <TypingIndicator />
             <ScrollArrow />
+            <BulkDeleteBar />
             <div className="sticky bottom-0 z-20 input-float">
               <MessageInput />
             </div>
@@ -416,6 +435,7 @@ function AppInner() {
       <ConnectionBanner />
       <OnboardingTour />
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      {showSessionLauncher && <SessionLauncher onClose={() => setShowSessionLauncher(false)} />}
     </div>
   );
 }
