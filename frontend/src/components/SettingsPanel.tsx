@@ -512,9 +512,135 @@ function AdvancedTab({
 
       <div className="h-px bg-outline-variant/8" />
 
+      {/* Server Config */}
+      <ServerConfigSection />
+
+      <div className="h-px bg-outline-variant/8" />
+
+      {/* Server Logs */}
+      <ServerLogsSection />
+
+      <div className="h-px bg-outline-variant/8" />
+
       {/* Maintenance / Cleanup */}
       <CleanupSection />
     </>
+  );
+}
+
+/* ── ServerConfigSection ───────────────────────────────────────────── */
+
+function ServerConfigSection() {
+  const [config, setConfig] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/server-config').then(r => r.json()).then(setConfig).catch(() => {});
+  }, []);
+
+  if (!config) return null;
+
+  const rows = [
+    ['Server Port', config.server?.port],
+    ['Host', config.server?.host],
+    ['Data Directory', config.server?.data_dir],
+    ['Upload Directory', config.server?.upload_dir],
+    ['Max Upload Size', `${config.server?.max_upload_mb} MB`],
+    ['MCP HTTP Port', config.mcp?.http_port],
+    ['MCP SSE Port', config.mcp?.sse_port],
+    ['Routing Mode', config.routing?.default],
+    ['Max Agent Hops', config.routing?.max_hops],
+    ['Agents Online', config.agents_online],
+    ['Uptime', `${Math.floor(config.uptime / 60)}m ${Math.floor(config.uptime % 60)}s`],
+  ];
+
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider mb-2">Server Configuration</div>
+      <div className="rounded-xl bg-surface-container/20 border border-outline-variant/8 overflow-hidden">
+        {rows.map(([label, value], i) => (
+          <div key={i} className={`flex justify-between px-3 py-1.5 text-[10px] ${i % 2 === 0 ? '' : 'bg-surface-container/10'}`}>
+            <span className="text-on-surface-variant/50">{label}</span>
+            <span className="text-on-surface font-mono">{value}</span>
+          </div>
+        ))}
+      </div>
+      <div className="text-[9px] text-on-surface-variant/30 mt-1.5">
+        Edit backend/config.toml to change server ports and paths. Restart required.
+      </div>
+    </div>
+  );
+}
+
+/* ── ServerLogsSection ─────────────────────────────────────────────── */
+
+function ServerLogsSection() {
+  const [logs, setLogs] = useState<{ timestamp: number; level: string; module: string; message: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const preRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const poll = async () => {
+      while (!cancelled) {
+        try {
+          const r = await fetch(`/api/logs?limit=100${filter ? `&level=${filter}` : ''}`);
+          const d = await r.json();
+          if (!cancelled) setLogs(d.logs || []);
+        } catch {}
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [open, filter]);
+
+  useEffect(() => {
+    if (preRef.current) preRef.current.scrollTop = preRef.current.scrollHeight;
+  }, [logs]);
+
+  const levelColor = (l: string) => {
+    switch (l) {
+      case 'ERROR': return 'text-red-400';
+      case 'WARNING': return 'text-yellow-400';
+      case 'INFO': return 'text-blue-400';
+      default: return 'text-on-surface-variant/40';
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">Server Logs</span>
+        <button onClick={() => setOpen(!open)} className="text-[10px] font-medium text-primary hover:text-primary/80">
+          {open ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      {open && (
+        <div className="rounded-xl bg-surface-container-lowest border border-outline-variant/8 overflow-hidden">
+          <div className="flex gap-1 px-2 py-1.5 border-b border-outline-variant/5">
+            {['', 'ERROR', 'WARNING', 'INFO', 'DEBUG'].map(l => (
+              <button key={l} onClick={() => setFilter(l)}
+                className={`px-2 py-0.5 rounded text-[9px] font-medium transition-colors ${filter === l ? 'bg-primary/15 text-primary' : 'text-on-surface-variant/40 hover:text-on-surface-variant/60'}`}>
+                {l || 'All'}
+              </button>
+            ))}
+          </div>
+          <pre ref={preRef} className="max-h-[200px] overflow-auto p-2 text-[10px] font-mono leading-relaxed">
+            {logs.length === 0 ? (
+              <span className="text-on-surface-variant/30">No logs yet</span>
+            ) : logs.map((l, i) => (
+              <div key={i}>
+                <span className="text-on-surface-variant/25">{new Date(l.timestamp * 1000).toLocaleTimeString()}</span>{' '}
+                <span className={`font-bold ${levelColor(l.level)}`}>{l.level.padEnd(7)}</span>{' '}
+                <span className="text-on-surface-variant/60">{l.message}</span>
+              </div>
+            ))}
+          </pre>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -525,6 +651,8 @@ function ProvidersTab() {
   const [configuring, setConfiguring] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState('');
+  const [testing, setTesting] = useState('');
+  const [testResult, setTestResult] = useState<{ provider: string; ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     api.getProviders().then(setStatus).catch(() => {});
@@ -534,10 +662,20 @@ function ProvidersTab() {
     if (!apiKey.trim()) return;
     try {
       await api.configureProvider(provider, apiKey.trim());
+      // Test the key
+      setTesting(provider);
+      try {
+        const testR = await fetch(`/api/providers/${provider}/test`, { method: 'POST' });
+        const testD = await testR.json();
+        setTestResult({ provider, ok: testR.ok, message: testD.message || testD.error || 'Unknown' });
+      } catch {
+        setTestResult({ provider, ok: true, message: 'Key saved (test unavailable)' });
+      }
+      setTesting('');
       setApiKey('');
       setConfiguring(null);
       setSaved(provider);
-      setTimeout(() => setSaved(''), 2000);
+      setTimeout(() => { setSaved(''); setTestResult(null); }, 3000);
       api.getProviders().then(setStatus).catch(() => {});
     } catch {}
   };
@@ -585,7 +723,9 @@ function ProvidersTab() {
                   {p.local && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400/80 font-medium">LOCAL</span>}
                 </div>
                 {p.configured ? (
-                  <span className="text-[9px] text-green-400/70 font-medium">{saved === p.id ? 'Saved!' : 'Connected'}</span>
+                  <span className="text-[9px] text-green-400/70 font-medium">
+                    {testing === p.id ? 'Testing...' : saved === p.id ? (testResult?.ok ? 'Verified!' : 'Saved') : 'Connected'}
+                  </span>
                 ) : (
                   <button
                     onClick={() => { setConfiguring(configuring === p.id ? null : p.id); setApiKey(''); }}
@@ -749,6 +889,85 @@ function CleanupSection() {
   );
 }
 
+/* ── PersistentAgentCard — expandable agent editor ──────────────── */
+
+function PersistentAgentCard({ agent, onUpdate, onRemove }: {
+  agent: PersistentAgent;
+  onUpdate: (updated: PersistentAgent) => void;
+  onRemove: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [editArgs, setEditArgs] = useState(agent.args?.join(' ') || '');
+  const [editColor, setEditColor] = useState(agent.color || '#a78bfa');
+  const [editCwd, setEditCwd] = useState(agent.cwd || '.');
+  const [editLabel, setEditLabel] = useState(agent.label || '');
+
+  const handleSave = () => {
+    onUpdate({
+      ...agent,
+      label: editLabel || agent.label,
+      args: editArgs.split(/\s+/).filter(Boolean),
+      color: editColor,
+      cwd: editCwd,
+    });
+    setExpanded(false);
+  };
+
+  return (
+    <div className="rounded-lg bg-surface-container/30 border border-outline-variant/5 overflow-hidden">
+      <div className="flex items-center gap-2 p-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <AgentIcon base={agent.base} color={agent.color} size={28} />
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] font-semibold" style={{ color: agent.color }}>{agent.label}</div>
+          <div className="text-[9px] text-on-surface-variant/45 font-mono truncate">{agent.command} {(agent.args || []).join(' ')}</div>
+        </div>
+        <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30">{expanded ? 'expand_less' : 'expand_more'}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="p-1 rounded text-on-surface-variant/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[14px]">close</span>
+        </button>
+      </div>
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2 border-t border-outline-variant/5 pt-2">
+          <div>
+            <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider block mb-1">Label</label>
+            <input value={editLabel} onChange={e => setEditLabel(e.target.value)}
+              className="w-full bg-surface-container-highest rounded-md px-2 py-1.5 text-[11px] text-on-surface border border-outline-variant/10 focus:border-primary/40 outline-none" />
+          </div>
+          <div>
+            <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider block mb-1">Workspace</label>
+            <input value={editCwd} onChange={e => setEditCwd(e.target.value)}
+              className="w-full bg-surface-container-highest rounded-md px-2 py-1.5 text-[11px] text-on-surface border border-outline-variant/10 focus:border-primary/40 outline-none font-mono" />
+          </div>
+          <div>
+            <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider block mb-1">CLI Arguments</label>
+            <input value={editArgs} onChange={e => setEditArgs(e.target.value)}
+              className="w-full bg-surface-container-highest rounded-md px-2 py-1.5 text-[11px] text-on-surface border border-outline-variant/10 focus:border-primary/40 outline-none font-mono"
+              placeholder="--dangerously-skip-permissions --model opus" />
+          </div>
+          <div>
+            <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider block mb-1">Color</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)}
+                className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" />
+              <span className="text-[10px] text-on-surface-variant/50 font-mono">{editColor}</span>
+            </div>
+          </div>
+          <div className="text-[9px] text-on-surface-variant/30 font-mono bg-surface-container-lowest rounded px-2 py-1.5">
+            {agent.command} {editArgs}
+          </div>
+          <button onClick={handleSave}
+            className="w-full py-1.5 rounded-lg bg-primary/15 text-primary text-[11px] font-semibold hover:bg-primary/25 transition-colors">
+            Save Changes
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── PersistentAgentsSection ─────────────────────────────────────── */
 
 function PersistentAgentsSection() {
@@ -827,19 +1046,19 @@ function PersistentAgentsSection() {
           </div>
         )}
         {persistent.map((pa, i) => (
-          <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-surface-container/30 border border-outline-variant/5">
-            <AgentIcon base={pa.base} color={pa.color} size={28} />
-            <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-semibold" style={{ color: pa.color }}>{pa.label}</div>
-              <div className="text-[9px] text-on-surface-variant/45 font-mono truncate">{pa.cwd}</div>
-            </div>
-            <button
-              onClick={() => removeAgent(i)}
-              className="p-1 rounded text-on-surface-variant/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[14px]">close</span>
-            </button>
-          </div>
+          <PersistentAgentCard
+            key={i}
+            agent={pa}
+            onUpdate={(updated) => {
+              const list = [...persistent];
+              list[i] = updated;
+              updateSettings({ persistentAgents: list });
+              api.saveSettings({ persistentAgents: list }).then(() => {
+                api.getStatus().then(r => setAgents(r.agents)).catch(() => {});
+              }).catch(() => {});
+            }}
+            onRemove={() => removeAgent(i)}
+          />
         ))}
       </div>
 

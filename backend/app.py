@@ -1716,6 +1716,74 @@ async def get_activity(limit: int = 50):
     return {"events": _activity_log[-limit:]}
 
 
+# ── Server Logs ──────────────────────────────────────────────────────
+
+_server_logs: list[dict] = []
+_MAX_LOG_ENTRIES = 500
+
+
+class _UILogHandler(logging.Handler):
+    """Captures log records for the UI log viewer."""
+    def emit(self, record):
+        try:
+            entry = {
+                "timestamp": record.created,
+                "level": record.levelname,
+                "module": record.module,
+                "message": self.format(record),
+            }
+            _server_logs.append(entry)
+            if len(_server_logs) > _MAX_LOG_ENTRIES:
+                _server_logs.pop(0)
+        except Exception:
+            pass
+
+
+# Attach log handler
+_ui_handler = _UILogHandler()
+_ui_handler.setLevel(logging.DEBUG)
+_ui_handler.setFormatter(logging.Formatter("%(message)s"))
+logging.getLogger().addHandler(_ui_handler)
+logging.getLogger("uvicorn.access").addHandler(_ui_handler)
+
+
+@app.get("/api/logs")
+async def get_server_logs(limit: int = 100, level: str = ""):
+    """Get recent server log entries for the UI log viewer."""
+    logs = list(_server_logs)
+    if level:
+        logs = [l for l in logs if l["level"] == level.upper()]
+    return {"logs": logs[-limit:]}
+
+
+# ── Server Config (read-only view for UI) ──────────────────────────
+
+@app.get("/api/server-config")
+async def get_server_config():
+    """Return current server configuration for the UI config viewer."""
+    return {
+        "server": {
+            "port": PORT,
+            "host": HOST,
+            "data_dir": str(DATA_DIR),
+            "static_dir": str(STATIC_DIR),
+            "upload_dir": str(UPLOAD_DIR),
+            "max_upload_mb": MAX_SIZE_MB,
+        },
+        "routing": {
+            "default": router.default_routing,
+            "max_hops": router.max_hops,
+        },
+        "mcp": {
+            "http_port": mcp_bridge.MCP_HTTP_PORT,
+            "sse_port": mcp_bridge.MCP_SSE_PORT,
+        },
+        "uptime": time.time() - _settings.get("_server_start", time.time()),
+        "agents_online": len([i for i in registry.get_all() if i.state in ("active", "thinking")]),
+        "total_messages": 0,  # Would need a count query
+    }
+
+
 # ── Usage tracking ───────────────────────────────────────────────────
 
 _usage: dict[str, int] = {}  # agent -> token count
@@ -1986,6 +2054,48 @@ async def configure_provider(request: Request):
 
     provider_registry.save_config(config_updates)
     return {"ok": True, "status": provider_registry.get_provider_status()}
+
+
+@app.post("/api/providers/{provider_id}/test")
+async def test_provider_key(provider_id: str):
+    """Test if the configured API key for a provider works."""
+    import urllib.request, urllib.error
+    from providers import PROVIDERS
+    pdef = PROVIDERS.get(provider_id)
+    if not pdef:
+        return JSONResponse({"error": "unknown provider"}, 404)
+    key = provider_registry.get_api_key(provider_id)
+    if not key:
+        return JSONResponse({"error": "no API key configured"}, 400)
+
+    # Quick validation request per provider
+    test_urls = {
+        "anthropic": ("https://api.anthropic.com/v1/messages", {"x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"}),
+        "openai": ("https://api.openai.com/v1/models", {"Authorization": f"Bearer {key}"}),
+        "google": (f"https://generativelanguage.googleapis.com/v1beta/models?key={key}", {}),
+        "xai": ("https://api.x.ai/v1/models", {"Authorization": f"Bearer {key}"}),
+        "groq": ("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {key}"}),
+        "together": ("https://api.together.xyz/v1/models", {"Authorization": f"Bearer {key}"}),
+        "huggingface": ("https://huggingface.co/api/whoami-v2", {"Authorization": f"Bearer {key}"}),
+    }
+
+    if provider_id not in test_urls:
+        return {"ok": True, "message": "Key saved (no test available for this provider)"}
+
+    url, headers = test_urls[provider_id]
+    try:
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status == 200:
+                return {"ok": True, "message": "API key verified"}
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return JSONResponse({"error": "Invalid API key — authentication failed"}, 401)
+        return {"ok": True, "message": f"Key accepted (status {e.code})"}
+    except Exception as e:
+        return JSONResponse({"error": f"Connection failed: {str(e)[:100]}"}, 500)
+
+    return {"ok": True, "message": "Key appears valid"}
 
 
 @app.get("/api/providers/{provider_id}/models")
