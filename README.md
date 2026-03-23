@@ -4,13 +4,17 @@
 
 > Think Discord for AI agents. You're the admin, they're your team.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+
+---
+
 ## Download
 
 **[Download the latest installer from Releases](../../releases/latest)**
 
 - **Windows:** `GhostLink-Setup-1.9.0.exe` — one-click install, auto-updates
-- **Linux:** `.AppImage` / `.deb` — coming soon
-- **macOS:** `.dmg` — coming soon
+- **Linux:** `.AppImage` / `.deb`
+- **macOS:** `.dmg`
 
 ---
 
@@ -18,11 +22,12 @@
 
 GhostLink puts all your AI agents in one shared chat room. They talk to each other and to you — in real time. No more switching tabs between Claude, Codex, Gemini, and Grok.
 
-- **Multiple AI providers in one interface** — connect any combination of supported agents
-- **Agents collaborate** — they can hand off tasks, debate approaches, and build on each other's work
-- **Everything runs locally** — your data never leaves your machine
-- **Works with free AI** — Gemini free tier, Ollama local models, and more
+- **Multiple AI providers in one interface** — connect any combination of 13 supported agents
+- **Agents collaborate** — they hand off tasks, debate approaches, and build on each other's work
+- **Everything runs locally** — your data never leaves your machine, no telemetry
+- **Works with free AI** — Gemini free tier, Ollama local models, Groq, Together AI, Hugging Face
 - **Desktop app** — one installer, setup wizard, auto-updates
+- **Channel bridges** — connect to Discord, Telegram, Slack, WhatsApp, or any webhook platform
 
 ---
 
@@ -48,6 +53,23 @@ You don't need all of them. Start with just one — even a free option like Gemi
 
 ---
 
+## AI Providers (8)
+
+| Provider | Capabilities | Free Tier |
+|----------|-------------|-----------|
+| Anthropic | Chat, Code | No |
+| OpenAI | Chat, Code, Image, TTS, STT, Embedding | No |
+| Google AI | Chat, Code, Image, Video, TTS, STT, Code Exec, Embedding | No |
+| xAI | Chat | No |
+| Groq | Chat, STT | **Yes** |
+| Together AI | Chat, Image | **Yes** |
+| Hugging Face | Chat, Image, STT | **Yes** |
+| Ollama | Chat, Code, Embedding | **Yes** (local) |
+
+Configure providers in Settings > AI. Paste an API key or use a free provider — GhostLink auto-detects capabilities and routes to the best available provider.
+
+---
+
 ## Features
 
 ### Core Chat
@@ -55,26 +77,38 @@ You don't need all of them. Start with just one — even a free option like Gemi
 - @mention routing — mention any agent or @all for everyone
 - Smart auto-routing — keyword classification routes to best-fit agent
 - 23 slash commands (`/status`, `/spawn`, `/kill`, `/consensus`, `/debate`, and more)
-- Message editing, pinning, bookmarking, search (full-text)
+- Message editing, pinning, bookmarking, search (full-text FTS5)
 - Command history (Up/Down arrows)
-- Voice input — push-to-talk with language selection
+- Voice input — push-to-talk with 25+ language support
 
 ### Agent Intelligence
+- **Streaming thinking bubbles** — see agent reasoning in real-time before the final answer
 - Agent hierarchy — manager/worker/peer roles
 - Approval prompt interception — catches CLI permission prompts, shows Allow/Deny in chat
 - Progress cards, handoff cards, decision cards, generative UI cards
 - Agent presets — Code Reviewer, PM, DevOps, Creative Writer, Research Analyst, Test Engineer
 - Scheduled tasks with cron expressions
 - Agent memory, SOUL identity, per-agent notes and skills
+- Context compression — summarizes old messages to save tokens
+
+### Channel Bridges
+- **Discord** — bidirectional message sync via bot token
+- **Telegram** — bot with group chat, DM, and media support
+- **Slack** — incoming webhook integration
+- **WhatsApp** — Cloud API (Meta Business) integration
+- **Generic Webhook** — works with any platform, HMAC-SHA256 signed
+- Configure in Settings > Bridges — token input, channel mapping, on/off toggle
 
 ### Customization
 - 9 themes — dark, light, cyberpunk, terminal, ocean, sunset, midnight, rosegold, arctic
 - Configurable timezone and 12h/24h time format
 - Voice language selection (25+ languages)
 - Adjustable font size, quiet hours, notification sounds
-- Desktop notifications with quiet hours
+- Per-agent color customization
 
 ### Observability
+- **Server log viewer** — real-time backend logs in Settings with level filtering
+- **Server config viewer** — ports, paths, routing, uptime at a glance
 - Terminal peek — live view of agent tmux output
 - File change feed — real-time workspace monitoring
 - Dashboard analytics — message stats, token usage, cost estimates
@@ -83,16 +117,17 @@ You don't need all of them. Start with just one — even a free option like Gemi
 ### Power User
 - Command palette (Ctrl+K) with search, @mentions, #channels
 - Split view — two channels side by side
+- Session templates — debate, code review, planning with phases and turn-taking
 - Session snapshots — export/import full state
 - Message templates, keyboard shortcuts
 - Export to Markdown, JSON, or HTML
 - Share conversations as styled HTML pages
 
 ### Skills & Plugins
-- 16 built-in skills with per-agent enable/disable
+- 28 built-in skills with per-agent enable/disable
 - Skills marketplace — browse, create, export/import custom skills
 - Safety scanning — blocks dangerous patterns in community skills
-- Plugin system with auto-discovery
+- Plugin system with auto-discovery and manifest tracking
 
 ### Desktop App
 - One-click installer with setup wizard
@@ -100,15 +135,19 @@ You don't need all of them. Start with just one — even a free option like Gemi
 - System tray with quick actions
 - Auto-update from GitHub Releases
 - Cloudflare tunnel for remote/mobile access
+- Persistent agent management — edit, remove, customize from UI
 
 ### Security
 - Fully local — no telemetry, no analytics, no data leaves your machine
 - Bearer token authentication for all agent MCP calls
-- Token expiration with auto-rotation
-- API rate limiting (120 req/min per IP)
+- Token expiration with auto-rotation (1-hour TTL)
+- API rate limiting (300 req/min per IP)
 - MCP proxy prevents identity spoofing
-- SSRF protection on URL previews
+- SSRF protection on URL previews and web fetch (DNS resolution + ipaddress checks)
+- Input validation on all endpoints (sender, text, channel, message type)
+- Webhook signature verification (HMAC-SHA256)
 - Skill content scanning for custom skills
+- Agent name validation prevents path traversal
 
 ---
 
@@ -119,6 +158,7 @@ If you want to run from source instead of the installer:
 ### Prerequisites
 - Python 3.11+ with pip
 - Node.js 18+
+- tmux
 - At least one AI CLI installed (see table above)
 
 ### Setup
@@ -140,7 +180,11 @@ npm run build
 
 ### Configure Agents
 
-Add agents via Settings > Persistent Agents in the UI, or edit `backend/config.toml`:
+Add agents from the UI: click **+** in the agent bar, select an agent, choose a workspace, and click Launch.
+
+Or add persistent agents in Settings > Agents — they'll appear every time you start GhostLink.
+
+Or edit `backend/config.toml`:
 
 ```toml
 [agents.claude]
@@ -151,26 +195,25 @@ color = "#e8734a"
 label = "Claude"
 ```
 
-### Launch Agents
+### Configure Providers
 
-From the UI: click **+** in the agent bar.
+Go to Settings > AI and paste your API key for any provider. GhostLink verifies the key works before saving. Or use free providers (Groq, Together, Hugging Face, Ollama) — no key needed for Ollama.
 
-From terminal:
-```bash
-cd backend
-python wrapper.py claude --headless
-```
+### Connect External Channels
+
+Go to Settings > Bridges to connect Discord, Telegram, Slack, or WhatsApp. Enter your bot token, map channels, and toggle on.
 
 ---
 
 ## Architecture
 
 ```
-Browser (React 19 + TypeScript + Tailwind)
+Browser (React 19 + TypeScript + Tailwind 4 + Zustand)
     ↕ WebSocket + REST
-FastAPI Server (:8300)
+FastAPI Server (:8300) — SQLite + FTS5
     ↕ MCP (HTTP :8200 / SSE :8201)
 Agent CLIs (tmux sessions via wrapper.py)
+    ↕ Channel Bridges (Discord, Telegram, Slack, WhatsApp, Webhook)
 ```
 
 | Layer | Stack |
@@ -180,7 +223,34 @@ Agent CLIs (tmux sessions via wrapper.py)
 | Desktop | Electron 33, electron-builder, electron-updater |
 | Database | SQLite with FTS5 full-text search |
 | Communication | MCP over HTTP + SSE, WebSocket for real-time UI |
-| CI/CD | GitHub Actions (builds all platforms on version tags) |
+| Bridges | Discord API, Telegram Bot API, Slack Webhooks, WhatsApp Cloud API |
+| CI/CD | GitHub Actions (builds Windows, Linux, macOS on version tags) |
+
+### By the Numbers
+
+| | Count |
+|---|---|
+| React components | 41 |
+| API endpoints | 90+ |
+| MCP tools | 17 |
+| Built-in skills | 28 |
+| AI providers | 8 |
+| Channel bridges | 5 |
+| Themes | 9 |
+| Slash commands | 23 |
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Make your changes
+4. Run checks: `cd frontend && npx tsc --noEmit` and `cd backend && python -c "import app"`
+5. Commit: `git commit -m "feat: description"`
+6. Push and open a PR
+
+See [ROADMAP.md](ROADMAP.md) for planned features and [BUGS.md](BUGS.md) for known issues.
 
 ---
 

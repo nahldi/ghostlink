@@ -84,6 +84,26 @@
 - [x] **Agent notes scratch pad** — free-form notes per agent
 - [x] **Agent config** — per-agent model, temperature, system prompt
 
+### Channel Bridges (v1.9.0)
+- [x] **Discord bridge** — bidirectional message sync via bot token, message polling, formatted output
+- [x] **Telegram bridge** — Bot API long-polling, Markdown formatting, group/DM support
+- [x] **Slack bridge** — incoming webhook with custom username and emoji
+- [x] **WhatsApp bridge** — Cloud API (Meta Business) integration
+- [x] **Generic webhook bridge** — inbound/outbound with HMAC-SHA256 signing
+- [x] **Bridge management UI** — Settings > Bridges tab with token input, channel mapping, on/off toggles
+
+### Streaming & Observability (v1.7.0–v1.9.0)
+- [x] **Streaming thinking bubbles** — live agent reasoning visible in chat during processing
+- [x] **Server log viewer** — real-time backend logs in Settings with level filtering
+- [x] **Server config viewer** — ports, paths, routing mode, uptime at a glance
+- [x] **Provider API key verification** — tests key against provider API before saving
+
+### Settings & Configuration (v1.8.0)
+- [x] **Persistent agent editor** — edit label, workspace, CLI args, and color for saved agents
+- [x] **8 AI providers** — Anthropic, OpenAI, Google, xAI, Groq, Together, HuggingFace, Ollama
+- [x] **Capability-based provider routing** — auto-selects best provider per capability
+- [x] **Free tier detection** — highlights free providers (Groq, Together, HuggingFace, Ollama)
+
 ### Additional
 - [x] **Cloudflare tunnel** — one-click remote access
 - [x] **Server shutdown endpoint** — graceful agent termination

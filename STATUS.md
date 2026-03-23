@@ -109,16 +109,24 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 - Voice input (Web Speech API push-to-talk)
 - Share conversations as self-contained HTML
 - Skill safety scanning (content validation for custom skills)
-- API rate limiting (120 req/min per IP)
+- API rate limiting (300 req/min per IP)
 - Token expiration with auto-rotation on heartbeat
+- Channel bridges — Discord, Telegram, Slack, WhatsApp, Generic Webhook
+- Streaming thinking bubbles — live agent reasoning in chat
+- Provider API key verification on save
+- Server log viewer in Settings > Advanced
+- Server config viewer in Settings > Advanced
+- Persistent agent editor — edit label, args, color, workspace from UI
+- Webhook signature verification (HMAC-SHA256)
 
 ### What's Not Done Yet
 - Native Windows support without WSL (wrapper rewrite needed)
-- Supermemory.ai integration (persistent cross-session agent memory)
-- OAuth token storage in OS keychain
-- Multi-project workspace switching without restart
-- IDE extensions (VS Code, Cursor panels)
-- Mobile app (React Native or PWA)
+- OAuth sign-in for providers (currently API key only)
+- Plugin marketplace with installable packages
+- Docker sandbox for agent execution
+- Mobile app (PWA or React Native)
+- Multi-user support
+- Streaming token-by-token responses
 
 ---
 
@@ -231,7 +239,7 @@ Paid agents (Claude, Codex, Grok) require their respective subscriptions but all
 
 ## DESKTOP APP FLOW
 
-1. **Install** — run `GhostLink Setup 1.0.18.exe` (79MB NSIS installer)
+1. **Install** — run `GhostLink-Setup-1.9.0.exe` (NSIS installer)
 2. **First run** — setup wizard: platform detection → Python check → deps install → workspace selection → done
 3. **Launcher** — shows server status, auth connections (Claude/Codex/Gemini/GitHub), settings, update check
 4. **Start Server** — launches Python backend via WSL (handles OneDrive path detection, venv creation, dep installation)
@@ -300,25 +308,35 @@ npm run build:win   # Windows .exe
 
 ## KNOWN ISSUES
 
-See BUGS.md for full list. Key open items:
-- BUG-002: Server startup may fail if python3-venv not installed in WSL
+See BUGS.md for full list. 52 bugs fixed as of v1.9.0. Remaining open items:
 - BUG-007: OneDrive paths need /tmp copy (handled but slow)
-- BUG-008: No agents appear on fresh install (user must click + to add)
+- BUG-011: Frontend dist path mismatch in packaged app (fallback exists)
 - ARCH-003: Desktop app requires WSL on Windows (no native Python support yet)
 
 ---
 
 ## WHAT'S NEXT
 
-### High Priority
-- Skill safety/sandboxing (content scanning for custom skills)
-- Supermemory.ai integration (persistent cross-session memory)
-- Native Windows Python support (no WSL requirement)
-- Railway-hosted shared skill registry (optional community features)
+See [ROADMAP.md](ROADMAP.md) for the full development plan (Phases 8-15).
 
-### Nice to Have
-- Voice chat (Web Speech API for STT, TTS for output)
-- Multi-project support (switch workspaces without restart)
-- IDE extensions (VS Code, Cursor panels connecting to GhostLink)
-- Mobile app (React Native or PWA via Cloudflare tunnel)
-- GhostLink Cloud (hosted SaaS version)
+### High Priority (Phase 9-10)
+- Plugin marketplace with installable packages (GhostHub)
+- Plugin SDK for community development
+- Docker sandbox for agent execution
+- Encrypted secrets manager
+- More model providers (Mistral, OpenRouter, Azure, Bedrock, Deepseek)
+
+### Medium Priority (Phase 11-13)
+- Model failover and cost-aware routing
+- Streaming token-by-token responses
+- RAG document search
+- PWA mobile app
+- Agent performance dashboards
+- OpenTelemetry integration
+
+### Future (Phase 14-15)
+- Multi-user support with roles
+- Docker Compose deployment
+- GhostLink Cloud (hosted SaaS)
+- Visual workflow builder
+- Multi-language UI (i18n)
