@@ -364,8 +364,10 @@ $btnRestart.addEventListener('click', () => {
 api.on('server:started', (port) => {
   setServerState('running');
   if (port) $portDisplay.textContent = 'Port: ' + port;
-  // Sync any already-detected auth results to the backend
-  if (providerStatuses.length > 0) syncConnectedToBackend(providerStatuses);
+  // Sync auth results to backend after server is fully ready (short delay for port binding)
+  setTimeout(() => {
+    if (providerStatuses.length > 0) syncConnectedToBackend(providerStatuses);
+  }, 1500);
   // Auto-open the chat window after a short delay
   setTimeout(() => {
     api.invoke('app:open-chat');

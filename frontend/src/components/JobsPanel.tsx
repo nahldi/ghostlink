@@ -58,6 +58,7 @@ export function JobsPanel() {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+  const [dragError, setDragError] = useState('');
 
   const columns = ['open', 'done', 'archived'] as const;
 
@@ -94,10 +95,14 @@ export function JobsPanel() {
     if (!jobId) return;
     const job = jobs.find(j => j.id === jobId);
     if (!job || job.status === targetStatus) return;
+    setDragError('');
     try {
       await api.updateJob(jobId, { status: targetStatus as Job['status'] });
       useChatStore.getState().updateJob({ ...job, status: targetStatus as Job['status'] });
-    } catch {}
+    } catch {
+      setDragError('Failed to move job');
+      setTimeout(() => setDragError(''), 3000);
+    }
   };
 
   return (
@@ -130,6 +135,12 @@ export function JobsPanel() {
           >
             Create
           </button>
+        </div>
+      )}
+
+      {dragError && (
+        <div className="mx-4 mt-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] text-red-400/80">
+          {dragError}
         </div>
       )}
 

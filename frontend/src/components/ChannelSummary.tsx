@@ -15,12 +15,14 @@ export function ChannelSummary({ channel, onClose }: { channel: string; onClose:
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError('');
     setData(null);
     api.getChannelSummary(channel)
-      .then((r) => { setData(r); setLoading(false); })
-      .catch(() => { setError('Failed to load summary'); setLoading(false); });
+      .then((r) => { if (!cancelled) { setData(r); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError('Failed to load summary'); setLoading(false); } });
+    return () => { cancelled = true; };
   }, [channel]);
 
   return (

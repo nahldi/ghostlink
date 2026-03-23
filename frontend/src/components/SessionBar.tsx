@@ -16,6 +16,7 @@ interface Session {
 export function SessionBar() {
   const activeChannel = useChatStore((s) => s.activeChannel);
   const [session, setSession] = useState<Session | null>(null);
+  const [advancing, setAdvancing] = useState(false);
 
   useEffect(() => {
     api.getSession(activeChannel)
@@ -42,10 +43,13 @@ export function SessionBar() {
   const progress = (Math.min(session.current_phase, phases.length) / phases.length) * 100;
 
   const handleAdvance = async () => {
+    if (advancing) return;
+    setAdvancing(true);
     try {
       const r = await api.advanceSession(activeChannel);
       setSession(r.session);
     } catch {}
+    setAdvancing(false);
   };
 
   const handleEnd = async () => {
@@ -102,7 +106,7 @@ export function SessionBar() {
         </button>
         <button
           onClick={handleAdvance}
-          disabled={isPaused}
+          disabled={isPaused || advancing}
           className="p-1 rounded-md text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-30"
           title="Next turn"
         >

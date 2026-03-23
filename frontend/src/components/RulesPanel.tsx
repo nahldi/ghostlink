@@ -9,6 +9,7 @@ export function RulesPanel() {
   const [showForm, setShowForm] = useState(false);
   const [text, setText] = useState('');
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
+  const [dragError, setDragError] = useState('');
 
   const active = rules.filter((r) => r.status === 'active');
   const drafts = rules.filter((r) => r.status === 'draft' || r.status === 'pending');
@@ -55,7 +56,12 @@ export function RulesPanel() {
     if (!rule || rule.status === targetStatus) return;
 
     // Enforce max 10 active rules
-    if (targetStatus === 'active' && active.length >= 10) return;
+    if (targetStatus === 'active' && active.length >= 10) {
+      setDragError('Max 10 active rules');
+      setTimeout(() => setDragError(''), 3000);
+      return;
+    }
+    setDragError('');
 
     try {
       await api.updateRule(ruleId, { status: targetStatus as Rule['status'] });
@@ -100,6 +106,11 @@ export function RulesPanel() {
       {active.length >= 7 && (
         <div className="mx-4 mt-3 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[10px] text-yellow-400/80">
           {active.length}/10 active rules. Fewer rules tend to work better.
+        </div>
+      )}
+      {dragError && (
+        <div className="mx-4 mt-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] text-red-400/80">
+          {dragError}
         </div>
       )}
 

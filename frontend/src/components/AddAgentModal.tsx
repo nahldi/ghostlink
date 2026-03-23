@@ -205,7 +205,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
               {templates.filter(t => t.available).map((t) => (
                 <button
                   key={t.base}
-                  onClick={() => { setSelected(t.base); setPermPreset(0); setSelectedModel(0); }}
+                  onClick={() => { setSelected(t.base); setLabel(''); setPermPreset(0); setSelectedModel(0); }}
                   className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl transition-all ${
                     selected === t.base
                       ? 'ring-1 ring-primary/30 bg-primary/8'
