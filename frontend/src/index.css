@@ -78,16 +78,22 @@ body {
 
 #root { min-height: 100vh; display: flex; max-width: 100vw; overflow-x: hidden; }
 
-/* ── Ambient Background ── */
+/* ── Ambient Background — animated gradient mesh ── */
 .ambient-bg {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(124, 58, 237, 0.06) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(56, 189, 248, 0.04) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(251, 146, 60, 0.02) 0%, transparent 70%);
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(124, 58, 237, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(251, 146, 60, 0.025) 0%, transparent 70%);
+  animation: ambient-drift 30s ease-in-out infinite alternate;
+}
+@keyframes ambient-drift {
+  0% { opacity: 0.7; transform: scale(1) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.05) rotate(0.5deg); }
+  100% { opacity: 0.8; transform: scale(0.98) rotate(-0.3deg); }
 }
 
 /* ── Scrollbar ── */
@@ -189,85 +195,148 @@ body {
 
 /* ── Message entrance ── */
 @keyframes msg-slide-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(12px) scale(0.97); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
-.msg-enter { animation: msg-slide-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.msg-enter { animation: msg-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 /* ── Panel entrance ── */
 @keyframes panel-slide-in {
-  from { opacity: 0; transform: translateX(16px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateX(20px) scale(0.98); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
 }
 @keyframes panel-fade-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.94); filter: blur(8px); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 @keyframes float-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  from { opacity: 0; transform: translateY(16px) scale(0.94); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Glass surfaces — liquid glass effect ── */
+/* ── Modal entrance (scale + blur) ── */
+@keyframes modal-enter {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); filter: blur(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+.modal-enter { animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Stagger children entrance ── */
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Glass surfaces — premium liquid glass effect ── */
 .glass {
-  background: rgba(14, 14, 22, 0.88);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  background: linear-gradient(135deg, rgba(14, 14, 22, 0.92) 0%, rgba(18, 18, 30, 0.85) 100%);
+  backdrop-filter: blur(24px) saturate(1.4) brightness(1.02);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4) brightness(1.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 -1px 0 rgba(0, 0, 0, 0.1);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .glass-strong {
-  background: rgba(12, 12, 18, 0.92);
-  backdrop-filter: blur(28px) saturate(1.4);
-  -webkit-backdrop-filter: blur(28px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  background: linear-gradient(135deg, rgba(12, 12, 18, 0.95) 0%, rgba(16, 16, 26, 0.92) 100%);
+  backdrop-filter: blur(32px) saturate(1.5) brightness(1.03);
+  -webkit-backdrop-filter: blur(32px) saturate(1.5) brightness(1.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Liquid glass card effect ── */
+/* ── Liquid glass card effect — premium interactive ── */
 .liquid-glass {
-  background: rgba(18, 18, 28, 0.55);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+  background: linear-gradient(160deg, rgba(18, 18, 28, 0.6) 0%, rgba(22, 22, 36, 0.5) 50%, rgba(16, 16, 26, 0.65) 100%);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 20px rgba(124, 58, 237, 0.02);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .liquid-glass:hover {
-  border-color: rgba(124, 58, 237, 0.15);
-  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transform: translateY(-1px);
+  border-color: rgba(124, 58, 237, 0.2);
+  box-shadow:
+    0 12px 32px rgba(124, 58, 237, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 30px rgba(124, 58, 237, 0.04);
+  transform: translateY(-2px) scale(1.005);
+  background: linear-gradient(160deg, rgba(20, 20, 32, 0.65) 0%, rgba(26, 26, 42, 0.55) 50%, rgba(18, 18, 30, 0.7) 100%);
+}
+
+/* ── Glass card for settings/modals ── */
+.glass-card {
+  background: linear-gradient(145deg, rgba(16, 16, 26, 0.9) 0%, rgba(20, 20, 34, 0.85) 100%);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.3),
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Chat bubble glow on hover ── */
 .bubble-glow {
-  transition: box-shadow 0.3s, transform 0.2s;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, box-shadow;
 }
 .bubble-glow:hover {
-  box-shadow: 0 0 24px rgba(124, 58, 237, 0.1), 0 4px 16px rgba(0, 0, 0, 0.08);
-  transform: translateY(-0.5px);
+  box-shadow: 0 0 28px rgba(124, 58, 237, 0.12), 0 6px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
 /* ── Smooth transitions for interactive elements ── */
-button, a, input, select, textarea {
-  transition: all 0.15s ease;
+button, a {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+button:active { transform: scale(0.97); }
+input, select, textarea {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
 }
 
 /* ── Sidebar panel entrance animation ── */
 .sidebar-panel {
-  animation: panel-slide-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: panel-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── Modal backdrop ── */
 .modal-backdrop {
-  animation: panel-fade-in 0.15s ease-out both;
+  animation: panel-fade-in 0.2s ease-out both;
+}
+
+/* ── Sidebar rail hover glow ── */
+.sidebar-rail {
+  transition: box-shadow 0.3s ease;
+}
+
+/* ── Interactive list items ── */
+.interactive-item {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.interactive-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateX(2px);
 }
 
 /* ── Channel tab active indicator ── */
 .channel-active {
   position: relative;
-  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .channel-active::after {
   content: '';
