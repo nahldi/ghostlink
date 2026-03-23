@@ -19,6 +19,8 @@ PROVIDERS = {
         "name": "Anthropic",
         "env_keys": ["ANTHROPIC_API_KEY"],
         "capabilities": ["chat", "code"],
+        "setup_url": "https://console.anthropic.com/settings/keys",
+        "setup_instructions": "1. Sign up at console.anthropic.com\n2. Go to Settings > API Keys\n3. Create a new key\n4. Paste it here",
         "models": {
             "claude-opus-4-6": {"label": "Claude Opus 4.6", "tier": "premium"},
             "claude-sonnet-4-6": {"label": "Claude Sonnet 4.6", "tier": "standard"},
@@ -29,6 +31,8 @@ PROVIDERS = {
         "name": "OpenAI",
         "env_keys": ["OPENAI_API_KEY"],
         "capabilities": ["chat", "code", "image", "tts", "stt", "embedding"],
+        "setup_url": "https://platform.openai.com/api-keys",
+        "setup_instructions": "1. Sign up at platform.openai.com\n2. Go to API Keys\n3. Create a new secret key\n4. Paste it here",
         "models": {
             "gpt-5.4": {"label": "GPT-5.4", "tier": "premium"},
             "gpt-5.4-mini": {"label": "GPT-5.4 Mini", "tier": "fast"},
@@ -43,6 +47,8 @@ PROVIDERS = {
         "name": "Google AI",
         "env_keys": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
         "capabilities": ["chat", "code", "image", "video", "tts", "stt", "code_exec", "embedding"],
+        "setup_url": "https://aistudio.google.com/app/apikey",
+        "setup_instructions": "1. Go to aistudio.google.com\n2. Click 'Get API Key'\n3. Create a key for your project\n4. Paste it here\n\nGoogle AI Ultra users get Imagen 4, Veo 3.1, and premium models",
         "models": {
             "gemini-3.1-pro-preview": {"label": "Gemini 3.1 Pro", "tier": "premium"},
             "gemini-2.5-pro": {"label": "Gemini 2.5 Pro", "tier": "standard"},
@@ -57,6 +63,8 @@ PROVIDERS = {
         "name": "xAI",
         "env_keys": ["XAI_API_KEY"],
         "capabilities": ["chat"],
+        "setup_url": "https://console.x.ai",
+        "setup_instructions": "1. Go to console.x.ai\n2. Create an API key\n3. Paste it here",
         "models": {
             "grok-3": {"label": "Grok 3", "tier": "premium"},
             "grok-3-mini": {"label": "Grok 3 Mini", "tier": "fast"},
@@ -67,6 +75,8 @@ PROVIDERS = {
         "env_keys": ["GROQ_API_KEY"],
         "capabilities": ["chat", "stt"],
         "free_tier": True,
+        "setup_url": "https://console.groq.com/keys",
+        "setup_instructions": "1. Sign up at console.groq.com (free)\n2. Go to API Keys\n3. Create a key\n4. Paste it here\n\nFree tier: fast inference on Llama 3.3 70B + Whisper STT",
         "models": {
             "llama-3.3-70b-versatile": {"label": "Llama 3.3 70B", "tier": "standard"},
             "llama-3.1-8b-instant": {"label": "Llama 3.1 8B", "tier": "fast"},
@@ -78,6 +88,8 @@ PROVIDERS = {
         "env_keys": ["TOGETHER_API_KEY"],
         "capabilities": ["chat", "image"],
         "free_tier": True,
+        "setup_url": "https://api.together.xyz/settings/api-keys",
+        "setup_instructions": "1. Sign up at together.ai (free)\n2. Go to Settings > API Keys\n3. Create a key\n4. Paste it here\n\nFree tier: FLUX.1 Schnell image gen + Llama 3.3 70B chat",
         "models": {
             "meta-llama/Llama-3.3-70B-Instruct-Turbo": {"label": "Llama 3.3 70B", "tier": "standard"},
             "black-forest-labs/FLUX.1-schnell-Free": {"label": "FLUX.1 Schnell (Free)", "tier": "image-free"},
@@ -88,6 +100,8 @@ PROVIDERS = {
         "env_keys": ["HF_TOKEN", "HUGGINGFACE_API_KEY"],
         "capabilities": ["chat", "image", "stt"],
         "free_tier": True,
+        "setup_url": "https://huggingface.co/settings/tokens",
+        "setup_instructions": "1. Sign up at huggingface.co (free)\n2. Go to Settings > Access Tokens\n3. Create a new token\n4. Paste it here\n\nFree tier: FLUX.1 Dev image gen + Llama 3.3 chat + Whisper STT",
         "models": {
             "meta-llama/Llama-3.3-70B-Instruct": {"label": "Llama 3.3 70B", "tier": "standard"},
             "black-forest-labs/FLUX.1-dev": {"label": "FLUX.1 Dev", "tier": "image-free"},
@@ -100,6 +114,8 @@ PROVIDERS = {
         "capabilities": ["chat", "code", "embedding"],
         "free_tier": True,
         "local": True,
+        "setup_url": "https://ollama.com/download",
+        "setup_instructions": "1. Download from ollama.com\n2. Install and run Ollama\n3. Pull a model: ollama pull qwen2.5-coder\n4. No API key needed — runs locally",
         "models": {
             "qwen2.5-coder": {"label": "Qwen 2.5 Coder", "tier": "standard"},
             "llama3.2": {"label": "Llama 3.2", "tier": "standard"},
@@ -161,6 +177,8 @@ class ProviderRegistry:
                 "capabilities": pdef["capabilities"],
                 "models": pdef["models"],
                 "configured": has_key or bool(user_key),
+                "setup_url": pdef.get("setup_url", ""),
+                "setup_instructions": pdef.get("setup_instructions", ""),
             })
         return available
 

@@ -600,23 +600,43 @@ function ProvidersTab() {
                   <span key={c} className="text-[8px] px-1 py-0.5 rounded bg-surface-container/40 text-on-surface-variant/40">{capLabels[c] || c}</span>
                 ))}
               </div>
-              {configuring === p.id && !p.local && (
-                <div className="mt-2 flex gap-1.5">
-                  <input
-                    value={apiKey}
-                    onChange={e => setApiKey(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSaveKey(p.id)}
-                    type="password"
-                    placeholder="Paste API key..."
-                    className="flex-1 bg-surface-container/40 border border-outline-variant/10 rounded-md px-2 py-1.5 text-[10px] text-on-surface outline-none focus:border-primary/30 font-mono"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleSaveKey(p.id)}
-                    className="px-2.5 py-1.5 bg-primary-container text-white rounded-md text-[10px] font-medium hover:brightness-110"
-                  >
-                    Save
-                  </button>
+              {configuring === p.id && (
+                <div className="mt-2 space-y-2">
+                  {p.setup_instructions && (
+                    <div className="text-[9px] text-on-surface-variant/50 leading-relaxed whitespace-pre-line bg-surface-container/20 rounded-lg px-2.5 py-2">
+                      {p.setup_instructions}
+                    </div>
+                  )}
+                  {p.setup_url && (
+                    <a
+                      href={p.setup_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                      {p.local ? 'Download' : 'Get API Key'}
+                    </a>
+                  )}
+                  {!p.local && (
+                    <div className="flex gap-1.5">
+                      <input
+                        value={apiKey}
+                        onChange={e => setApiKey(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSaveKey(p.id)}
+                        type="password"
+                        placeholder="Paste API key..."
+                        className="flex-1 bg-surface-container/40 border border-outline-variant/10 rounded-md px-2 py-1.5 text-[10px] text-on-surface outline-none focus:border-primary/30 font-mono"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleSaveKey(p.id)}
+                        className="px-2.5 py-1.5 bg-primary-container text-white rounded-md text-[10px] font-medium hover:brightness-110"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
