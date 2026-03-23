@@ -180,18 +180,26 @@ class ServerManager {
         // Create dir and copy files using wsl
         execSync('wsl bash -c "mkdir -p /tmp/ghostlink-backend"', { stdio: 'pipe', timeout: 5_000 });
 
-        // Copy each Python file individually via wsl
-        const filesToCopy = fs.readdirSync(backendPath).filter(f => f.endsWith('.py') || f.endsWith('.txt') || f.endsWith('.toml'));
-        for (const file of filesToCopy) {
-          const src = path.join(backendPath, file);
-          const content = fs.readFileSync(src, 'utf-8');
-          // Write via wsl bash to avoid path issues
-          execSync(`wsl bash -c "cat > /tmp/ghostlink-backend/${file}"`, {
-            input: content,
-            stdio: ['pipe', 'pipe', 'pipe'],
-            timeout: 5_000,
-          });
-        }
+        // Copy Python files and subdirectories (plugins/) via wsl
+        // Note: execSync with wsl is required here — paths are pre-validated, no user input
+        const copyDir = (srcDir: string, wslDest: string) => {
+          for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+            if (entry.name.startsWith('__pycache__') || entry.name === 'data' || entry.name === 'uploads' || entry.name === '.venv') continue;
+            const srcPath = path.join(srcDir, entry.name);
+            if (entry.isDirectory()) {
+              execSync(`wsl bash -c "mkdir -p '${wslDest}/${entry.name}'"`, { stdio: 'pipe', timeout: 5_000 });
+              copyDir(srcPath, `${wslDest}/${entry.name}`);
+            } else if (/\.(py|txt|toml|json)$/.test(entry.name)) {
+              const content = fs.readFileSync(srcPath, 'utf-8');
+              execSync(`wsl bash -c "cat > '${wslDest}/${entry.name}'"`, {
+                input: content,
+                stdio: ['pipe', 'pipe', 'pipe'],
+                timeout: 5_000,
+              });
+            }
+          }
+        };
+        copyDir(backendPath, '/tmp/ghostlink-backend');
 
         // Copy frontend dist — check both packaged layout (frontend/) and dev layout (frontend/dist/)
         let frontendSrc = path.resolve(backendPath, '..', 'frontend', 'dist');
