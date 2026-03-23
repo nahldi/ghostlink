@@ -69,6 +69,18 @@ const PERMISSION_PRESETS: Record<string, { label: string; args: string[]; desc: 
     { label: 'Auto Yes', args: ['--yes'], desc: 'Auto-accept all suggestions' },
     { label: 'Default', args: [], desc: 'Ask before applying changes' },
   ],
+  goose: [
+    { label: 'Default', args: [], desc: 'Standard mode with Ollama or API' },
+  ],
+  opencode: [
+    { label: 'Default', args: [], desc: 'Standard mode' },
+  ],
+  ollama: [
+    { label: 'Default', args: ['run', 'qwen2.5-coder'], desc: 'Run default coding model' },
+  ],
+  copilot: [
+    { label: 'Default', args: [], desc: 'GitHub Copilot mode' },
+  ],
 };
 
 export function AddAgentModal({ onClose }: AddAgentModalProps) {

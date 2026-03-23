@@ -729,34 +729,41 @@ async def agent_templates():
         "grok": ["XAI_API_KEY"],
     }
 
+    # Cache detection results so we don't re-run slow WSL checks on every call
+    _available_cache: dict[str, bool] = {}
+
     def _is_available(name: str, cmd: str) -> bool:
         """Check if agent is available via CLI binary, API key, or WSL."""
+        if name in _available_cache:
+            return _available_cache[name]
+
+        result = _check_available(name, cmd)
+        _available_cache[name] = result
+        return result
+
+    def _check_available(name: str, cmd: str) -> bool:
         if _shutil.which(cmd):
             return True
         # Check API keys
         for key in _API_KEY_ENV.get(name, []):
             if os.environ.get(key):
                 return True
-        # Check in WSL with full login shell PATH (npm globals, pip, etc)
-        try:
-            result = subprocess.run(
-                ['wsl', 'bash', '-lc', f'which {cmd} 2>/dev/null || command -v {cmd} 2>/dev/null'],
-                capture_output=True, timeout=8,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                return True
-        except Exception:
-            pass
-        # Check npm global for node-based CLIs
-        _NPM_AGENTS = {"claude": "@anthropic-ai/claude-code", "gemini": "@google/gemini-cli", "codex": "@openai/codex"}
-        pkg = _NPM_AGENTS.get(name)
-        if pkg:
+        # Check in WSL — try multiple methods for maximum compatibility
+        wsl_checks = [
+            f'which {cmd} 2>/dev/null',
+            f'command -v {cmd} 2>/dev/null',
+            # Check common npm global paths directly
+            f'test -f "$HOME/.nvm/versions/node/*/bin/{cmd}" 2>/dev/null && echo found',
+            f'test -f "/usr/local/bin/{cmd}" 2>/dev/null && echo found',
+            f'ls $(npm root -g 2>/dev/null)/.bin/{cmd} 2>/dev/null',
+        ]
+        for check in wsl_checks:
             try:
-                result = subprocess.run(
-                    ['wsl', 'bash', '-lc', f'npm list -g {pkg} 2>/dev/null | grep {pkg}'],
+                r = subprocess.run(
+                    ['wsl', 'bash', '-lc', check],
                     capture_output=True, timeout=8,
                 )
-                if result.returncode == 0 and result.stdout.strip():
+                if r.returncode == 0 and r.stdout.strip():
                     return True
             except Exception:
                 pass
