@@ -10,7 +10,7 @@ export function ChannelTabs() {
   const [showSummary, setShowSummary] = useState(false);
 
   return (
-    <div className="relative flex items-center gap-1.5 px-4 overflow-x-auto">
+    <div className="relative flex items-center gap-1.5 px-4 overflow-x-auto overflow-y-visible">
       {channels.map((ch) => (
         <button
           key={ch.name}

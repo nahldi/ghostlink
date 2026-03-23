@@ -1101,13 +1101,11 @@ async def pick_folder():
             return f"/mnt/{m.group(1).lower()}/{m.group(2)}"
         return p
 
-    # Try Windows folder picker via PowerShell (WSL)
+    # Try modern Windows folder picker via PowerShell (full Explorer dialog)
     ps_script = (
-        "Add-Type -AssemblyName System.Windows.Forms;"
-        "$f = New-Object System.Windows.Forms.FolderBrowserDialog;"
-        "$f.Description = 'Select workspace folder';"
-        "$f.ShowNewFolderButton = $true;"
-        "if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath } else { '' }"
+        "$shell = New-Object -ComObject Shell.Application;"
+        "$folder = $shell.BrowseForFolder(0, 'Select workspace folder', 0x40, 0);"
+        "if ($folder) { $folder.Self.Path } else { '' }"
     )
     # Find powershell
     import shutil as _shutil
