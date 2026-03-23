@@ -76,24 +76,28 @@ class ServerManager {
       return { success: true, port: this.port };
     }
 
-    // Kill any stale processes on our ports to prevent "address already in use"
+    // Kill ALL stale GhostLink processes and free ports
     try {
       if (isWsl()) {
-        // Try multiple methods — lsof, fuser, or pkill
+        // Kill by port AND by process name — covers all cases
         const killCmd = [
+          // Kill by port (multiple methods for compatibility)
           `lsof -ti:${this.port} | xargs -r kill -9`,
           `lsof -ti:8200 | xargs -r kill -9`,
           `lsof -ti:8201 | xargs -r kill -9`,
           `fuser -k ${this.port}/tcp`,
           `fuser -k 8200/tcp`,
           `fuser -k 8201/tcp`,
+          // Kill by process name — catches orphaned Python servers
+          `pkill -9 -f 'python.*app\\.py'`,
+          `pkill -9 -f 'uvicorn'`,
         ].join('; ');
         execSync(`wsl bash -c "${killCmd}" 2>/dev/null`, { stdio: 'ignore', timeout: 8_000 });
       } else {
-        execSync(`kill $(lsof -ti:${this.port}) 2>/dev/null; kill $(lsof -ti:8200) 2>/dev/null; kill $(lsof -ti:8201) 2>/dev/null`, { stdio: 'ignore', timeout: 5_000 });
+        execSync(`kill $(lsof -ti:${this.port}) 2>/dev/null; kill $(lsof -ti:8200) 2>/dev/null; kill $(lsof -ti:8201) 2>/dev/null; pkill -9 -f 'python.*app.py' 2>/dev/null`, { stdio: 'ignore', timeout: 5_000 });
       }
-      // Give OS time to release the ports
-      await new Promise(r => setTimeout(r, 1000));
+      // Wait for OS to fully release the ports
+      await new Promise(r => setTimeout(r, 2000));
       log.info('Cleared stale processes on ports %d, 8200, 8201', this.port);
     } catch { /* no stale processes — normal */ }
 
@@ -548,38 +552,42 @@ class ServerManager {
     const maxAttempts = 60; // 60 * 500 ms = 30 s
     const intervalMs = 500;
     let attempts = 0;
+    // Wait 3 seconds before first poll — gives kill time to release ports
+    // and prevents health check from hitting a stale server
+    const initialDelay = 3000;
 
     return new Promise((resolve, reject) => {
-      const timer = setInterval(() => {
-        attempts++;
+      setTimeout(() => {
+        const timer = setInterval(() => {
+          attempts++;
 
-        // If the process exited before becoming ready, abort
-        if (!this.process || this.process.exitCode !== null) {
-          clearInterval(timer);
-          reject(new Error('Backend process exited before becoming ready'));
-          return;
-        }
-
-        const req = http.get(`http://127.0.0.1:${this.port}/api/status`, (res) => {
-          if (res.statusCode === 200) {
+          // If the process exited before becoming ready, abort
+          if (!this.process || this.process.exitCode !== null) {
             clearInterval(timer);
-            resolve();
+            reject(new Error('Backend process exited before becoming ready'));
+            return;
           }
-          // Consume response data to free up memory
-          res.resume();
-        });
 
-        req.on('error', () => {
-          // Server not ready yet — keep polling
-        });
+          const req = http.get(`http://127.0.0.1:${this.port}/api/status`, (res) => {
+            if (res.statusCode === 200) {
+              clearInterval(timer);
+              resolve();
+            }
+            res.resume();
+          });
 
-        req.setTimeout(400, () => req.destroy());
+          req.on('error', () => {
+            // Server not ready yet — keep polling
+          });
 
-        if (attempts >= maxAttempts) {
-          clearInterval(timer);
-          reject(new Error(`Backend did not become ready after ${(maxAttempts * intervalMs) / 1000}s`));
-        }
-      }, intervalMs);
+          req.setTimeout(400, () => req.destroy());
+
+          if (attempts >= maxAttempts) {
+            clearInterval(timer);
+            reject(new Error(`Backend did not become ready after ${(maxAttempts * intervalMs) / 1000}s`));
+          }
+        }, intervalMs);
+      }, initialDelay);
     });
   }
 
