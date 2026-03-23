@@ -129,8 +129,8 @@
 - 8200: MCP HTTP (configurable)
 - 8201: MCP SSE (configurable)
 
-### MCP Tools (10 shipped)
-chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim
+### MCP Tools (17 shipped)
+chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_load, memory_list, memory_search, web_search, web_fetch, image_generate
 
-### Components (33)
-ActivityTimeline, AddAgentModal, AgentBar, AgentIcon, AgentInfoPanel, AgentMiniCard, AgentStatusPill, ApprovalCard, ChannelTabs, ChatMessage, CodeBlock, CommandBar, ConnectionBanner, ConsensusCard, DecisionCard, GenerativeCard, HandoffCard, JobProposal, JobsPanel, KeyboardShortcutsModal, MessageInput, MobileHeader, MobileSidebar, OnboardingTour, ProgressCard, RemoteSession, RulesPanel, SearchModal, SettingsPanel, Sidebar, StatsPanel, TypingIndicator, UrlPreview
+### Components (41)
+ActivityTimeline, AddAgentModal, AgentBar, AgentIcon, AgentInfoPanel, AgentMiniCard, AgentStatusPill, ApprovalCard, BulkDeleteBar, ChannelSummary, ChannelTabs, ChatMessage, CodeBlock, CommandBar, ConnectionBanner, ConsensusCard, DecisionCard, GenerativeCard, HandoffCard, HelpPanel, JobProposal, JobsPanel, KeyboardShortcutsModal, MessageInput, MobileHeader, MobileSidebar, OnboardingTour, ProgressCard, RemoteSession, ReplayViewer, RulesPanel, SearchModal, SessionBar, SessionLauncher, SettingsPanel, Sidebar, SplitView, StatsPanel, TerminalPeek, TypingIndicator, UrlPreview

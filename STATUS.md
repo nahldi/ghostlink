@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
-**Last updated:** 2026-03-22
-**Version:** v1.0.18
+**Last updated:** 2026-03-23
+**Version:** v1.9.0
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,15 +66,18 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v1.0.18)
+## CURRENT STATE (v1.9.0)
 
 ### Numbers
-- **80+ completed features** (see FEATURES.md for full list)
-- **37 React components**
-- **80+ API endpoints**
-- **10 MCP tools** (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim)
+- **90+ completed features** (see FEATURES.md for full list)
+- **41 React components**
+- **90+ API endpoints**
+- **17 MCP tools** (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_load, memory_list, memory_search, web_search, web_fetch, image_generate)
 - **13 known AI agents** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)
+- **8 AI providers** (Anthropic, OpenAI, Google, xAI, Groq, Together, HuggingFace, Ollama)
+- **5 channel bridges** (Discord, Telegram, Slack, WhatsApp, Generic Webhook)
 - **9 themes** (dark, light, cyberpunk, terminal, ocean, sunset, midnight, rosegold, arctic)
+- **28 built-in skills**
 - **23 slash commands**
 - **3 plugins** (example, file_watcher, skill_marketplace)
 - **3 platform installers** (Windows .exe, Linux .AppImage/.deb, macOS .dmg)
