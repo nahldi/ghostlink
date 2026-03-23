@@ -1108,6 +1108,283 @@ def sessions_send(sender: str, target: str, message: str, channel: str = "genera
     return "Failed to send message."
 
 
+# ── Gemini AI tools (image gen, video gen, TTS, STT, code exec) ──────
+
+_GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+def _gemini_api_key() -> str | None:
+    return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+
+def _gemini_request(endpoint: str, body: dict, timeout: int = 60) -> dict:
+    """Make authenticated request to Gemini API."""
+    import urllib.request
+    key = _gemini_api_key()
+    if not key:
+        raise RuntimeError("No GEMINI_API_KEY or GOOGLE_API_KEY set")
+    url = f"{_GEMINI_API_BASE}/{endpoint}?key={key}"
+    data = json.dumps(body).encode()
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read())
+
+
+def gemini_image(prompt: str, aspect_ratio: str = "1:1", model: str = "imagen-4.0-generate-001") -> str:
+    """Generate an image using Google Imagen 4. Requires GEMINI_API_KEY.
+
+    Args:
+        prompt: Description of the image to generate
+        aspect_ratio: Image ratio — "1:1", "16:9", "9:16", "3:4", "4:3"
+        model: Imagen model — "imagen-4.0-generate-001", "imagen-4.0-ultra-generate-001", "imagen-4.0-fast-generate-001"
+
+    Returns:
+        Path to saved image file, or error message
+    """
+    if not _gemini_api_key():
+        return "Error: Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable"
+
+    valid_ratios = ("1:1", "16:9", "9:16", "3:4", "4:3")
+    if aspect_ratio not in valid_ratios:
+        aspect_ratio = "1:1"
+
+    try:
+        result = _gemini_request(f"models/{model}:predict", {
+            "instances": [{"prompt": prompt}],
+            "parameters": {
+                "sampleCount": 1,
+                "aspectRatio": aspect_ratio,
+                "personGeneration": "allow_adult",
+            },
+        }, timeout=60)
+
+        predictions = result.get("predictions", [])
+        if not predictions:
+            return "No image generated. Try a different prompt."
+
+        import base64
+        img_data = base64.b64decode(predictions[0].get("bytesBase64Encoded", ""))
+        save_dir = _data_dir / "generated" if _data_dir else Path("./data/generated")
+        save_dir.mkdir(parents=True, exist_ok=True)
+        filepath = save_dir / f"img-{int(time.time())}.png"
+        filepath.write_bytes(img_data)
+        return f"Image generated: {filepath} ({aspect_ratio})\nPrompt: {prompt}"
+    except Exception as e:
+        return f"Image generation failed: {str(e)[:300]}"
+
+
+def gemini_video(prompt: str, duration: str = "8", aspect_ratio: str = "16:9") -> str:
+    """Generate a video using Google Veo 3.1. Long-running operation — may take 1-6 minutes.
+
+    Args:
+        prompt: Description of the video to generate (include audio/dialogue cues in quotes)
+        duration: Video length in seconds — "4", "6", or "8"
+        aspect_ratio: Video ratio — "16:9" (landscape) or "9:16" (portrait)
+
+    Returns:
+        Path to saved video file, or status message
+    """
+    if not _gemini_api_key():
+        return "Error: Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable"
+
+    import urllib.request
+    key = _gemini_api_key()
+
+    try:
+        # Start generation (long-running operation)
+        body = json.dumps({
+            "instances": [{"prompt": prompt}],
+            "parameters": {
+                "aspectRatio": aspect_ratio,
+                "resolution": "720p",
+                "durationSeconds": duration,
+                "personGeneration": "allow_all",
+            },
+        }).encode()
+        url = f"{_GEMINI_API_BASE}/models/veo-3.1-generate-preview:predictLongRunning?key={key}"
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            op = json.loads(resp.read())
+
+        op_name = op.get("name", "")
+        if not op_name:
+            return "Failed to start video generation."
+
+        # Poll for completion (up to 6 minutes)
+        import urllib.request as _ur
+        for _ in range(72):  # 72 * 5s = 360s = 6 min
+            time.sleep(5)
+            poll_url = f"{_GEMINI_API_BASE}/{op_name}?key={key}"
+            poll_req = _ur.Request(poll_url)
+            with _ur.urlopen(poll_req, timeout=10) as poll_resp:
+                status = json.loads(poll_resp.read())
+            if status.get("done"):
+                response = status.get("response", {})
+                videos = response.get("generatedVideos", response.get("predictions", []))
+                if videos:
+                    import base64
+                    vid_data = base64.b64decode(videos[0].get("bytesBase64Encoded", videos[0].get("video", "")))
+                    save_dir = _data_dir / "generated" if _data_dir else Path("./data/generated")
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    filepath = save_dir / f"vid-{int(time.time())}.mp4"
+                    filepath.write_bytes(vid_data)
+                    return f"Video generated: {filepath} ({duration}s, {aspect_ratio})\nPrompt: {prompt}"
+                return "Video generation completed but no video data returned."
+            if status.get("error"):
+                return f"Video generation error: {status['error'].get('message', 'Unknown')}"
+
+        return f"Video generation timed out after 6 minutes. Operation: {op_name}"
+    except Exception as e:
+        return f"Video generation failed: {str(e)[:300]}"
+
+
+def text_to_speech(text: str, voice: str = "Kore", model: str = "gemini-2.5-flash-preview-tts") -> str:
+    """Convert text to speech using Gemini TTS. Returns path to audio file.
+
+    Args:
+        text: Text to speak (max ~5000 chars)
+        voice: Voice name — Kore, Puck, Zephyr, Enceladus, Breeze, etc.
+        model: TTS model — "gemini-2.5-flash-preview-tts" or "gemini-2.5-pro-preview-tts"
+
+    Returns:
+        Path to saved WAV audio file, or error message
+    """
+    if not _gemini_api_key():
+        return "Error: Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable"
+
+    try:
+        result = _gemini_request(f"models/{model}:generateContent", {
+            "contents": [{"role": "user", "parts": [{"text": text[:5000]}]}],
+            "generationConfig": {
+                "responseModalities": ["AUDIO"],
+                "speechConfig": {
+                    "voiceConfig": {
+                        "prebuiltVoiceConfig": {"voiceName": voice}
+                    }
+                },
+            },
+        }, timeout=30)
+
+        candidates = result.get("candidates", [])
+        if not candidates:
+            return "No audio generated."
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        for part in parts:
+            inline = part.get("inlineData", {})
+            if inline.get("data"):
+                import base64
+                audio_data = base64.b64decode(inline["data"])
+                save_dir = _data_dir / "generated" if _data_dir else Path("./data/generated")
+                save_dir.mkdir(parents=True, exist_ok=True)
+                filepath = save_dir / f"tts-{int(time.time())}.wav"
+                filepath.write_bytes(audio_data)
+                return f"Audio generated: {filepath} (voice: {voice})"
+
+        return "TTS completed but no audio data returned."
+    except Exception as e:
+        return f"TTS failed: {str(e)[:300]}"
+
+
+def speech_to_text(audio_path: str, task: str = "transcribe") -> str:
+    """Transcribe or analyze audio using Gemini. Supports WAV, MP3, FLAC, OGG.
+
+    Args:
+        audio_path: Path to audio file
+        task: What to do — "transcribe", "translate", "summarize", "analyze"
+
+    Returns:
+        Transcription or analysis text
+    """
+    if not _gemini_api_key():
+        return "Error: Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable"
+
+    audio_file = Path(audio_path)
+    if not audio_file.exists():
+        return f"Error: File not found: {audio_path}"
+
+    mime_types = {".wav": "audio/wav", ".mp3": "audio/mp3", ".flac": "audio/flac", ".ogg": "audio/ogg", ".aac": "audio/aac"}
+    mime = mime_types.get(audio_file.suffix.lower(), "audio/wav")
+
+    import base64
+    audio_data = base64.b64encode(audio_file.read_bytes()).decode()
+
+    prompts = {
+        "transcribe": "Transcribe this audio accurately. Include speaker labels if multiple speakers.",
+        "translate": "Transcribe and translate this audio to English.",
+        "summarize": "Summarize the key points from this audio.",
+        "analyze": "Analyze this audio: describe the content, speakers, emotions, and any notable elements.",
+    }
+
+    try:
+        result = _gemini_request("models/gemini-2.5-flash:generateContent", {
+            "contents": [{
+                "role": "user",
+                "parts": [
+                    {"text": prompts.get(task, prompts["transcribe"])},
+                    {"inlineData": {"mimeType": mime, "data": audio_data}},
+                ],
+            }],
+        }, timeout=60)
+
+        candidates = result.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            text_parts = [p["text"] for p in parts if "text" in p]
+            return "\n".join(text_parts) if text_parts else "No transcription returned."
+        return "No results from audio analysis."
+    except Exception as e:
+        return f"Speech-to-text failed: {str(e)[:300]}"
+
+
+def code_execute(code: str, language: str = "python") -> str:
+    """Execute code using Gemini's sandboxed code execution. Python only.
+
+    Args:
+        code: The code to execute (Python)
+        language: Programming language (only "python" supported)
+
+    Returns:
+        Code output and any errors
+    """
+    if not _gemini_api_key():
+        return "Error: Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable"
+
+    if language != "python":
+        return "Error: Only Python code execution is supported."
+
+    try:
+        result = _gemini_request("models/gemini-2.5-flash:generateContent", {
+            "contents": [{
+                "role": "user",
+                "parts": [{"text": f"Execute this Python code and return the output:\n```python\n{code}\n```"}],
+            }],
+            "tools": [{"codeExecution": {}}],
+        }, timeout=45)
+
+        candidates = result.get("candidates", [])
+        if not candidates:
+            return "No execution result."
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        output_parts = []
+        for part in parts:
+            if "text" in part:
+                output_parts.append(part["text"])
+            if "executableCode" in part:
+                output_parts.append(f"```python\n{part['executableCode'].get('code', '')}\n```")
+            if "codeExecutionResult" in part:
+                outcome = part["codeExecutionResult"].get("outcome", "")
+                output = part["codeExecutionResult"].get("output", "")
+                if outcome == "OUTCOME_OK":
+                    output_parts.append(f"Output:\n{output}")
+                else:
+                    output_parts.append(f"Error ({outcome}):\n{output}")
+
+        return "\n\n".join(output_parts) if output_parts else "Execution completed with no output."
+    except Exception as e:
+        return f"Code execution failed: {str(e)[:300]}"
+
+
 # ── Server setup ────────────────────────────────────────────────────
 
 _ALL_TOOLS = [
@@ -1118,6 +1395,8 @@ _ALL_TOOLS = [
     memory_save, memory_search, memory_get, memory_list,
     # Web & Browser
     web_fetch, web_search, browser_snapshot, image_generate,
+    # Gemini AI
+    gemini_image, gemini_video, text_to_speech, speech_to_text, code_execute,
     # Agent control
     set_thinking, sessions_list, sessions_send,
 ]
