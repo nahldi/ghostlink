@@ -34,6 +34,47 @@ const CONVERSATION_STARTERS = [
   { text: 'Type /help for commands', icon: 'help' },
 ];
 
+function ThinkingBubbles() {
+  const thinkingStreams = useChatStore((s) => s.thinkingStreams);
+  const agents = useChatStore((s) => s.agents);
+
+  const activeStreams = Object.entries(thinkingStreams).filter(([, s]) => s.active && s.text);
+  if (activeStreams.length === 0) return null;
+
+  return (
+    <>
+      {activeStreams.map(([agentName, stream]) => {
+        const agent = agents.find(a => a.name === agentName);
+        const color = agent?.color || '#a78bfa';
+        const label = agent?.label || agentName;
+        // Show last 8 non-empty lines of thinking output
+        const lines = stream.text.split('\n').filter(l => l.trim()).slice(-8);
+
+        return (
+          <div key={agentName} className="flex gap-3 py-2 msg-enter">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 agent-chip-thinking"
+              style={{ background: `${color}20`, '--agent-color': color } as React.CSSProperties}>
+              <span className="text-xs font-bold" style={{ color }}>{label[0]}</span>
+              <div className="agent-spin-border" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
+                <span className="text-[9px] text-on-surface-variant/40 italic">thinking...</span>
+              </div>
+              <div className="bg-surface-container/30 rounded-xl px-3 py-2 border border-outline-variant/5">
+                <pre className="text-[10px] font-mono text-on-surface-variant/50 leading-relaxed whitespace-pre-wrap overflow-hidden max-h-[120px]">
+                  {lines.join('\n')}
+                </pre>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function ConversationStarters({ channel }: { channel: string }) {
   const settings = useChatStore((s) => s.settings);
   const sendMessage = (text: string) => {
@@ -127,6 +168,7 @@ function ChatFeed() {
       ) : (
         channelMessages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
       )}
+      <ThinkingBubbles />
       </div>
 
     </div>

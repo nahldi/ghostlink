@@ -1446,6 +1446,43 @@ async def heartbeat(agent_name: str, request: Request):
     return JSONResponse({"error": "not found"}, 404)
 
 
+# ── Agent Thinking Stream ────────────────────────────────────────────
+
+_thinking_buffers: dict[str, dict] = {}  # agent_name → {text, updated_at, active}
+
+
+@app.post("/api/agents/{agent_name}/thinking")
+async def update_thinking(agent_name: str, request: Request):
+    """Update an agent's thinking buffer. Called by wrapper during active processing."""
+    body = await request.json()
+    text = body.get("text", "")
+    active = body.get("active", True)
+
+    _thinking_buffers[agent_name] = {
+        "text": text[-2000:] if text else "",  # Cap at 2KB
+        "updated_at": time.time(),
+        "active": active,
+    }
+
+    # Broadcast to all connected WebSocket clients
+    await broadcast("thinking_stream", {
+        "agent": agent_name,
+        "text": text[-2000:] if text else "",
+        "active": active,
+    })
+
+    return {"ok": True}
+
+
+@app.get("/api/agents/{agent_name}/thinking")
+async def get_thinking(agent_name: str):
+    """Get current thinking buffer for an agent."""
+    buf = _thinking_buffers.get(agent_name)
+    if not buf or time.time() - buf.get("updated_at", 0) > 30:
+        return {"text": "", "active": False}
+    return buf
+
+
 # ── Approval Prompts ───────────────────────────────────────────────
 
 @app.post("/api/approval/respond")

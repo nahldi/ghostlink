@@ -57,6 +57,7 @@ export function useWebSocket() {
     deleteMessages,
     reactMessage,
     addActivity,
+    setThinkingStream,
     updateMessageMeta,
     setWsState,
   } = useChatStore();
@@ -155,6 +156,9 @@ export function useWebSocket() {
             break;
           case 'activity':
             addActivity(parsed.data);
+            break;
+          case 'thinking_stream':
+            setThinkingStream(parsed.data.agent, parsed.data.text || '', parsed.data.active ?? false);
             break;
           case 'approval_response':
             if (parsed.data.message_id) {

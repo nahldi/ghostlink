@@ -732,8 +732,10 @@ def main():
     def _activity_monitor():
         last_active = None
         last_report_time = 0
+        last_thinking_text = ""
         REPORT_INTERVAL = 3
         IDLE_REPORT_INTERVAL = 8
+        THINKING_INTERVAL = 2  # Stream thinking every 2s
         while True:
             time.sleep(1)
             if not _activity_checker:
@@ -757,6 +759,42 @@ def main():
                     )
                     urllib.request.urlopen(req, timeout=5)
                     last_active = active
+
+                # Stream thinking output when agent is active
+                if active and now - last_report_time >= THINKING_INTERVAL:
+                    try:
+                        result = subprocess.run(
+                            ["tmux", "capture-pane", "-t", session_name, "-p", "-S", "-20"],
+                            capture_output=True, timeout=3,
+                        )
+                        if result.returncode == 0:
+                            pane_text = result.stdout.decode("utf-8", errors="replace").strip()
+                            if pane_text and pane_text != last_thinking_text:
+                                last_thinking_text = pane_text
+                                current_name, _ = get_identity()
+                                think_body = json.dumps({"text": pane_text[-1500:], "active": True}).encode()
+                                think_req = urllib.request.Request(
+                                    f"http://127.0.0.1:{server_port}/api/agents/{current_name}/thinking",
+                                    method="POST", data=think_body,
+                                    headers={"Content-Type": "application/json"},
+                                )
+                                urllib.request.urlopen(think_req, timeout=3)
+                    except Exception:
+                        pass
+                elif not active and last_thinking_text:
+                    # Clear thinking when idle
+                    try:
+                        current_name, _ = get_identity()
+                        clear_body = json.dumps({"text": "", "active": False}).encode()
+                        clear_req = urllib.request.Request(
+                            f"http://127.0.0.1:{server_port}/api/agents/{current_name}/thinking",
+                            method="POST", data=clear_body,
+                            headers={"Content-Type": "application/json"},
+                        )
+                        urllib.request.urlopen(clear_req, timeout=3)
+                        last_thinking_text = ""
+                    except Exception:
+                        pass
                     last_report_time = now
             except Exception as e:
                 import logging

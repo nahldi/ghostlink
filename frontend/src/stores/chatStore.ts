@@ -77,6 +77,10 @@ interface ChatState {
   newMsgCount: number;
   setNewMsgCount: (v: number | ((n: number) => number)) => void;
 
+  // Agent thinking streams
+  thinkingStreams: Record<string, { text: string; active: boolean }>;
+  setThinkingStream: (agent: string, text: string, active: boolean) => void;
+
   // Multi-select deletion
   selectMode: boolean;
   selectedIds: Set<number>;
@@ -219,6 +223,13 @@ export const useChatStore = create<ChatState>((set) => ({
   setChatAtBottom: (v) => set({ chatAtBottom: v }),
   newMsgCount: 0,
   setNewMsgCount: (v) => set((s) => ({ newMsgCount: typeof v === 'function' ? v(s.newMsgCount) : v })),
+
+  // Agent thinking streams
+  thinkingStreams: {},
+  setThinkingStream: (agent, text, active) =>
+    set((s) => ({
+      thinkingStreams: { ...s.thinkingStreams, [agent]: { text, active } },
+    })),
 
   // Multi-select deletion
   selectMode: false,
