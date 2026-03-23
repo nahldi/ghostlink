@@ -161,6 +161,17 @@ body {
   to { --agent-border-angle: 360deg; }
 }
 
+/* Fallback for Firefox/Safari: rotate the entire pseudo-element */
+@supports not (background: conic-gradient(from var(--agent-border-angle), red, blue)) {
+  .agent-spin-border {
+    background: linear-gradient(var(--agent-color, #4ade80), transparent) !important;
+    animation: agent-spin-fallback 2s linear infinite !important;
+  }
+  @keyframes agent-spin-fallback {
+    to { transform: rotate(360deg); }
+  }
+}
+
 /* Only spin on thinking chips */
 .agent-chip-thinking .agent-spin-border {
   display: block;

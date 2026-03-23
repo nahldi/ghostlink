@@ -74,6 +74,7 @@ export function MessageInput() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedDraft, setSavedDraft] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string; type: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeChannel = useChatStore((s) => s.activeChannel);
   const settings = useChatStore((s) => s.settings);
@@ -527,8 +528,9 @@ export function MessageInput() {
       pushHistory(trimmed);
       setHistoryIndex(-1);
       setSavedDraft('');
-      await api.sendMessage(settings.username, trimmed, activeChannel, replyTo?.id);
+      await api.sendMessage(settings.username, trimmed, activeChannel, replyTo?.id, pendingAttachments.length > 0 ? pendingAttachments : undefined);
       setText('');
+      setPendingAttachments([]);
       setReplyTo(null);
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -639,6 +641,7 @@ export function MessageInput() {
           const result = await api.uploadImage(file);
           if (result.url) {
             setText((prev) => prev + `![image](${result.url})`);
+            setPendingAttachments((prev) => [...prev, { name: result.name || 'image', url: result.url, type: 'image' }]);
           }
         } catch (err) {
           console.error('Upload failed:', err);
@@ -668,6 +671,7 @@ export function MessageInput() {
         const result = await api.uploadImage(file);
         if (result.url) {
           setText((prev) => prev + `![image](${result.url})`);
+          setPendingAttachments((prev) => [...prev, { name: result.name || file.name, url: result.url, type: 'image' }]);
         }
       } catch (err) {
         console.error('Upload failed:', err);

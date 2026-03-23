@@ -1,7 +1,7 @@
 # GhostLink — Known Bugs & Issues
 
 **Last updated:** 2026-03-23
-**Version:** v1.7.0
+**Version:** v1.7.1
 **Source:** Full codebase audit + live API testing + deep code path audit + user-reported bugs + 3 fix rounds
 
 ---
@@ -111,14 +111,9 @@
 ### BUG-025: Failed agent spawns leave ghost agents in bar — FIXED (v1.7.0)
 **Fix:** Persistent agent entry is rolled back on spawn failure.
 
-### BUG-026: Claude can't use GhostLink MCP tools — tries to use external chat apps instead
-**Severity:** Critical — agent receives @mention triggers but can't read or send messages back
-**Where:** Claude CLI running in tmux via wrapper.py
-**Symptoms:** Claude gets the trigger (`mcp read #general — you were mentioned`), but responds with "No MCP resources are available for reading Discord messages" and suggests setting up a Discord MCP server. The GhostLink `chat_read`/`chat_send` tools are not being recognized by Claude.
-**Root cause:** Likely MCP config injection issue — the `--mcp-config` file written by wrapper.py may not be getting picked up by the Claude CLI, or the MCP bridge isn't responding correctly on port 8200. Could also be a Claude CLI version change that altered how MCP configs are loaded. The literal trigger text "mcp read #general" may also be confusing Claude into thinking it needs a specific "mcp" command rather than using its available MCP tools.
-**User expectation:** Messages in GhostLink UI must stay within GhostLink. Agents should exclusively use GhostLink MCP tools (`chat_read`, `chat_send`) — never attempt to route through Discord, Slack, or any other external app unless the user explicitly configures an external integration in settings.
-**Future feature:** Settings > Integrations panel where user can add external chat bridges (Discord, Slack, Telegram, etc.) with bot token input, channel mapping, and on/off toggle. Off by default. When activated, bidirectional sync should work flawlessly.
-**Status:** Open
+### BUG-026: Claude can't use GhostLink MCP tools — FIXED (v1.7.1)
+**Fix:** The trigger text injected via tmux was `mcp read #general` which confused Claude into looking for an external MCP command. Replaced with natural language: `"You were @mentioned in #general on GhostLink. Use the chat_read tool with channel="general" to read recent messages, then use chat_send to respond."` This tells Claude to use its available MCP tools instead of interpreting "mcp read" as a literal command.
+**Future feature:** Settings > Integrations panel for external chat bridges (Discord, Slack, Telegram) — bot token input, channel mapping, on/off toggle. Off by default.
 
 ### BUG-028: Many config/setup tasks require terminal access — should all be in UI
 **Severity:** High — breaks the "no terminal needed" promise of the desktop app
@@ -191,11 +186,11 @@
 ### BUG-055: Start scripts fail without venv — FIXED (v1.7.0)
 ### BUG-056: ReplayViewer variable naming — FIXED (v1.7.0)
 ### BUG-057: Sidebar channel response type mismatch — FIXED (v1.7.0)
-### BUG-058: MessageInput attachments not sent — Open (needs sendMessage API change)
-### BUG-059: Voice language doesn't update recognizer — Open (needs recognizer recreation)
+### BUG-058: MessageInput attachments not sent — FIXED (v1.7.1)
+### BUG-059: Voice language recognizer — VERIFIED NOT A BUG (recreated each press)
 ### BUG-060: TerminalPeek polling after unmount — FIXED (v1.7.0)
 ### BUG-061: Auth detection false positives — FIXED (v1.7.0)
-### BUG-062: CSS @property Firefox/Safari — Open (low, cosmetic)
+### BUG-062: CSS @property Firefox/Safari — FIXED (v1.7.1)
 ### BUG-063: CSS scrollbar Firefox fallback — FIXED (v1.7.0)
 ### BUG-064: file_watcher thread cleanup — FIXED (v1.7.0)
 ### BUG-065: Video duration validation — FIXED (v1.7.0)
