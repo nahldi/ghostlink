@@ -327,6 +327,7 @@ class Marketplace:
         self._data_dir = data_dir
         self._registry = list(MARKETPLACE_REGISTRY)
         self._installed: dict[str, dict] = {}
+        self._lock = threading.Lock()
         self._load_state()
 
     def _state_path(self) -> Path:
@@ -368,7 +369,11 @@ class Marketplace:
         return results
 
     def install(self, plugin_id: str) -> dict:
-        """Install a plugin from the marketplace."""
+        """Install a plugin from the marketplace (thread-safe)."""
+        with self._lock:
+            return self._install_locked(plugin_id)
+
+    def _install_locked(self, plugin_id: str) -> dict:
         plugin = next((p for p in self._registry if p["id"] == plugin_id), None)
         if not plugin:
             return {"ok": False, "error": "Plugin not found in marketplace"}
@@ -464,8 +469,9 @@ SKILL_PACKS: list[dict] = [
 class HookManager:
     """Manages user-defined automation hooks."""
 
-    def __init__(self, data_dir: Path):
+    def __init__(self, data_dir: Path, server_port: int = 8300):
         self._data_dir = data_dir
+        self._server_port = server_port
         self._hooks_file = data_dir / "hooks.json"
         self._hooks: list[dict] = []
         self._load()
@@ -558,7 +564,7 @@ class HookManager:
                 try:
                     body = json.dumps({"sender": "system", "text": text, "channel": channel, "type": "system"}).encode()
                     req = urllib.request.Request(
-                        f"http://127.0.0.1:8300/api/send",
+                        f"http://127.0.0.1:{self._server_port}/api/send",
                         data=body, method="POST",
                         headers={"Content-Type": "application/json"},
                     )

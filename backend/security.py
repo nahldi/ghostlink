@@ -207,6 +207,7 @@ class AuditLog:
 
     def __init__(self, data_dir: Path):
         self._log_file = data_dir / "audit_log.jsonl"
+        self._write_lock = __import__('threading').Lock()
 
     _MAX_LOG_SIZE = 50_000_000  # 50MB rotation threshold
 
@@ -217,27 +218,19 @@ class AuditLog:
             "actor": actor,
             "details": details,
         }
-        try:
-            self._log_file.parent.mkdir(parents=True, exist_ok=True)
-            # Rotate if file exceeds size limit
-            if self._log_file.exists() and self._log_file.stat().st_size > self._MAX_LOG_SIZE:
-                backup = self._log_file.with_suffix(".jsonl.old")
-                if backup.exists():
-                    backup.unlink()
-                self._log_file.rename(backup)
-            with open(self._log_file, "a", encoding="utf-8") as f:
-                try:
-                    import fcntl
-                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                    try:
-                        f.write(json.dumps(entry) + "\n")
-                    finally:
-                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                except ImportError:
-                    # Windows: no fcntl
+        with self._write_lock:
+            try:
+                self._log_file.parent.mkdir(parents=True, exist_ok=True)
+                # Rotate if file exceeds size limit
+                if self._log_file.exists() and self._log_file.stat().st_size > self._MAX_LOG_SIZE:
+                    backup = self._log_file.with_suffix(".jsonl.old")
+                    if backup.exists():
+                        backup.unlink()
+                    self._log_file.rename(backup)
+                with open(self._log_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry) + "\n")
-        except Exception as e:
-            log.debug("Audit log write failed: %s", e)
+            except Exception as e:
+                log.debug("Audit log write failed: %s", e)
 
     def get_recent(self, limit: int = 100, event_type: str = "") -> list[dict]:
         if not self._log_file.exists():

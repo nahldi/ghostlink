@@ -280,7 +280,8 @@ async def broadcast(event_type: str, data: dict):
     for ws in list(_ws_clients):
         try:
             await ws.send_text(payload)
-        except Exception:
+        except Exception as e:
+            log.debug("WebSocket send failed, removing client: %s", e)
             dead.append(ws)
     for ws in dead:
         _ws_clients.discard(ws)
@@ -338,7 +339,7 @@ async def lifespan(_app: FastAPI):
     provider_registry = ProviderRegistry(DATA_DIR)
     bridge_manager = BridgeManager(DATA_DIR, store=store, registry=registry)
     marketplace = Marketplace(DATA_DIR)
-    hook_manager = HookManager(DATA_DIR)
+    hook_manager = HookManager(DATA_DIR, server_port=PORT)
     hook_manager.register_all()
     secrets_manager = SecretsManager(DATA_DIR)
     exec_policy = ExecPolicy(DATA_DIR)
@@ -2712,10 +2713,7 @@ async def api_delete_agent_memory(name: str, key: str):
 
 # ── Plugins ───────────────────────────────────────────────────────
 
-@app.get("/api/plugins")
-async def list_plugins():
-    """List all discovered plugins."""
-    return {"plugins": plugin_loader.list_plugins()}
+# Note: GET /api/plugins is defined in lifespan (line 470)
 
 
 # ── Terminal Peek & Visible Terminal ──────────────────────────────
