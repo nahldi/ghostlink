@@ -43,6 +43,7 @@ from rules import RuleStore
 from skills import SkillsRegistry
 from schedules import ScheduleStore, cron_matches
 from sessions import SessionManager
+from providers import ProviderRegistry
 import mcp_bridge
 import plugin_loader
 
@@ -115,6 +116,7 @@ job_store: JobStore
 schedule_store: ScheduleStore
 rule_store: RuleStore
 session_manager: SessionManager
+provider_registry: ProviderRegistry
 registry = AgentRegistry()
 router = MessageRouter(max_hops=MAX_HOPS, default_routing=DEFAULT_ROUTING)
 
@@ -302,7 +304,7 @@ def _deliver_webhooks(event_type: str, data: dict):
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global store, job_store, rule_store, schedule_store, skills_registry, session_manager
+    global store, job_store, rule_store, schedule_store, skills_registry, session_manager, provider_registry
 
     _load_settings()
     _settings["_server_start"] = time.time()
@@ -321,6 +323,7 @@ async def lifespan(_app: FastAPI):
     await schedule_store.init()
     skills_registry = SkillsRegistry(DATA_DIR)
     session_manager = SessionManager(DATA_DIR)
+    provider_registry = ProviderRegistry(DATA_DIR)
 
     # Broadcast new messages via WebSocket
     async def on_msg(msg: dict):
@@ -1894,6 +1897,65 @@ async def trigger_agent(agent_name: str, request: Request):
     _route_mentions("system", msg_text, channel)
 
     return {"ok": True, "message_id": msg.get("id"), "agent": agent_name}
+
+
+# ── Providers ────────────────────────────────────────────────────────
+
+@app.get("/api/providers")
+async def get_providers():
+    """Get all available providers, capabilities, and free options."""
+    return provider_registry.get_provider_status()
+
+
+@app.post("/api/providers/configure")
+async def configure_provider(request: Request):
+    """Set API key or preference for a provider.
+
+    Body: {
+        "provider": "groq",
+        "api_key": "gsk_...",            // Optional: set API key
+        "preferred_for": "chat",          // Optional: set as preferred for capability
+    }
+    """
+    body = await request.json()
+    pid = body.get("provider", "").strip()
+    if not pid:
+        return JSONResponse({"error": "provider required"}, 400)
+
+    config_updates = {}
+    if "api_key" in body:
+        config_updates[f"{pid}_api_key"] = body["api_key"]
+    if "preferred_for" in body:
+        config_updates[f"preferred_{body['preferred_for']}"] = pid
+
+    provider_registry.save_config(config_updates)
+    return {"ok": True, "status": provider_registry.get_provider_status()}
+
+
+@app.get("/api/providers/{provider_id}/models")
+async def get_provider_models(provider_id: str):
+    """Get available models for a specific provider."""
+    from providers import PROVIDERS
+    pdef = PROVIDERS.get(provider_id)
+    if not pdef:
+        return JSONResponse({"error": "unknown provider"}, 404)
+    has_key = provider_registry.get_api_key(provider_id) is not None
+    return {
+        "provider": provider_id,
+        "name": pdef["name"],
+        "available": has_key or pdef.get("local", False),
+        "models": pdef["models"],
+        "capabilities": pdef["capabilities"],
+    }
+
+
+@app.get("/api/providers/resolve/{capability}")
+async def resolve_provider(capability: str):
+    """Find the best available provider for a capability (chat, image, video, tts, stt, etc.)."""
+    result = provider_registry.resolve_capability(capability)
+    if result:
+        return result
+    return JSONResponse({"error": f"no provider available for '{capability}'"}, 404)
 
 
 # ── Export ───────────────────────────────────────────────────────────

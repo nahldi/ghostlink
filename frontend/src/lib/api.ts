@@ -334,6 +334,21 @@ export const api = {
   resumeSession: (channel: string) =>
     request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}/resume`, { method: 'POST' }),
 
+  // Providers
+  getProviders: () =>
+    request<{
+      providers: { id: string; name: string; available: boolean; free_tier: boolean; local: boolean; capabilities: string[]; models: Record<string, { label: string; tier: string }>; configured: boolean }[];
+      capabilities: Record<string, { available: boolean; provider: string | null; provider_name: string | null }>;
+      free_options: any[];
+      total_configured: number;
+    }>('/api/providers'),
+
+  configureProvider: (provider: string, apiKey?: string, preferredFor?: string) =>
+    request<{ ok: boolean }>('/api/providers/configure', {
+      method: 'POST',
+      body: JSON.stringify({ provider, api_key: apiKey, preferred_for: preferredFor }),
+    }),
+
   getChannelSummary: (channel: string) =>
     request<{
       channel: string;

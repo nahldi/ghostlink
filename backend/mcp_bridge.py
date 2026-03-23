@@ -992,46 +992,109 @@ def browser_snapshot(url: str) -> str:
         return f"Screenshot failed: {str(e)[:200]}"
 
 
-def image_generate(prompt: str, style: str = "natural") -> str:
-    """Generate an image from a text description. Posts the result to chat.
+def image_generate(prompt: str, style: str = "natural", provider: str = "auto") -> str:
+    """Generate an image from a text description. Auto-detects best available provider.
 
     Args:
         prompt: Description of the image to generate
         style: Image style — "natural", "artistic", "diagram", "icon"
+        provider: Provider to use — "auto" (best available), "google", "openai", "together", "huggingface"
 
     Returns:
-        Status message. Image will be posted to the chat channel.
+        Path to saved image or URL, or error with setup instructions
     """
-    # Check for available image generation APIs
     import urllib.request
+    import base64
 
-    # Try OpenAI DALL-E
-    openai_key = os.environ.get("OPENAI_API_KEY")
-    if openai_key:
+    save_dir = _data_dir / "generated" if _data_dir else Path("./data/generated")
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # Try providers in priority order
+    providers_to_try = []
+    if provider != "auto":
+        providers_to_try = [provider]
+    else:
+        # Priority: Gemini Imagen > OpenAI DALL-E > Together FLUX > HuggingFace
+        if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+            providers_to_try.append("google")
+        if os.environ.get("OPENAI_API_KEY"):
+            providers_to_try.append("openai")
+        if os.environ.get("TOGETHER_API_KEY"):
+            providers_to_try.append("together")
+        if os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY"):
+            providers_to_try.append("huggingface")
+
+    for prov in providers_to_try:
         try:
-            body = json.dumps({
-                "model": "dall-e-3",
-                "prompt": prompt,
-                "n": 1,
-                "size": "1024x1024",
-                "style": "vivid" if style == "artistic" else "natural",
-            }).encode()
-            req = urllib.request.Request(
-                "https://api.openai.com/v1/images/generations",
-                data=body,
-                headers={
-                    "Authorization": f"Bearer {openai_key}",
-                    "Content-Type": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                result = json.loads(resp.read())
-            image_url = result["data"][0]["url"]
-            return f"Image generated: {image_url}\nPrompt: {prompt}"
-        except Exception as e:
-            return f"Image generation failed: {str(e)[:200]}"
+            if prov == "google":
+                key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                body = json.dumps({
+                    "instances": [{"prompt": prompt}],
+                    "parameters": {"sampleCount": 1, "aspectRatio": "1:1", "personGeneration": "allow_adult"},
+                }).encode()
+                req = urllib.request.Request(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key={key}",
+                    data=body, headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    result = json.loads(resp.read())
+                predictions = result.get("predictions", [])
+                if predictions:
+                    img_data = base64.b64decode(predictions[0].get("bytesBase64Encoded", ""))
+                    filepath = save_dir / f"img-{int(time.time())}.png"
+                    filepath.write_bytes(img_data)
+                    return f"Image generated (Imagen 4): {filepath}\nPrompt: {prompt}"
 
-    return "Error: No image generation API configured. Set OPENAI_API_KEY for DALL-E support."
+            elif prov == "openai":
+                key = os.environ.get("OPENAI_API_KEY")
+                body = json.dumps({"model": "dall-e-3", "prompt": prompt, "n": 1, "size": "1024x1024",
+                                   "style": "vivid" if style == "artistic" else "natural"}).encode()
+                req = urllib.request.Request(
+                    "https://api.openai.com/v1/images/generations", data=body,
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    result = json.loads(resp.read())
+                return f"Image generated (DALL-E 3): {result['data'][0]['url']}\nPrompt: {prompt}"
+
+            elif prov == "together":
+                key = os.environ.get("TOGETHER_API_KEY")
+                body = json.dumps({"model": "black-forest-labs/FLUX.1-schnell-Free", "prompt": prompt,
+                                   "width": 1024, "height": 1024, "steps": 4, "n": 1}).encode()
+                req = urllib.request.Request(
+                    "https://api.together.xyz/v1/images/generations", data=body,
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    result = json.loads(resp.read())
+                img_b64 = result.get("data", [{}])[0].get("b64_json", "")
+                if img_b64:
+                    filepath = save_dir / f"img-{int(time.time())}.png"
+                    filepath.write_bytes(base64.b64decode(img_b64))
+                    return f"Image generated (FLUX.1 Free): {filepath}\nPrompt: {prompt}"
+
+            elif prov == "huggingface":
+                key = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY")
+                req = urllib.request.Request(
+                    "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev",
+                    data=json.dumps({"inputs": prompt}).encode(),
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    img_data = resp.read()
+                filepath = save_dir / f"img-{int(time.time())}.png"
+                filepath.write_bytes(img_data)
+                return f"Image generated (FLUX.1 Dev): {filepath}\nPrompt: {prompt}"
+
+        except Exception as e:
+            log.debug("Image gen failed with %s: %s", prov, e)
+            continue
+
+    return ("No image generation provider configured. Options:\n"
+            "- Set GEMINI_API_KEY for Imagen 4 (Google AI)\n"
+            "- Set OPENAI_API_KEY for DALL-E 3\n"
+            "- Set TOGETHER_API_KEY for FLUX.1 (free tier available)\n"
+            "- Set HF_TOKEN for Hugging Face (free tier available)")
 
 
 # ── Agent control tools ──────────────────────────────────────────────

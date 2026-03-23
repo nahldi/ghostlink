@@ -17,12 +17,13 @@ const AGENT_PRESETS: { base: string; label: string; command: string; color: stri
   { base: 'ollama', label: 'Ollama', command: 'ollama', color: '#ffffff', defaultArgs: [] },
 ];
 
-type SettingsTab = 'general' | 'appearance' | 'agents' | 'advanced';
+type SettingsTab = 'general' | 'appearance' | 'agents' | 'providers' | 'advanced';
 
 const TABS: { id: SettingsTab; label: string; icon: string }[] = [
   { id: 'general', label: 'General', icon: 'tune' },
   { id: 'appearance', label: 'Look', icon: 'palette' },
   { id: 'agents', label: 'Agents', icon: 'smart_toy' },
+  { id: 'providers', label: 'AI', icon: 'model_training' },
   { id: 'advanced', label: 'Advanced', icon: 'settings' },
 ];
 
@@ -170,6 +171,9 @@ export function SettingsPanel() {
         )}
         {tab === 'agents' && (
           <AgentsTab display={display} updateDraft={updateDraft} applyInstant={applyInstant} settings={settings} />
+        )}
+        {tab === 'providers' && (
+          <ProvidersTab />
         )}
         {tab === 'advanced' && (
           <AdvancedTab display={display} applyInstant={applyInstant} settings={settings} />
@@ -510,6 +514,124 @@ function AdvancedTab({
 
       {/* Maintenance / Cleanup */}
       <CleanupSection />
+    </>
+  );
+}
+
+/* ── Tab: Providers ──────────────────────────────────────────────── */
+
+function ProvidersTab() {
+  const [status, setStatus] = useState<any>(null);
+  const [configuring, setConfiguring] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [saved, setSaved] = useState('');
+
+  useEffect(() => {
+    api.getProviders().then(setStatus).catch(() => {});
+  }, []);
+
+  const handleSaveKey = async (provider: string) => {
+    if (!apiKey.trim()) return;
+    try {
+      await api.configureProvider(provider, apiKey.trim());
+      setApiKey('');
+      setConfiguring(null);
+      setSaved(provider);
+      setTimeout(() => setSaved(''), 2000);
+      api.getProviders().then(setStatus).catch(() => {});
+    } catch {}
+  };
+
+  if (!status) return <div className="text-xs text-on-surface-variant/40 text-center py-8">Loading providers...</div>;
+
+  const capLabels: Record<string, string> = {
+    chat: 'Chat/LLM', code: 'Code', image: 'Image Gen', video: 'Video Gen',
+    tts: 'Text-to-Speech', stt: 'Speech-to-Text', code_exec: 'Code Execution', embedding: 'Embeddings',
+  };
+
+  return (
+    <>
+      {/* Capabilities overview */}
+      <div>
+        <div className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider mb-2">AI Capabilities</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {Object.entries(status.capabilities).map(([cap, info]: [string, any]) => (
+            <div key={cap} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] ${
+              info.available ? 'bg-green-500/8 text-green-400/80' : 'bg-surface-container/30 text-on-surface-variant/30'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${info.available ? 'bg-green-400' : 'bg-outline-variant/30'}`} />
+              <span className="font-medium">{capLabels[cap] || cap}</span>
+              {info.provider_name && <span className="ml-auto text-[8px] text-on-surface-variant/30">{info.provider_name}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="h-px bg-outline-variant/8" />
+
+      {/* Provider list */}
+      <div>
+        <div className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider mb-2">Providers</div>
+        <div className="space-y-2">
+          {status.providers.map((p: any) => (
+            <div key={p.id} className={`rounded-xl p-3 border transition-all ${
+              p.configured ? 'bg-green-500/5 border-green-500/15' : p.free_tier ? 'bg-primary/5 border-primary/10' : 'bg-surface-container/20 border-outline-variant/8'
+            }`}>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${p.configured ? 'bg-green-400' : p.local ? 'bg-blue-400' : 'bg-outline-variant/30'}`} />
+                  <span className="text-[11px] font-semibold text-on-surface">{p.name}</span>
+                  {p.free_tier && <span className="text-[8px] px-1.5 py-0.5 rounded bg-primary/15 text-primary/80 font-medium">FREE</span>}
+                  {p.local && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400/80 font-medium">LOCAL</span>}
+                </div>
+                {p.configured ? (
+                  <span className="text-[9px] text-green-400/70 font-medium">{saved === p.id ? 'Saved!' : 'Connected'}</span>
+                ) : (
+                  <button
+                    onClick={() => { setConfiguring(configuring === p.id ? null : p.id); setApiKey(''); }}
+                    className="text-[9px] font-medium text-primary hover:text-primary/80"
+                  >
+                    {configuring === p.id ? 'Cancel' : 'Configure'}
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1 mb-1">
+                {p.capabilities.map((c: string) => (
+                  <span key={c} className="text-[8px] px-1 py-0.5 rounded bg-surface-container/40 text-on-surface-variant/40">{capLabels[c] || c}</span>
+                ))}
+              </div>
+              {configuring === p.id && !p.local && (
+                <div className="mt-2 flex gap-1.5">
+                  <input
+                    value={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveKey(p.id)}
+                    type="password"
+                    placeholder="Paste API key..."
+                    className="flex-1 bg-surface-container/40 border border-outline-variant/10 rounded-md px-2 py-1.5 text-[10px] text-on-surface outline-none focus:border-primary/30 font-mono"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleSaveKey(p.id)}
+                    className="px-2.5 py-1.5 bg-primary-container text-white rounded-md text-[10px] font-medium hover:brightness-110"
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {status.free_options.length > 0 && (
+        <>
+          <div className="h-px bg-outline-variant/8" />
+          <div className="text-[10px] text-on-surface-variant/40 leading-relaxed">
+            Free providers available: {status.free_options.map((p: any) => p.name).join(', ')}. Configure them above to unlock more AI capabilities at no cost.
+          </div>
+        </>
+      )}
     </>
   );
 }
