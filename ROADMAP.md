@@ -4,7 +4,7 @@
 > For any AI picking this up: follow the phases IN ORDER. Each phase has verification steps. Do NOT skip ahead.
 
 **Last updated:** 2026-03-23
-**Version:** v1.8.0
+**Version:** v2.1.4
 **Benchmark:** OpenClaw v2026.3.22 (247K stars, 125+ features)
 **Source:** Full competitive analysis + codebase audit + user feedback
 
@@ -477,6 +477,229 @@ The following phases from the original roadmap are **DONE**:
 
 ---
 
+## PHASE 16: COMPUTER CONTROL & VISION
+
+> Agents can see and control the user's computer — fast, smart, secure.
+
+### 16.1 Hybrid Computer Control (Accessibility + Vision)
+**What:** Agents interact with desktop apps via accessibility APIs + optional vision capture.
+**Effort:** Very Large
+**How:**
+- Accessibility tree reader (`pyatspi` Linux, `pywinauto` Windows, `applescript` Mac)
+- Reads all UI elements instantly — buttons, text fields, menus, windows
+- Keyboard/mouse control via `pynput` or platform APIs
+- Vision capture via `mss` library (~30ms per screenshot) — only when agent needs to SEE something
+- MCP tools: `screen_read()`, `screen_click(target)`, `screen_type(text)`, `screen_capture()`
+- Agent decides when to use accessibility tree vs vision capture
+- Settings toggle: "Allow computer control" (off by default, per-agent)
+- App allowlist: agents can only interact with approved applications
+**Test:** Agent opens VS Code → reads file tree via accessibility → clicks file → reads content → edits.
+
+### 16.2 Screen Streaming to Chat
+**What:** Live screen view inside GhostLink chat — see what agents are doing on your desktop.
+**Effort:** Large
+**How:**
+- Low-res screen capture streamed to chat as thumbnails (1fps)
+- Click on thumbnail to see full-res snapshot
+- Agent actions highlighted with colored overlays
+- Picture-in-picture mode for watching agent work while chatting
+**Test:** Agent controlling VS Code → live thumbnails appear in chat showing each action.
+
+---
+
+## PHASE 17: AGENT INTELLIGENCE v2
+
+> Make agents smarter, more autonomous, and self-improving.
+
+### 17.1 Autonomous Agent Mode
+**What:** Set a goal and let the agent work independently — checks in with progress.
+**Effort:** Very Large
+**How:**
+- Goal input: "Refactor auth module, write tests, make PR"
+- Agent creates its own task breakdown, works through steps
+- Progress cards posted automatically as it works
+- Pause/resume/cancel autonomous work
+- Human approval gates at configurable checkpoints
+- Auto-commit with descriptive messages
+**Test:** Set goal → agent works for 30 minutes → progress cards show each step → PR created.
+
+### 17.2 Agent Memory Graph (Cross-Session Intelligence)
+**What:** Persistent knowledge graph that survives across sessions.
+**Effort:** Large
+**How:**
+- Entities: people, projects, files, bugs, decisions
+- Relationships: "depends on", "caused by", "assigned to", "blocked by"
+- Auto-extracted from conversations (NER + relation extraction)
+- Queryable: "What do we know about the auth module?"
+- Shared across agents (optional — configurable)
+- Visual graph explorer in UI
+**Test:** Chat about a bug → close session → reopen → ask "what was that auth bug?" → agent remembers with full context.
+
+### 17.3 Agent Specialization Training
+**What:** Agents learn from user feedback and improve over time.
+**Effort:** Large
+**How:**
+- Feedback loop: thumbs up/down on responses (already exists)
+- System prompt evolution: positive feedback patterns → added to agent instructions
+- Correction tracking: when user corrects an agent, the correction is stored
+- Accuracy metrics: "Claude accuracy improved 23% over 47 corrections"
+- Export trained profiles to marketplace
+**Test:** Correct agent 10 times on code style → agent starts following the style unprompted.
+
+### 17.4 Agent-to-Agent Protocol (A2A) Support
+**What:** Standard protocol for external agents to join GhostLink.
+**Effort:** Large
+**How:**
+- Google A2A protocol implementation
+- External agents can discover and join GhostLink channels
+- Authentication via agent cards (A2A spec)
+- Capability negotiation (what tools does each agent have?)
+- Cross-platform agent collaboration
+**Test:** External A2A agent connects → appears in agent bar → can chat with local agents.
+
+---
+
+## PHASE 18: VOICE & MULTIMODAL
+
+> Beyond text — voice, images, video in the agent workflow.
+
+### 18.1 Voice Rooms
+**What:** Discord-style voice channels where you talk with agents.
+**Effort:** Large
+**How:**
+- WebRTC audio streams between browser and backend
+- STT: transcribe user speech in real-time
+- TTS: agents speak responses aloud (Gemini TTS, ElevenLabs, or local)
+- Multiple agents in one voice room, each with distinct voice
+- Push-to-talk or always-on modes
+- Voice activity detection for natural conversation flow
+**Test:** Join voice room → speak to Claude → Claude responds with voice → Codex chimes in.
+
+### 18.2 Image Generation Pipeline
+**What:** Chain multiple image generation steps — sketch → refine → upscale → edit.
+**Effort:** Medium
+**How:**
+- Agent generates image → posts in chat with "Refine" button
+- Click refine → agent modifies based on feedback
+- Version history: see all iterations side-by-side
+- Multi-provider: DALL-E, Imagen, Stable Diffusion, FLUX
+- In-chat image annotation (draw on images to guide agents)
+**Test:** "Generate a logo" → agent creates → "Make it more minimal" → agent refines → export final.
+
+### 18.3 Document Understanding
+**What:** Upload any document and agents can read, analyze, and reference it.
+**Effort:** Medium
+**How:**
+- Upload PDF, DOCX, images, spreadsheets
+- OCR for scanned documents
+- Chunked indexing for RAG search
+- "Ask about this document" mode — agent focuses on uploaded file
+- Citation tracking: agent responses link back to source pages
+**Test:** Upload 50-page PDF → "Summarize section 3" → agent returns accurate summary with page references.
+
+---
+
+## PHASE 19: UX POLISH & DELIGHT
+
+> Make every interaction feel premium.
+
+### 19.1 Theme Creator
+**What:** Users can create and share custom themes.
+**Effort:** Medium
+**How:**
+- Visual theme editor: pick colors for each surface, text, accent
+- Live preview as you edit
+- Export/import themes as JSON
+- Community theme gallery
+- Theme presets: "Match my VS Code theme", "Match my terminal"
+**Test:** Create custom theme → save → share → another user imports → looks identical.
+
+### 19.2 Notification Center
+**What:** Centralized notification feed with filtering.
+**Effort:** Medium
+**How:**
+- All events in one place: messages, approvals, agent status, errors, hooks
+- Filter by type, agent, channel
+- Mark as read/unread
+- Notification preferences per event type
+- Badge count on sidebar icon
+**Test:** Agent sends message → notification appears → click to jump to message.
+
+### 19.3 Command Palette v2
+**What:** Supercharged command palette — search everything, do anything.
+**Effort:** Medium
+**How:**
+- Search messages, agents, channels, settings, skills, hooks, bridges
+- Quick actions: spawn agent, create channel, toggle theme, start session
+- Recent actions history
+- Keyboard-first navigation (vim-style j/k)
+- Fuzzy matching with highlighting
+**Test:** Ctrl+K → type "claude" → see agent, recent messages, and "Spawn Claude" action.
+
+### 19.4 Onboarding v2 (Interactive First-Run)
+**What:** Guided setup that actually spawns an agent and sends your first message.
+**Effort:** Medium
+**How:**
+- Step 1: Choose your name
+- Step 2: Pick a free agent (Gemini or Ollama) and install it
+- Step 3: Agent spawns automatically
+- Step 4: Pre-written first message sent, agent responds
+- Step 5: "You're set! Here's what you can do next..."
+- Skippable at any point
+**Test:** Fresh install → onboarding walks through setup → agent is running and responsive by end.
+
+### 19.5 Keyboard Shortcuts Overhaul
+**What:** Customizable shortcuts for every action.
+**Effort:** Small
+**How:**
+- Settings > Shortcuts with rebindable keys
+- Vim mode (j/k navigation, / to search)
+- Quick agent switching: Alt+1-9 for agents (not just channels)
+- Quick actions: Ctrl+Enter to send, Ctrl+Shift+Enter to send to all
+**Test:** Rebind Ctrl+K to Ctrl+P → command palette opens on Ctrl+P.
+
+---
+
+## PHASE 20: GROWTH & MONETIZATION
+
+> Turn GhostLink into a business.
+
+### 20.1 Agent Marketplace (Rent Your Agents)
+**What:** Users publish trained agents, others rent them.
+**Effort:** Very Large
+**How:**
+- Publish: export agent config (SOUL + skills + corrections) to marketplace
+- Browse: search by category, rating, use case
+- Rent: one-click import of an agent profile
+- Revenue sharing: creators earn from usage
+- Reviews and ratings
+**Test:** User A publishes "Senior Code Reviewer" agent → User B rents it → agent performs code reviews with User A's training.
+
+### 20.2 GhostLink Teams
+**What:** Multi-user workspaces for teams.
+**Effort:** Very Large
+**How:**
+- Team creation with invite links
+- Shared agent pool — all team members see and use the same agents
+- Private channels per user
+- Admin controls: who can spawn agents, who can modify settings
+- Billing: per-seat pricing
+**Test:** Create team → invite 3 members → all share the same Claude agent → private channels stay isolated.
+
+### 20.3 Analytics Dashboard (Pro)
+**What:** Deep insights for power users.
+**Effort:** Large
+**How:**
+- Token usage over time (daily/weekly/monthly charts)
+- Cost tracking per agent, per provider
+- Response quality metrics (thumbs up/down ratio)
+- Agent utilization (which agents are used most)
+- Session replay with full transcript
+- Export reports as PDF
+**Test:** Dashboard shows accurate cost of $4.23 for Claude this week across 47 conversations.
+
+---
+
 ## PHASE CHECKLIST
 
 After each phase, verify:
@@ -497,15 +720,20 @@ After each phase, verify:
 | Phase | Category | Items | Priority |
 |-------|----------|-------|----------|
 | ~~0-7~~ | ~~Foundation~~ | ~~50~~ | ~~DONE~~ |
-| 8 | Channel Integrations | 5 | **Critical** — biggest competitive gap |
-| 9 | Plugin Marketplace & SDK | 4 | **High** — ecosystem growth |
-| 10 | Security & Sandboxing | 5 | **High** — enterprise readiness |
+| ~~8~~ | ~~Channel Integrations~~ | ~~6~~ | ~~DONE (v1.9.0)~~ |
+| ~~9~~ | ~~Plugin Marketplace & SDK~~ | ~~4~~ | ~~DONE (v2.0.0)~~ |
+| ~~10~~ | ~~Security & Sandboxing~~ | ~~5~~ | ~~DONE (v2.1.0)~~ |
 | 11 | Model Providers & AI | 5 | **High** — capability breadth |
-| 12 | Mobile App | 2 | **Medium** — reach |
+| 12 | Mobile App | 2 | **High** — reach |
 | 13 | Observability & Analytics | 3 | **Medium** — enterprise value |
 | 14 | Advanced UX & Polish | 5 | **Medium** — delight |
-| 15 | Enterprise & Cloud | 3 | **Future** — revenue |
-| **Total remaining** | | **32** | |
+| 15 | Enterprise & Cloud | 3 | **Medium** — revenue |
+| 16 | Computer Control & Vision | 2 | **High** — unique differentiator |
+| 17 | Agent Intelligence v2 | 4 | **High** — autonomy |
+| 18 | Voice & Multimodal | 3 | **Medium** — beyond text |
+| 19 | UX Polish & Delight | 5 | **Medium** — premium feel |
+| 20 | Growth & Monetization | 3 | **Future** — business |
+| **Total remaining** | | **35** | |
 
 ---
 
