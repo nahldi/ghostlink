@@ -91,6 +91,30 @@ The following phases from the original roadmap are **DONE**:
 - Supports Matrix, Mattermost, Rocket.Chat, or any webhook-compatible platform
 **Test:** curl POST to inbound webhook → message appears in GhostLink → agent responds → outbound webhook fires.
 
+### 8.6 Streaming Thinking → Final Answer Pattern (All Channels)
+**What:** When an agent is triggered, immediately show a "thinking" message that live-updates with reasoning tokens, then resolves into the clean final answer. Works in GhostLink UI and all channel integrations.
+**Effort:** Large
+**How:**
+- **GhostLink UI:**
+  - On agent trigger, insert a provisional "thinking" bubble with spinner + reasoning stream
+  - WebSocket event: `{ type: "thinking_stream", data: { agent, token, reasoning } }`
+  - Thinking bubble shows live reasoning text (italic, dimmed) that grows token-by-token
+  - On completion, replace thinking bubble with final message (clean, full response)
+  - Toggle in settings: "Show thinking process" (on/off — some users just want the answer)
+- **Discord/Telegram/Slack:**
+  - On trigger, bot sends initial message: "🧠 *Thinking...*"
+  - Every 2-3 seconds, bot edits the message with current reasoning progress
+  - Format: "🧠 *Thinking...*\n```\nAnalyzing the code structure...\nFound 3 potential issues...\nDrafting response...\n```"
+  - On completion, bot edits one final time with the clean answer (removes thinking prefix)
+  - Rate-limit edits to avoid API throttling (Discord: max 5 edits/10s, Telegram: 1 edit/s)
+- **Backend:**
+  - MCP bridge captures streaming output from tmux pane during agent thinking
+  - New WebSocket event type for thinking streams
+  - Thinking buffer per agent with debounced broadcast
+  - `wrapper.py` captures intermediate tmux output and posts to `/api/agents/{name}/thinking`
+  - New endpoint: `GET /api/agents/{name}/thinking` returns current thinking buffer
+**Test:** @mention agent → thinking bubble appears → shows live reasoning → resolves to final answer. In Discord: message edits show progress → final edit is clean answer.
+
 ---
 
 ## PHASE 9: PLUGIN MARKETPLACE & SDK
