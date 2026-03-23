@@ -3160,6 +3160,21 @@ async def spa_middleware(request: Request, call_next):
 
 if __name__ == "__main__":
     import uvicorn
+
+    # Kill any stale processes on our ports before starting
+    def _cleanup_ports():
+        import subprocess as _sp
+        for port in [PORT, 8200, 8201]:
+            for cmd in [f"kill $(lsof -ti:{port}) 2>/dev/null", f"fuser -k {port}/tcp 2>/dev/null"]:
+                try:
+                    _sp.run(["bash", "-c", cmd], capture_output=True, timeout=3)
+                except Exception:
+                    pass
+        import time as _t
+        _t.sleep(1)
+
+    _cleanup_ports()
+
     print(f"GhostLink starting on http://{HOST}:{PORT}")
     uvicorn.run(
         "app:app",

@@ -1524,12 +1524,37 @@ def _init_servers():
         _mcp_sse = _create_server(MCP_SSE_PORT)
 
 
+def _kill_port(port: int):
+    """Try to kill whatever is holding a port."""
+    import subprocess
+    for cmd in [f"kill $(lsof -ti:{port})", f"fuser -k {port}/tcp"]:
+        try:
+            subprocess.run(["bash", "-c", cmd], capture_output=True, timeout=3)
+        except Exception:
+            pass
+    import time
+    time.sleep(0.5)
+
+
 def run_http_server():
     """Block — run streamable-http MCP in a background thread."""
     _ensure_loop()
     _init_servers()
     log.info(f"MCP HTTP bridge starting on port {MCP_HTTP_PORT}")
-    _mcp_http.run(transport="streamable-http")
+    try:
+        _mcp_http.run(transport="streamable-http")
+    except OSError as e:
+        if "address already in use" in str(e).lower():
+            log.warning("Port %d in use — killing stale process and retrying", MCP_HTTP_PORT)
+            _kill_port(MCP_HTTP_PORT)
+            try:
+                global _mcp_http
+                _mcp_http = _create_server(MCP_HTTP_PORT)
+                _mcp_http.run(transport="streamable-http")
+            except Exception as e2:
+                log.error("MCP HTTP bridge failed after retry: %s", e2)
+        else:
+            log.error("MCP HTTP bridge failed: %s", e)
 
 
 def run_sse_server():
@@ -1537,7 +1562,20 @@ def run_sse_server():
     _ensure_loop()
     _init_servers()
     log.info(f"MCP SSE bridge starting on port {MCP_SSE_PORT}")
-    _mcp_sse.run(transport="sse")
+    try:
+        _mcp_sse.run(transport="sse")
+    except OSError as e:
+        if "address already in use" in str(e).lower():
+            log.warning("Port %d in use — killing stale process and retrying", MCP_SSE_PORT)
+            _kill_port(MCP_SSE_PORT)
+            try:
+                global _mcp_sse
+                _mcp_sse = _create_server(MCP_SSE_PORT)
+                _mcp_sse.run(transport="sse")
+            except Exception as e2:
+                log.error("MCP SSE bridge failed after retry: %s", e2)
+        else:
+            log.error("MCP SSE bridge failed: %s", e)
 
 
 # Backward compat — single server entry point
