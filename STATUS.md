@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-22
-**Version:** v1.0.4
+**Version:** v1.0.18
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,7 +66,7 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v1.0.4)
+## CURRENT STATE (v1.0.18)
 
 ### Numbers
 - **80+ completed features** (see FEATURES.md for full list)
@@ -228,7 +228,7 @@ Paid agents (Claude, Codex, Grok) require their respective subscriptions but all
 
 ## DESKTOP APP FLOW
 
-1. **Install** — run `GhostLink Setup 1.0.4.exe` (79MB NSIS installer)
+1. **Install** — run `GhostLink Setup 1.0.18.exe` (79MB NSIS installer)
 2. **First run** — setup wizard: platform detection → Python check → deps install → workspace selection → done
 3. **Launcher** — shows server status, auth connections (Claude/Codex/Gemini/GitHub), settings, update check
 4. **Start Server** — launches Python backend via WSL (handles OneDrive path detection, venv creation, dep installation)
