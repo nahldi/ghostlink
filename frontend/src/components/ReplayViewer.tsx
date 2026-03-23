@@ -25,11 +25,11 @@ export function ReplayViewer({ channel, onClose }: ReplayViewerProps) {
       return;
     }
     const current = channelMsgs[visibleCount];
-    const next = channelMsgs[visibleCount - 1];
+    const prev = channelMsgs[visibleCount - 1];
     // Calculate delay based on original timing between messages
     let delay = 500; // default
-    if (next && current) {
-      const gap = (current.timestamp - next.timestamp) * 1000;
+    if (prev && current) {
+      const gap = (current.timestamp - prev.timestamp) * 1000;
       delay = Math.min(Math.max(gap / speed, 100), 3000); // 100ms-3s range
     }
     timerRef.current = setTimeout(() => {

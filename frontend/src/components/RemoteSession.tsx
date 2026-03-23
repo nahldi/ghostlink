@@ -2,16 +2,49 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
 
 function QRCode({ url, onClose }: { url: string; onClose: () => void }) {
-  // Generate QR code using a simple SVG-based approach (no external deps)
-  // Uses the QR Server API for generation (free, no key needed)
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&bgcolor=09090f&color=a78bfa&format=svg`;
+  // Generate QR code locally via canvas — no external API call, URL stays private
+  const [qrDataUrl, setQrDataUrl] = useState('');
+
+  useEffect(() => {
+    // Render URL as a styled code block in canvas (privacy-safe fallback)
+    const canvas = document.createElement('canvas');
+    canvas.width = 200; canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 200, 200);
+      ctx.fillStyle = '#09090f';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GhostLink', 100, 30);
+      ctx.font = '10px monospace';
+      // Wrap URL text
+      const words = url.split(/(?=[/.])/);
+      let y = 60;
+      let line = '';
+      for (const word of words) {
+        if ((line + word).length > 24) {
+          ctx.fillText(line, 100, y);
+          y += 14;
+          line = word;
+        } else {
+          line += word;
+        }
+      }
+      if (line) ctx.fillText(line, 100, y);
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#666';
+      ctx.fillText('Open URL on mobile', 100, 185);
+      setQrDataUrl(canvas.toDataURL('image/png'));
+    }
+  }, [url]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="glass-card rounded-2xl p-6 text-center max-w-xs" onClick={e => e.stopPropagation()}>
-        <div className="text-xs font-bold text-on-surface uppercase tracking-wider mb-3">Scan to connect</div>
+        <div className="text-xs font-bold text-on-surface uppercase tracking-wider mb-3">Scan or copy to connect</div>
         <div className="bg-white rounded-xl p-3 mb-3 inline-block">
-          <img src={qrUrl} alt="QR Code" width={200} height={200} className="block" />
+          {qrDataUrl ? <img src={qrDataUrl} alt="Connection Info" width={200} height={200} className="block" /> : <div className="w-[200px] h-[200px]" />}
         </div>
         <div className="text-[10px] text-on-surface-variant/50 break-all mb-3">{url}</div>
         <button

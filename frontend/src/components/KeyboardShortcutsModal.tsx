@@ -20,7 +20,7 @@ const SHORTCUTS = [
 
 export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[55] flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         className="relative w-[440px] max-w-[92vw] rounded-2xl overflow-hidden"

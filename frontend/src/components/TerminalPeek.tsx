@@ -15,21 +15,24 @@ export function TerminalPeek({ agentName, agentColor, onClose }: TerminalPeekPro
 
   useEffect(() => {
     let cancelled = false;
+    const abort = new AbortController();
     const poll = async () => {
       while (!cancelled) {
         try {
-          const res = await fetch(`/api/agents/${encodeURIComponent(agentName)}/terminal?lines=40`);
+          const res = await fetch(`/api/agents/${encodeURIComponent(agentName)}/terminal?lines=40`, { signal: abort.signal });
           const data = await res.json();
           if (!cancelled) {
             setOutput(data.output || '');
             setActive(data.active ?? false);
           }
-        } catch {}
+        } catch {
+          if (cancelled) break;
+        }
         await new Promise(r => setTimeout(r, 1500));
       }
     };
     poll();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; abort.abort(); };
   }, [agentName]);
 
   useEffect(() => {

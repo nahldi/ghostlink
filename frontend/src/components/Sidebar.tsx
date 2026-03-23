@@ -48,12 +48,18 @@ export function Sidebar() {
   const [contextMenu, setContextMenu] = useState<{ name: string; x: number; y: number } | null>(null);
   const [expanded, setExpanded] = useState(false);
 
+  // Helper to merge channel names with existing unread counts
+  const mergeChannels = (names: string[]) => {
+    const existing = Object.fromEntries(channels.map(c => [c.name, c.unread]));
+    return names.map(n => ({ name: n, unread: existing[n] || 0 }));
+  };
+
   const handleCreate = async () => {
     const name = newName.trim().toLowerCase();
     if (!name) return;
     try {
       const r = await api.createChannel(name) as { channels: string[] };
-      setChannels(r.channels.map((n: string) => ({ name: n, unread: 0 })));
+      setChannels(mergeChannels(r.channels));
       setNewName(''); setAdding(false);
     } catch {}
   };
@@ -62,7 +68,7 @@ export function Sidebar() {
     if (name === 'general') return;
     try {
       const r = await api.deleteChannel(name) as { channels: string[] };
-      setChannels(r.channels.map((n: string) => ({ name: n, unread: 0 })));
+      setChannels(mergeChannels(r.channels));
       if (activeChannel === name) setActiveChannel('general');
     } catch {}
     setContextMenu(null);

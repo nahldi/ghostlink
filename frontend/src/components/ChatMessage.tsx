@@ -70,7 +70,7 @@ function ReactionBar({ reactions, messageId, username }: { reactions: Record<str
         return (
           <button
             key={emoji}
-            onClick={() => api.reactToMessage(messageId, emoji, username).catch(() => {})}
+            onClick={() => api.reactToMessage(messageId, emoji, username).catch((e: Error) => console.warn('Reaction failed:', e.message))}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] transition-colors ${
               active
                 ? 'bg-primary/15 border border-primary/25 text-primary'
@@ -131,7 +131,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const agentColor = agent?.color || '#a78bfa';
 
   const handleReact = (emoji: string) => {
-    api.reactToMessage(message.id, emoji, settings.username).catch(() => {});
+    api.reactToMessage(message.id, emoji, settings.username).catch((e: Error) => {
+      console.warn('Reaction failed:', e.message);
+    });
   };
 
   const decision = metadata.decision as { title: string; description: string; choices: { label: string; value: string }[]; resolved?: string } | undefined;

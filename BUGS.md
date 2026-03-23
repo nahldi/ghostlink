@@ -1,8 +1,8 @@
 # GhostLink — Known Bugs & Issues
 
 **Last updated:** 2026-03-23
-**Version:** v1.6.2
-**Source:** Full codebase audit + bug fix pass + feature development
+**Version:** v1.7.0
+**Source:** Full codebase audit + live API testing + deep code path audit + user-reported bugs + 3 fix rounds
 
 ---
 
@@ -104,6 +104,102 @@
 ### BUG-021: Gemini video gen created empty files — FIXED (v1.6.2)
 ### BUG-022: Auth detection too strict for Claude/Gemini — FIXED (v1.6.3)
 ### BUG-023: Gemini Connect opens wrong terminal command — FIXED (v1.6.3)
+
+### BUG-024: Gemini and Copilot fail to spawn — FIXED (v1.7.0)
+**Fix:** Copilot command corrected from `github-copilot` to `gh` with `copilot` subcommand. Spawn endpoint now also checks WSL when command not on host PATH.
+
+### BUG-025: Failed agent spawns leave ghost agents in bar — FIXED (v1.7.0)
+**Fix:** Persistent agent entry is rolled back on spawn failure.
+
+### BUG-026: Claude can't use GhostLink MCP tools — tries to use external chat apps instead
+**Severity:** Critical — agent receives @mention triggers but can't read or send messages back
+**Where:** Claude CLI running in tmux via wrapper.py
+**Symptoms:** Claude gets the trigger (`mcp read #general — you were mentioned`), but responds with "No MCP resources are available for reading Discord messages" and suggests setting up a Discord MCP server. The GhostLink `chat_read`/`chat_send` tools are not being recognized by Claude.
+**Root cause:** Likely MCP config injection issue — the `--mcp-config` file written by wrapper.py may not be getting picked up by the Claude CLI, or the MCP bridge isn't responding correctly on port 8200. Could also be a Claude CLI version change that altered how MCP configs are loaded. The literal trigger text "mcp read #general" may also be confusing Claude into thinking it needs a specific "mcp" command rather than using its available MCP tools.
+**User expectation:** Messages in GhostLink UI must stay within GhostLink. Agents should exclusively use GhostLink MCP tools (`chat_read`, `chat_send`) — never attempt to route through Discord, Slack, or any other external app unless the user explicitly configures an external integration in settings.
+**Future feature:** Settings > Integrations panel where user can add external chat bridges (Discord, Slack, Telegram, etc.) with bot token input, channel mapping, and on/off toggle. Off by default. When activated, bidirectional sync should work flawlessly.
+**Status:** Open
+
+### BUG-028: Many config/setup tasks require terminal access — should all be in UI
+**Severity:** High — breaks the "no terminal needed" promise of the desktop app
+**Where:** Various — agent config, integrations, troubleshooting
+**Examples of things that currently require terminal:**
+- Editing `config.toml` for agent commands, ports, or custom args
+- Installing agent CLIs (npm/pip commands)
+- Removing ghost "Offline" agents from persistent list (editing settings.json)
+- Viewing agent tmux output for debugging (Terminal Peek exists but limited)
+- Setting environment variables for API keys
+- Running `wrapper.py` manually for advanced agent configs
+**User expectation:** If the desktop UI is installed, the user should never need to open a terminal. All customization, personalization, agent management, API key entry, integration setup, and troubleshooting should be doable entirely from the UI.
+**Status:** Open
+
+### BUG-027: Thinking glow not showing — FIXED (v1.7.0)
+**Fix:** Reduced startup delay from 15s to 5s. Heartbeat now checks `_was_triggered` flag from @mentions to activate thinking immediately. Thinking state now activates both from activity detection and from @mention triggers.
+
+---
+
+## v1.6.3 DEEP AUDIT BUGS (2026-03-23)
+
+### BUG-029: Killing one agent can kill another agent's process — FIXED (v1.7.0)
+### BUG-030: Schedule checker silently fails — unawaited coroutines — FIXED (v1.7.0)
+### BUG-031: Settings save race condition — FIXED (v1.7.0)
+### BUG-032: Rate limiter too aggressive + IP cleanup — FIXED (v1.7.0)
+### BUG-033: Progress card updates don't broadcast — FIXED (v1.7.0)
+### BUG-034: WebSocket reconnect doesn't fetch missed messages — FIXED (v1.7.0)
+### BUG-035: Messages array grows unbounded — FIXED (v1.7.0)
+### BUG-036: useWebSocket stale closures — VERIFIED NOT A BUG (Zustand stable refs)
+### BUG-037: Select mode persists across channel switches — FIXED (v1.7.0)
+### BUG-038: Approval auto-approve presses wrong keys — FIXED (v1.7.0)
+### BUG-039: Silent API errors — FIXED (v1.7.0)
+### BUG-040: Rate limiter IP entries never cleaned — FIXED (v1.7.0)
+### BUG-041: Z-index conflicts between modals — FIXED (v1.7.0)
+### BUG-042: Direct store._db access — FIXED (v1.7.0)
+
+### BUG-043: Agent spawn setTimeout not cancelled on modal close
+**Severity:** Low
+**Where:** `frontend/src/components/AddAgentModal.tsx:165-171`
+**Root cause:** After spawning, a 3-second setTimeout fetches status. If modal is closed before timeout fires, it updates unmounted component state.
+**Status:** Open
+
+### BUG-044: QR code leaked tunnel URL to external API — FIXED (v1.7.0)
+**Fix:** Replaced external QR API with local canvas-based generation. Tunnel URL never leaves the client.
+
+### BUG-045: Clipboard API not checked before use
+**Severity:** Low
+**Where:** `frontend/src/components/CodeBlock.tsx:11-14`
+**Root cause:** `navigator.clipboard.writeText()` called without checking availability. Fails in older browsers or insecure (http://) contexts.
+**Status:** Open
+
+### BUG-046: OAuth sign-in not available — all providers require manual API key entry
+**Severity:** High — UX friction
+**Where:** Settings > AI > Providers panel
+**Root cause:** All 8 providers (Anthropic, OpenAI, Google, xAI, Groq, Together, HuggingFace, Ollama) require manually pasting API keys. There's no OAuth flow for providers that support it (Google, GitHub). Users with subscriptions (Claude Pro, ChatGPT Plus, Gemini Advanced) can't sign in with their accounts — they must separately obtain API keys. Should offer one-click OAuth where the provider supports it.
+**Status:** Open
+
+---
+
+## v1.6.3 DEEP AUDIT ROUND 2 (2026-03-23)
+
+### BUG-047: XSS in HTML export — FIXED (v1.7.0)
+### BUG-048: Arbitrary settings injection — FIXED (v1.7.0)
+### BUG-049: Webhook update field injection — FIXED (v1.7.0)
+### BUG-050: Provider config key injection — FIXED (v1.7.0)
+### BUG-051: Agent config unvalidated values — FIXED (v1.7.0)
+### BUG-052: SSRF bypass in mcp_bridge web_fetch — FIXED (v1.7.0)
+### BUG-053: Wizard allows proceeding without Python — FIXED (v1.7.0)
+### BUG-054: Launcher hardcodes port 8300 — FIXED (v1.7.0)
+### BUG-055: Start scripts fail without venv — FIXED (v1.7.0)
+### BUG-056: ReplayViewer variable naming — FIXED (v1.7.0)
+### BUG-057: Sidebar channel response type mismatch — FIXED (v1.7.0)
+### BUG-058: MessageInput attachments not sent — Open (needs sendMessage API change)
+### BUG-059: Voice language doesn't update recognizer — Open (needs recognizer recreation)
+### BUG-060: TerminalPeek polling after unmount — FIXED (v1.7.0)
+### BUG-061: Auth detection false positives — FIXED (v1.7.0)
+### BUG-062: CSS @property Firefox/Safari — Open (low, cosmetic)
+### BUG-063: CSS scrollbar Firefox fallback — FIXED (v1.7.0)
+### BUG-064: file_watcher thread cleanup — FIXED (v1.7.0)
+### BUG-065: Video duration validation — FIXED (v1.7.0)
+### BUG-066: Snapshot import value validation — FIXED (v1.7.0)
 
 ---
 

@@ -87,7 +87,13 @@ export async function checkGoogle(): Promise<AuthStatus> {
     ];
     for (const dir of tokenPaths) {
       if (fs.existsSync(dir)) {
-        return { ...base, authenticated: true, user: 'token-file' };
+        // Verify directory contains actual token/config files, not just an empty dir
+        try {
+          const files = fs.readdirSync(dir);
+          if (files.length > 0) {
+            return { ...base, authenticated: true, user: 'token-file' };
+          }
+        } catch {}
       }
     }
   }

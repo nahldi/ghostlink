@@ -127,7 +127,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const placeholder = 'Search messages, / commands, @agents, #channels...';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         className="relative w-[560px] max-w-[92vw] max-h-[60vh] rounded-2xl overflow-hidden flex flex-col"

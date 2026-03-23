@@ -258,17 +258,16 @@ async function runPythonCheck() {
         }
       }
     } else {
-      $pythonStatus.innerHTML = '<span style="color:#f87171;font-size:16px;">&#10007;</span><span>Python not found &mdash; Install Python 3.10+</span>';
+      $pythonStatus.textContent = '\u2717 Python not found \u2014 Install Python 3.10+ to continue';
       $pythonStatus.className = 'check-status error';
-      // Allow proceeding anyway so the user can set up Python later
       pythonOk = false;
-      $btnPythonNext.disabled = false;
+      $btnPythonNext.disabled = true;
     }
   } catch (err) {
     console.error('Python check failed:', err);
-    $pythonStatus.innerHTML = '<span style="color:#f87171;font-size:16px;">&#10007;</span><span>Detection failed</span>';
+    $pythonStatus.textContent = '\u2717 Detection failed \u2014 Install Python 3.10+ and retry';
     $pythonStatus.className = 'check-status error';
-    $btnPythonNext.disabled = false;
+    $btnPythonNext.disabled = true;
   }
 }
 

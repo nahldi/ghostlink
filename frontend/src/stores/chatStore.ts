@@ -88,7 +88,13 @@ interface ChatState {
 export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   addMessage: (msg) =>
-    set((s) => ({ messages: [...s.messages, msg] })),
+    set((s) => {
+      // Prevent duplicate messages (from reconnect refetch)
+      if (s.messages.some((m) => m.id === msg.id)) return s;
+      const updated = [...s.messages, msg];
+      // Cap at 2000 messages to prevent memory leak in long sessions
+      return { messages: updated.length > 2000 ? updated.slice(-1500) : updated };
+    }),
   setMessages: (messages) => set({ messages }),
   pinMessage: (id, pinned) =>
     set((s) => ({
@@ -131,7 +137,7 @@ export const useChatStore = create<ChatState>((set) => ({
   channels: [{ name: 'general', unread: 0 }],
   activeChannel: 'general',
   setChannels: (channels) => set({ channels }),
-  setActiveChannel: (name) => set({ activeChannel: name }),
+  setActiveChannel: (name) => set({ activeChannel: name, selectMode: false, selectedIds: new Set() }),
   incrementUnread: (channel) =>
     set((s) => ({
       channels: s.channels.map((c) =>

@@ -74,7 +74,12 @@ export async function checkOpenAI(): Promise<AuthStatus> {
         path.join(home, '.config', 'codex'),
       ];
       for (const dir of configDirs) {
-        if (fs.existsSync(dir)) return { ...base, authenticated: true };
+        if (fs.existsSync(dir)) {
+          try {
+            const files = fs.readdirSync(dir);
+            if (files.length > 0) return { ...base, authenticated: true };
+          } catch {}
+        }
       }
       if (process.env.OPENAI_API_KEY) {
         return { ...base, authenticated: true, user: 'API key' };

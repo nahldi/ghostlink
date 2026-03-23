@@ -7,11 +7,13 @@ export class WebSocketClient {
   private ws: WebSocket | null = null;
   private listeners: Set<WSCallback> = new Set();
   private stateListeners: Set<(s: WSState) => void> = new Set();
+  private reconnectListeners: Set<() => void> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 1000;
   private maxDelay = 30000;
   private shouldReconnect = true;
   private _state: WSState = 'disconnected';
+  private wasConnected = false;
 
   constructor(url: string) {
     this.url = url;
@@ -35,7 +37,14 @@ export class WebSocketClient {
       this.ws = new WebSocket(this.url);
       this.ws.onopen = () => {
         this.reconnectDelay = 1000;
+        const isReconnect = this.wasConnected;
+        this.wasConnected = true;
         this.setState('connected');
+        if (isReconnect) {
+          this.reconnectListeners.forEach((cb) => {
+            try { cb(); } catch {}
+          });
+        }
       };
       this.ws.onmessage = (event) => {
         this.listeners.forEach((cb) => {
@@ -80,6 +89,11 @@ export class WebSocketClient {
   onStateChange(cb: (s: WSState) => void) {
     this.stateListeners.add(cb);
     return () => { this.stateListeners.delete(cb); };
+  }
+
+  onReconnect(cb: () => void) {
+    this.reconnectListeners.add(cb);
+    return () => { this.reconnectListeners.delete(cb); };
   }
 
   disconnect() {

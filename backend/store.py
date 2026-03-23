@@ -217,6 +217,46 @@ class MessageStore:
         await self._db.commit()
         return reactions
 
+    async def edit(self, msg_id: int, new_text: str) -> dict | None:
+        """Edit a message's text. Returns updated message or None."""
+        if self._db is None:
+            raise RuntimeError("MessageStore not initialized — call await store.init() first")
+        cursor = await self._db.execute("SELECT * FROM messages WHERE id = ?", (msg_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        await self._db.execute("UPDATE messages SET text = ? WHERE id = ?", (new_text, msg_id))
+        await self._db.commit()
+        msg = self._row_to_dict(row)
+        msg["text"] = new_text
+        return msg
+
+    async def get_by_id(self, msg_id: int) -> dict | None:
+        """Get a single message by ID."""
+        if self._db is None:
+            raise RuntimeError("MessageStore not initialized — call await store.init() first")
+        cursor = await self._db.execute("SELECT * FROM messages WHERE id = ?", (msg_id,))
+        row = await cursor.fetchone()
+        return self._row_to_dict(row) if row else None
+
+    async def update_metadata(self, msg_id: int, metadata: str) -> bool:
+        """Update a message's metadata field."""
+        if self._db is None:
+            raise RuntimeError("MessageStore not initialized — call await store.init() first")
+        await self._db.execute("UPDATE messages SET metadata = ? WHERE id = ?", (metadata, msg_id))
+        await self._db.commit()
+        return True
+
+    async def rename_channel(self, old_name: str, new_name: str) -> int:
+        """Rename all messages in a channel. Returns count of updated rows."""
+        if self._db is None:
+            raise RuntimeError("MessageStore not initialized — call await store.init() first")
+        cursor = await self._db.execute(
+            "UPDATE messages SET channel = ? WHERE channel = ?", (new_name, old_name)
+        )
+        await self._db.commit()
+        return cursor.rowcount
+
     @staticmethod
     def _row_to_dict(row: Any) -> dict:
         return {

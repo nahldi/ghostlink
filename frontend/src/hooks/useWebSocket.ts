@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { WebSocketClient } from '../lib/ws';
 import { useChatStore } from '../stores/chatStore';
 import { SoundManager } from '../lib/sounds';
+import { api } from '../lib/api';
 import type { WSEvent } from '../types';
 
 function updateFaviconBadge(count: number) {
@@ -73,6 +74,22 @@ export function useWebSocket() {
 
     // Track connection state
     const unsubState = client.onStateChange((s) => setWsState(s));
+
+    // Fetch missed messages on reconnect
+    const unsubReconnect = client.onReconnect(async () => {
+      try {
+        const state = useChatStore.getState();
+        const lastMsg = state.messages[state.messages.length - 1];
+        const sinceId = lastMsg?.id || 0;
+        if (sinceId > 0) {
+          const resp = await api.getMessages(state.activeChannel, sinceId);
+          const msgs = resp.messages || [];
+          for (const msg of msgs) {
+            state.addMessage(msg);
+          }
+        }
+      } catch {}
+    });
 
     const unsub = client.subscribe((event) => {
       try {
@@ -169,6 +186,7 @@ export function useWebSocket() {
       try {
         unsub();
         unsubState();
+        unsubReconnect();
         client.disconnect();
       } catch {}
     };

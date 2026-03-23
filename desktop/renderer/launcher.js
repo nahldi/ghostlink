@@ -431,7 +431,8 @@ function syncConnectedToBackend(statuses) {
     .map(s => providerToBase[s.provider] || s.provider)
     .filter(Boolean);
   if (connected.length === 0) return;
-  fetch('http://127.0.0.1:8300/api/settings', {
+  const port = document.getElementById('setting-port')?.value || '8300';
+  fetch(`http://127.0.0.1:${port}/api/settings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ connectedAgents: connected }),

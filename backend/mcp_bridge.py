@@ -648,9 +648,18 @@ def chat_progress(
             (metadata, message_id),
         ))
         _run_async(_store._db.commit())
-        # Broadcast update
-        import asyncio
-        # Can't easily broadcast from sync context, so just return
+        # Broadcast the metadata update to all WebSocket clients
+        try:
+            import urllib.request
+            body = json.dumps({"metadata": metadata}).encode()
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{_server_port}/api/messages/{message_id}/progress-update",
+                data=body, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=3)
+        except Exception as e:
+            log.debug("Progress broadcast failed: %s", e)
         return f"Updated progress (id={message_id}): step {current}/{total or len(steps)}"
 
     msg = _run_async(_store.add(
@@ -869,11 +878,25 @@ def web_fetch(url: str, extract: str = "text") -> str:
     if not url.startswith(("http://", "https://")):
         return "Error: URL must start with http:// or https://"
 
-    # Block private IPs
-    import re
-    hostname = url.split("//", 1)[-1].split("/")[0].split(":")[0]
-    if re.match(r'^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|localhost)', hostname):
-        return "Error: Cannot fetch private/local URLs"
+    # Block private/internal IPs (handles hex, octal, integer notations via DNS resolution)
+    from urllib.parse import urlparse
+    import ipaddress, socket
+    try:
+        parsed_url = urlparse(url)
+        hostname = parsed_url.hostname or ""
+        if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"):
+            return "Error: Cannot fetch private/local URLs"
+        if hostname.endswith(".local") or hostname.endswith(".internal"):
+            return "Error: Cannot fetch private/local URLs"
+        try:
+            ip = socket.gethostbyname(hostname)
+            addr = ipaddress.ip_address(ip)
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                return "Error: Cannot fetch private/local URLs"
+        except (socket.gaierror, ValueError):
+            pass
+    except Exception:
+        return "Error: Invalid URL"
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "GhostLink/1.3 (Bot)"})
@@ -1246,6 +1269,10 @@ def gemini_video(prompt: str, duration: str = "8", aspect_ratio: str = "16:9") -
     Returns:
         Path to saved video file, or status message
     """
+    if duration not in ("4", "6", "8"):
+        return "Error: duration must be '4', '6', or '8' seconds"
+    if aspect_ratio not in ("16:9", "9:16"):
+        return "Error: aspect_ratio must be '16:9' or '9:16'"
     if not _gemini_api_key():
         return "Error: Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable"
 

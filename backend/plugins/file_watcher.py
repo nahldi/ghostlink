@@ -104,8 +104,9 @@ def setup(app, store=None, registry=None, mcp_bridge=None):
             return JSONResponse({"error": "valid directory path required"}, 400)
         if directory in _watchers and _watchers[directory].get("active"):
             return {"ok": True, "already_watching": True}
-        _watchers[directory] = {"active": True}
+        _watchers[directory] = {"active": True, "thread": None}
         t = threading.Thread(target=_watch_loop, args=(directory, None), daemon=True)
+        _watchers[directory]["thread"] = t
         t.start()
         return {"ok": True, "directory": directory}
 

@@ -131,6 +131,7 @@ _settings: dict = {
     "notificationSounds": True,
     "channels": ["general"],
 }
+_settings_lock = asyncio.Lock()
 
 
 def _load_settings():
@@ -354,6 +355,9 @@ async def lifespan(_app: FastAPI):
     sse_thread.start()
     print(f"  MCP bridge (SSE) started on port {mcp_bridge.MCP_SSE_PORT}")
 
+    # Capture the running event loop for use by background threads
+    _main_loop = asyncio.get_running_loop()
+
     # Start schedule checker background thread
     _schedule_stop = threading.Event()
 
@@ -362,7 +366,7 @@ async def lifespan(_app: FastAPI):
         while not _schedule_stop.is_set():
             try:
                 schedules = asyncio.run_coroutine_threadsafe(
-                    schedule_store.list_enabled(), asyncio.get_event_loop()
+                    schedule_store.list_enabled(), _main_loop
                 ).result(timeout=5)
                 now = time.time()
                 for sched in schedules:
@@ -385,7 +389,7 @@ async def lifespan(_app: FastAPI):
                             try:
                                 asyncio.run_coroutine_threadsafe(
                                     store.add(sender="system", text=f"Scheduled: @{agent} — {command}", msg_type="system", channel=channel),
-                                    asyncio.get_event_loop(),
+                                    _main_loop,
                                 ).result(timeout=5)
                             except Exception as e:
                                 log.warning("Schedule message post failed: %s", e)
@@ -393,7 +397,7 @@ async def lifespan(_app: FastAPI):
                         try:
                             asyncio.run_coroutine_threadsafe(
                                 schedule_store.mark_run(sched["id"]),
-                                asyncio.get_event_loop(),
+                                _main_loop,
                             ).result(timeout=5)
                         except Exception as e:
                             log.warning("Schedule mark_run failed for %s: %s", sched["id"], e)
@@ -424,7 +428,7 @@ async def lifespan(_app: FastAPI):
                         try:
                             asyncio.run_coroutine_threadsafe(
                                 broadcast("status", {"agents": _get_full_agent_list()}),
-                                asyncio.get_event_loop(),
+                                _main_loop,
                             ).result(timeout=5)
                         except Exception:
                             pass
@@ -483,7 +487,8 @@ import collections
 
 _rate_limits: dict[str, collections.deque] = {}
 _RATE_LIMIT_WINDOW = 60  # seconds
-_RATE_LIMIT_MAX = 120  # requests per window per IP
+_RATE_LIMIT_MAX = 300  # requests per window per IP (increased for UI rapid actions)
+_rate_limit_last_cleanup = time.time()
 
 
 @asynccontextmanager
@@ -498,6 +503,7 @@ app = FastAPI(title="GhostLink", lifespan=lifespan)
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Simple IP-based rate limiting for API endpoints."""
+    global _rate_limit_last_cleanup
     if request.url.path.startswith("/api/"):
         client_ip = request.client.host if request.client else "unknown"
         now = time.time()
@@ -513,6 +519,12 @@ async def rate_limit_middleware(request: Request, call_next):
                 status_code=429,
             )
         dq.append(now)
+        # Periodic cleanup of stale IP entries (every 5 minutes)
+        if now - _rate_limit_last_cleanup > 300:
+            _rate_limit_last_cleanup = now
+            stale = [ip for ip, dq in _rate_limits.items() if not dq or dq[-1] < now - _RATE_LIMIT_WINDOW]
+            for ip in stale:
+                _rate_limits.pop(ip, None)
     return await call_next(request)
 
 
@@ -639,16 +651,9 @@ async def edit_message(msg_id: int, request: Request):
         return JSONResponse({"error": "text required"}, 400)
     if len(new_text) > 102400:
         return JSONResponse({"error": "message too long"}, 400)
-    if store._db is None:
-        raise RuntimeError("Database not initialized.")
-    cursor = await store._db.execute("SELECT * FROM messages WHERE id = ?", (msg_id,))
-    row = await cursor.fetchone()
-    if not row:
+    msg = await store.edit(msg_id, new_text)
+    if not msg:
         return JSONResponse({"error": "not found"}, 404)
-    await store._db.execute("UPDATE messages SET text = ? WHERE id = ?", (new_text, msg_id))
-    await store._db.commit()
-    msg = store._row_to_dict(row)
-    msg["text"] = new_text
     await broadcast("message_edit", {"message_id": msg_id, "text": new_text})
     return msg
 
@@ -661,6 +666,15 @@ async def bookmark_message(msg_id: int, request: Request):
     # and broadcasts so other clients can sync
     await broadcast("bookmark", {"message_id": msg_id, "bookmarked": bookmarked})
     return {"message_id": msg_id, "bookmarked": bookmarked}
+
+
+@app.post("/api/messages/{msg_id}/progress-update")
+async def progress_update(msg_id: int, request: Request):
+    """Internal: broadcast a progress metadata update to all WebSocket clients."""
+    body = await request.json()
+    metadata = body.get("metadata", "{}")
+    await broadcast("message_edit", {"message_id": msg_id, "metadata": metadata})
+    return {"ok": True}
 
 
 @app.delete("/api/messages/{msg_id}")
@@ -766,8 +780,17 @@ async def get_settings():
 @app.post("/api/settings")
 async def save_settings(request: Request):
     body = await request.json()
-    _settings.update(body)
-    _save_settings()
+    # Whitelist allowed settings keys to prevent arbitrary injection
+    _ALLOWED_SETTINGS = {
+        "username", "title", "theme", "fontSize", "loopGuard", "notificationSounds",
+        "channels", "persistentAgents", "autoRoute", "connectedAgents",
+        "quietHoursStart", "quietHoursEnd", "soundEnabled", "soundVolume",
+        "soundPerAgent", "timezone", "timeFormat", "voiceLanguage",
+    }
+    filtered = {k: v for k, v in body.items() if k in _ALLOWED_SETTINGS}
+    async with _settings_lock:
+        _settings.update(filtered)
+        _save_settings()
     # Sync loop guard to router
     if "loopGuard" in body:
         router.max_hops = int(body["loopGuard"])
@@ -838,11 +861,7 @@ async def rename_channel(name: str, request: Request):
     _settings["channels"] = channels
     _save_settings()
     # Update messages in the renamed channel
-    await store._db.execute(
-        "UPDATE messages SET channel = ? WHERE channel = ?",
-        (new_name, name),
-    )
-    await store._db.commit()
+    await store.rename_channel(name, new_name)
     await broadcast("channel_update", {"channels": [{"name": c, "unread": 0} for c in channels]})
     return {"channels": channels}
 
@@ -1010,7 +1029,7 @@ async def agent_templates(connected: str = ""):
         ("codex", "codex", "Codex", "#10a37f", "OpenAI", ["--sandbox", "danger-full-access", "-a", "never"]),
         ("gemini", "gemini", "Gemini", "#4285f4", "Google", ["-y"]),
         ("grok", "grok", "Grok", "#ff6b35", "xAI", []),
-        ("copilot", "github-copilot", "Copilot", "#6cc644", "GitHub", []),
+        ("copilot", "gh", "Copilot", "#6cc644", "GitHub", ["copilot"]),
         ("aider", "aider", "Aider", "#14b8a6", "Aider", ["--yes"]),
         ("goose", "goose", "Goose", "#f59e0b", "Block", []),
         ("pi", "pi", "Pi", "#8b5cf6", "Inflection", []),
@@ -1095,7 +1114,18 @@ async def spawn_agent(request: Request):
 
     import shutil as _shutil
     if not _shutil.which(command):
-        return JSONResponse({"error": f"'{command}' not found on PATH"}, 400)
+        # Check WSL — agent CLIs are often installed there
+        found_in_wsl = False
+        for check in [f'which {command} 2>/dev/null', f'command -v {command} 2>/dev/null']:
+            try:
+                r = subprocess.run(['wsl', 'bash', '-lc', check], capture_output=True, timeout=8)
+                if r.returncode == 0 and r.stdout.strip():
+                    found_in_wsl = True
+                    break
+            except Exception:
+                pass
+        if not found_in_wsl:
+            return JSONResponse({"error": f"'{command}' not found on PATH or in WSL"}, 400)
 
     # Update in-memory config for this session (don't overwrite config.toml)
     if cwd or extra_args:
@@ -1187,14 +1217,14 @@ async def kill_agent(name: str):
     except Exception as e:
         log.debug("tmux kill-session for %s: %s", name, e)
 
-    # Only kill the wrapper process for THIS agent
-    # Processes are stored as {base}_{pid} — scan for matching base name
+    # Only kill the wrapper process for THIS specific agent
+    # Processes are stored as {base}_{pid} — match exact name prefix only
     async with _agent_lock:
         proc = _agent_processes.pop(name, None)
         if proc is None:
-            # Scan for keys that start with the agent's base name
+            # Scan for keys matching this exact agent name + "_" (pid suffix)
             for key in list(_agent_processes):
-                if key.startswith(name + "_") or key.startswith(name.split("-")[0] + "_"):
+                if key.startswith(name + "_"):
                     proc = _agent_processes.pop(key, None)
                     break
     if proc:
@@ -1379,11 +1409,17 @@ async def heartbeat(agent_name: str, request: Request):
     if inst:
         _last_heartbeats[agent_name] = time.time()
         old_state = inst.state
+        # Check if agent was triggered by @mention — activate thinking immediately
+        was_triggered = getattr(inst, '_was_triggered', False)
+        if was_triggered:
+            inst.state = "thinking"
+            inst._think_ts = time.time()  # type: ignore[attr-defined]
+            inst._was_triggered = False  # type: ignore[attr-defined]
         try:
             body = await request.json()
             if body.get("active"):
-                # Glow whenever agent is doing anything — but skip first 15s (startup noise)
-                if time.time() - inst.registered_at > 15:
+                # Glow whenever agent is doing anything — skip first 5s (startup noise)
+                if time.time() - inst.registered_at > 5:
                     inst.state = "thinking"
                     inst._think_ts = time.time()  # type: ignore[attr-defined]
             else:
@@ -1391,13 +1427,13 @@ async def heartbeat(agent_name: str, request: Request):
                 last_think = getattr(inst, '_think_ts', 0)
                 if old_state == "thinking" and (time.time() - last_think) < 3:
                     pass  # keep thinking
-                else:
+                elif not was_triggered:
                     inst.state = "active"
         except Exception:
             last_think = getattr(inst, '_think_ts', 0)
             if old_state == "thinking" and (time.time() - last_think) < 3:
                 pass
-            else:
+            elif not was_triggered:
                 inst.state = "active"
         # Broadcast state change so frontend sees thinking glow
         if inst.state != old_state:
@@ -1803,10 +1839,16 @@ async def list_webhooks():
 @app.post("/api/webhooks")
 async def create_webhook(request: Request):
     body = await request.json()
+    url = (body.get("url", "") or "").strip()
+    if not url or not url.startswith(("http://", "https://")):
+        return JSONResponse({"error": "valid http/https URL required"}, 400)
+    events = body.get("events", [])
+    if not isinstance(events, list):
+        events = []
     wh = {
         "id": f"wh-{int(time.time())}",
-        "url": body.get("url", ""),
-        "events": body.get("events", []),
+        "url": url,
+        "events": [str(e) for e in events],
         "active": True,
         "created_at": time.time(),
     }
@@ -1817,9 +1859,14 @@ async def create_webhook(request: Request):
 @app.post("/api/webhook/{wh_id}")
 async def update_webhook(wh_id: str, request: Request):
     body = await request.json()
+    _ALLOWED_WH_KEYS = {"url", "events", "active"}
     for wh in _webhooks:
         if wh["id"] == wh_id:
-            wh.update(body)
+            for k, v in body.items():
+                if k in _ALLOWED_WH_KEYS:
+                    if k == "url" and not str(v).startswith(("http://", "https://")):
+                        return JSONResponse({"error": "valid http/https URL required"}, 400)
+                    wh[k] = v
             return wh
     return JSONResponse({"error": "not found"}, 404)
 
@@ -1923,11 +1970,19 @@ async def configure_provider(request: Request):
     if not pid:
         return JSONResponse({"error": "provider required"}, 400)
 
+    from providers import PROVIDERS, CAPABILITY_PRIORITY
+    if pid not in PROVIDERS:
+        return JSONResponse({"error": f"unknown provider: {pid}"}, 400)
+
     config_updates = {}
     if "api_key" in body:
-        config_updates[f"{pid}_api_key"] = body["api_key"]
+        api_key = str(body["api_key"]).strip()
+        config_updates[f"{pid}_api_key"] = api_key
     if "preferred_for" in body:
-        config_updates[f"preferred_{body['preferred_for']}"] = pid
+        capability = str(body["preferred_for"]).strip()
+        if capability not in CAPABILITY_PRIORITY:
+            return JSONResponse({"error": f"unknown capability: {capability}"}, 400)
+        config_updates[f"preferred_{capability}"] = pid
 
     provider_registry.save_config(config_updates)
     return {"ok": True, "status": provider_registry.get_provider_status()}
@@ -1972,14 +2027,20 @@ async def export_channel(channel: str = "general", format: str = "markdown"):
     rows = await cursor.fetchall()
     msgs = [store._row_to_dict(r) for r in rows]
 
+    import html as _html
+
     if format == "json":
         return {"messages": msgs, "channel": channel, "count": len(msgs)}
     elif format == "html":
-        html_lines = [f"<html><head><title>#{channel}</title></head><body style='background:#09090f;color:#e0dff0;font-family:sans-serif;padding:2rem'>"]
-        html_lines.append(f"<h1>#{channel}</h1>")
+        ch_escaped = _html.escape(channel)
+        html_lines = [f"<html><head><title>#{ch_escaped}</title></head><body style='background:#09090f;color:#e0dff0;font-family:sans-serif;padding:2rem'>"]
+        html_lines.append(f"<h1>#{ch_escaped}</h1>")
         for m in msgs:
             color = "#38bdf8" if m.get("type") == "chat" and m["sender"] not in [a.name for a in registry.get_all()] else "#a78bfa"
-            html_lines.append(f"<div style='margin:1rem 0;padding:0.75rem;border-radius:8px;background:rgba(255,255,255,0.03)'><b style='color:{color}'>{m['sender']}</b> <small style='color:#666'>{m.get('time','')}</small><p>{m['text']}</p></div>")
+            sender_escaped = _html.escape(m["sender"])
+            text_escaped = _html.escape(m["text"])
+            time_escaped = _html.escape(m.get("time", ""))
+            html_lines.append(f"<div style='margin:1rem 0;padding:0.75rem;border-radius:8px;background:rgba(255,255,255,0.03)'><b style='color:{color}'>{sender_escaped}</b> <small style='color:#666'>{time_escaped}</small><p>{text_escaped}</p></div>")
         html_lines.append("</body></html>")
         return {"html": "\n".join(html_lines), "filename": f"{channel}-export.html"}
     else:
@@ -2125,8 +2186,21 @@ async def set_agent_config(name: str, request: Request):
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
     body = await request.json()
-    for key in ("label", "color", "role", "workspace", "responseMode", "thinkingLevel", "model", "failoverModel", "autoApprove"):
+    _CONFIG_VALIDATORS = {
+        "label": lambda v: isinstance(v, str) and 0 < len(v) <= 50,
+        "color": lambda v: isinstance(v, str) and len(v) <= 20,
+        "role": lambda v: isinstance(v, str) and v in ("", "manager", "worker", "peer"),
+        "workspace": lambda v: isinstance(v, str) and len(v) <= 500,
+        "responseMode": lambda v: isinstance(v, str) and v in ("mentioned", "always", "listen", "silent"),
+        "thinkingLevel": lambda v: isinstance(v, str) and v in ("", "off", "minimal", "low", "medium", "high"),
+        "model": lambda v: isinstance(v, str) and len(v) <= 100,
+        "failoverModel": lambda v: isinstance(v, str) and len(v) <= 100,
+        "autoApprove": lambda v: isinstance(v, bool),
+    }
+    for key, validator in _CONFIG_VALIDATORS.items():
         if key in body:
+            if not validator(body[key]):
+                return JSONResponse({"error": f"invalid value for {key}"}, 400)
             setattr(inst, key, body[key])
     if any(k in body for k in ("role", "responseMode", "thinkingLevel", "model", "autoApprove")):
         await broadcast("status", {"agents": _get_full_agent_list()})
@@ -2381,10 +2455,17 @@ async def import_snapshot(request: Request):
     imported_settings = body.get("settings", {})
     imported_channels = body.get("channels", [])
 
-    # Merge settings (keep existing channels, merge the rest)
-    safe_keys = {"username", "theme", "fontSize", "loopGuard", "notificationSounds", "autoRoute"}
-    for k in safe_keys:
-        if k in imported_settings:
+    # Merge settings (keep existing channels, merge the rest) with type validation
+    _safe_validators = {
+        "username": lambda v: isinstance(v, str) and len(v) <= 50,
+        "theme": lambda v: isinstance(v, str) and v in ("dark", "light", "cyberpunk", "terminal", "ocean", "sunset", "midnight", "rosegold", "arctic"),
+        "fontSize": lambda v: isinstance(v, (int, float)) and 8 <= v <= 32,
+        "loopGuard": lambda v: isinstance(v, (int, float)) and 1 <= v <= 20,
+        "notificationSounds": lambda v: isinstance(v, bool),
+        "autoRoute": lambda v: isinstance(v, (str, bool)),
+    }
+    for k, validator in _safe_validators.items():
+        if k in imported_settings and validator(imported_settings[k]):
             _settings[k] = imported_settings[k]
 
     # Merge channels

@@ -371,10 +371,10 @@ def _approval_watcher(
 
                     # Auto-approve GhostLink MCP tool prompts (our own tools)
                     if 'ghostlink' in pane_text.lower() or 'chat_read' in pane_text or 'chat_send' in pane_text:
-                        # Try multiple input methods for different CLI versions:
-                        # 1. Arrow down to "Yes, and don't ask again" (option 2) then Enter
-                        # 2. Send literal "2" as fallback for numeric-input CLIs
-                        subprocess.run(["tmux", "send-keys", "-t", session_name, "Down"], capture_output=True, timeout=3)
+                        # Use the agent-specific keymap for "allow session" (safest approach)
+                        keymap = _APPROVAL_KEYMAPS.get(agent_base, _APPROVAL_KEYMAPS["_default"])
+                        key = keymap.get("allow_session", "a")
+                        subprocess.run(["tmux", "send-keys", "-t", session_name, key], capture_output=True, timeout=3)
                         time.sleep(0.15)
                         subprocess.run(["tmux", "send-keys", "-t", session_name, "Enter"], capture_output=True, timeout=3)
                         last_prompt_hash = prompt_hash

@@ -172,6 +172,15 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to spawn');
       setSpawning(false);
+      // Remove the persistent agent entry if spawn failed
+      if (persistent && selected) {
+        const existing = settings.persistentAgents || [];
+        const rolled = existing.filter(a => a.base !== selected);
+        if (rolled.length < existing.length) {
+          updateSettings({ persistentAgents: rolled });
+          api.saveSettings({ persistentAgents: rolled }).catch(() => {});
+        }
+      }
     }
   };
 
