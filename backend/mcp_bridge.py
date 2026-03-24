@@ -121,6 +121,34 @@ def _run_async(coro):
         raise TimeoutError("MCP bridge async operation timed out")
 
 
+# ── Execution mode enforcement ─────────────────────────────────────
+
+# Tools that modify state (blocked in plan/review mode)
+_WRITE_TOOLS = {
+    "code_execute", "gemini_image", "gemini_video",
+    "image_generate", "text_to_speech", "speech_to_text",
+}
+
+
+def _check_execution_mode(channel: str, tool_name: str) -> str | None:
+    """Check if the tool is allowed in the current session's execution mode.
+    Returns an error message if blocked, None if allowed."""
+    if not _settings or tool_name not in _WRITE_TOOLS:
+        return None
+    try:
+        from sessions import SessionManager
+        import deps as _deps
+        if _deps.session_manager:
+            mode = _deps.session_manager.get_execution_mode(channel)
+            if mode in ("plan", "review") and tool_name in _WRITE_TOOLS:
+                return (f"Blocked: tool '{tool_name}' is not available in {mode} mode. "
+                        f"The current session is in {mode} mode (read-only). "
+                        f"Switch to execute mode to use write tools.")
+    except Exception:
+        pass
+    return None
+
+
 # ── Helpers ─────────────────────────────────────────────────────────
 
 def _touch_presence(name: str):
@@ -820,7 +848,7 @@ def memory_search(sender: str, query: str) -> str:
     for r in results[:10]:
         entries.append({
             "key": r["key"],
-            "preview": r["content"][:200] + ("..." if len(r["content"]) > 200 else ""),
+            "preview": r.get("preview", ""),
             "updated_at": r.get("updated_at"),
         })
     return json.dumps(entries, indent=2)
@@ -866,6 +894,30 @@ def memory_list(sender: str) -> str:
         return "No memories stored yet."
     items = [{"key": e["key"], "size": e.get("size", 0)} for e in entries]
     return json.dumps(items, indent=2)
+
+
+def memory_search_all(sender: str, query: str) -> str:
+    """Search memories across ALL agents (cross-session recall).
+
+    Unlike memory_search which only searches your own memories, this searches
+    every agent's stored memories. Useful for finding information any agent
+    has previously recorded.
+
+    Args:
+        sender: Your agent name
+        query: Search term to find across all agent memories
+
+    Returns:
+        JSON array of matching entries with agent name, key, preview, timestamp
+    """
+    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    if err:
+        return err
+    from agent_memory import search_all_memories
+    results = search_all_memories(_data_dir, query)
+    if not results:
+        return "No memories match that query across any agent."
+    return json.dumps(results, indent=2)
 
 
 # ── Web & Browser tools ──────────────────────────────────────────────
@@ -1494,7 +1546,7 @@ _ALL_TOOLS = [
     chat_send, chat_read, chat_join, chat_who, chat_channels,
     chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim,
     # Memory
-    memory_save, memory_search, memory_get, memory_list,
+    memory_save, memory_search, memory_search_all, memory_get, memory_list,
     # Web & Browser
     web_fetch, web_search, browser_snapshot, image_generate,
     # Gemini AI
@@ -1511,6 +1563,39 @@ _mcp_http: FastMCP | None = None
 _mcp_sse: FastMCP | None = None
 
 
+def _wrap_tool_with_hooks(func):
+    """Wrap an MCP tool function with pre/post lifecycle hooks."""
+    import functools
+    tool_name = func.__name__
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # Extract agent identity from first arg (most tools have sender as first param)
+        agent = args[0] if args else kwargs.get("sender", kwargs.get("name", "unknown"))
+
+        # Fire pre_tool_use hook
+        try:
+            from plugin_sdk import event_bus
+            event_bus.emit("pre_tool_use", {"agent": agent, "tool": tool_name, "args": kwargs})
+        except Exception:
+            pass
+
+        # Execute the actual tool
+        result = func(*args, **kwargs)
+
+        # Fire post_tool_use hook
+        try:
+            from plugin_sdk import event_bus
+            result_preview = str(result)[:200] if result else ""
+            event_bus.emit("post_tool_use", {"agent": agent, "tool": tool_name, "args": kwargs, "result": result_preview})
+        except Exception:
+            pass
+
+        return result
+
+    return wrapper
+
+
 def _create_server(port: int) -> FastMCP:
     server = FastMCP(
         "ghostlink",
@@ -1520,7 +1605,7 @@ def _create_server(port: int) -> FastMCP:
         instructions=_INSTRUCTIONS,
     )
     for func in _ALL_TOOLS:
-        server.tool()(func)
+        server.tool()(_wrap_tool_with_hooks(func))
     return server
 
 

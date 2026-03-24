@@ -81,6 +81,9 @@ EVENTS = {
     "on_bridge_message": "Fired when a message arrives from external bridge",
     "on_server_start": "Fired when the server starts",
     "on_server_stop": "Fired when the server shuts down",
+    # v3.4.0: Lifecycle hooks for MCP tool execution
+    "pre_tool_use": "Fired before an MCP tool is called (data: agent, tool, args)",
+    "post_tool_use": "Fired after an MCP tool completes (data: agent, tool, args, result)",
 }
 
 

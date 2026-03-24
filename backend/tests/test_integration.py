@@ -364,3 +364,33 @@ def test_agent_memory_search_cross_agent(tmp_path: Path):
 
     assert len(results_a) > 0
     assert len(results_b) == 0  # gemini-1 has no "ghostlink" in memory
+
+
+def test_search_all_memories_cross_agent(tmp_path: Path):
+    """search_all_memories finds results across multiple agents."""
+    from agent_memory import AgentMemory, search_all_memories
+
+    mem_a = AgentMemory(tmp_path, "claude-1")
+    mem_b = AgentMemory(tmp_path, "gemini-1")
+    mem_c = AgentMemory(tmp_path, "codex-1")
+
+    mem_a.save("design", "React component architecture for dashboard")
+    mem_b.save("research", "React performance optimization techniques")
+    mem_c.save("notes", "Python backend refactoring plan")
+
+    # Search for "React" should find results from claude-1 and gemini-1
+    results = search_all_memories(tmp_path, "React")
+    assert len(results) == 2
+    agents_found = {r["agent"] for r in results}
+    assert "claude-1" in agents_found
+    assert "gemini-1" in agents_found
+    assert "codex-1" not in agents_found
+
+    # Search for "plan" should find codex-1
+    results = search_all_memories(tmp_path, "plan")
+    assert len(results) == 1
+    assert results[0]["agent"] == "codex-1"
+
+    # Search for nonexistent term returns empty
+    results = search_all_memories(tmp_path, "zzz_nonexistent")
+    assert len(results) == 0

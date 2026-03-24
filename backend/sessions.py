@@ -122,6 +122,7 @@ class SessionManager:
             "current_phase": 0,
             "current_turn": 0,
             "status": "active",  # active, paused, completed
+            "execution_mode": "execute",  # plan, execute, review
             "started_at": time.time(),
             "completed_at": None,
         }
@@ -181,6 +182,23 @@ class SessionManager:
             session["status"] = "active"
             self._save()
         return session
+
+    def set_execution_mode(self, channel: str, mode: str) -> dict | None:
+        """Set the execution mode for a session: plan, execute, or review."""
+        if mode not in ("plan", "execute", "review"):
+            raise ValueError(f"Invalid execution mode: {mode!r}. Must be plan, execute, or review.")
+        session = self._sessions.get(channel)
+        if session:
+            session["execution_mode"] = mode
+            self._save()
+        return session
+
+    def get_execution_mode(self, channel: str) -> str:
+        """Get the execution mode for a channel's session. Defaults to 'execute'."""
+        session = self._sessions.get(channel)
+        if session:
+            return session.get("execution_mode", "execute")
+        return "execute"
 
     def get_current_prompt(self, channel: str) -> dict | None:
         """Get the current phase prompt and role for the session."""

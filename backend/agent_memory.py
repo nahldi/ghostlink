@@ -128,6 +128,41 @@ _memory_cache: dict[str, tuple[AgentMemory, float]] = {}
 _MEMORY_CACHE_TTL = 300.0  # 5 minutes
 
 
+def search_all_memories(data_dir: Path, query: str, limit: int = 20) -> list[dict]:
+    """Search across ALL agents' memories for a keyword (cross-session recall).
+
+    Returns results from all agents, sorted by relevance (updated_at descending).
+    """
+    query_lower = query.lower()
+    results: list[dict] = []
+    agents_dir = data_dir
+    if not agents_dir.exists():
+        return results
+    for agent_dir in sorted(agents_dir.iterdir()):
+        memory_dir = agent_dir / "memory"
+        if not agent_dir.is_dir() or not memory_dir.exists():
+            continue
+        agent_name = agent_dir.name
+        for f in sorted(memory_dir.glob("*.json")):
+            try:
+                data = json.loads(f.read_text("utf-8"))
+                key = data.get("key", f.stem)
+                content = data.get("content", "")
+                if query_lower in key.lower() or query_lower in content.lower():
+                    preview = content[:200] + ("..." if len(content) > 200 else "")
+                    results.append({
+                        "agent": agent_name,
+                        "key": key,
+                        "preview": preview,
+                        "updated_at": data.get("updated_at", 0),
+                    })
+            except Exception:
+                pass
+    # Sort by most recently updated first
+    results.sort(key=lambda r: r.get("updated_at", 0), reverse=True)
+    return results[:limit]
+
+
 def get_agent_memory(data_dir: Path, agent_name: str) -> AgentMemory:
     """Get or create an AgentMemory instance for the given agent (cached with TTL)."""
     import time as _time

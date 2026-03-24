@@ -99,3 +99,20 @@ async def resume_session(channel: str):
 async def get_session_prompt(channel: str):
     prompt = deps.session_manager.get_current_prompt(channel)
     return {"prompt": prompt}
+
+
+@router.post("/api/sessions/{channel}/mode")
+async def set_session_mode(channel: str, request: Request):
+    """Set execution mode for a session: plan (read-only), execute (full), review (read-only)."""
+    body = await request.json()
+    mode = body.get("mode", "execute")
+    try:
+        session = deps.session_manager.set_execution_mode(channel, mode)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, 400)
+    if not session:
+        return JSONResponse({"error": "no active session"}, 404)
+    mode_labels = {"plan": "Plan (read-only)", "execute": "Execute (full access)", "review": "Review (read-only)"}
+    await deps.store.add("system", f"Execution mode set to **{mode_labels.get(mode, mode)}**", "system", channel)
+    await deps.broadcast("session_update", {"channel": channel, "session": session})
+    return {"session": session}
