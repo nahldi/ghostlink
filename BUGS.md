@@ -289,3 +289,60 @@
 ### ~~ARCH-004: 3400-line monolithic app.py~~ RESOLVED (v3.0.0)
 **Root cause:** All 90+ API endpoints lived in a single `app.py` file, making it impossible to navigate, test in isolation, or extend without merge conflicts.
 **Fix:** Split into `backend/deps.py` (shared state) + 13 `backend/routes/` modules: `agents.py`, `bridges.py`, `channels.py`, `jobs.py`, `messages.py`, `misc.py`, `plugins.py`, `providers.py`, `rules.py`, `schedules.py`, `search.py`, `security.py`, `sessions.py`. `app.py` reduced from 3401 → 612 lines.
+
+---
+
+## HOURLY HEALTH AUDIT — 2026-03-24T11:XX UTC
+
+**Audit type:** Automated scheduled audit (no code edits — issues logged only)
+**Test suite:** 56/56 tests passed
+**TypeScript:** Compiles clean (0 errors from `tsc -b`)
+**Frontend:** 0 vulnerabilities in npm audit; 306 packages OK
+**Git:** On `master`, up to date with `origin/master`. 50 files with uncommitted changes (all from recent v3.3.0 work). 1 stash present.
+
+### BUG-067: Backend dependency conflict — fastapi vs mcp version pins
+**Severity:** HIGH — fresh `pip install -r requirements.txt` fails
+**Where:** `backend/requirements.txt`
+**Root cause:** `fastapi==0.115.0` requires `starlette<0.39.0`, but `mcp==1.0.0` requires `starlette>=0.39`. These two pins are mutually incompatible. A fresh install produces `ResolutionImpossible`.
+**Workaround:** `pip install "fastapi>=0.115.0" "mcp>=1.0.0"` (lets pip resolve to compatible versions — installs mcp 1.26.0 with starlette 0.46+, upgrading fastapi accordingly).
+**Fix needed:** Update `requirements.txt` to use compatible version ranges, e.g. `fastapi>=0.115.0` and `mcp>=1.0.0` (remove exact pins), or pin to tested-compatible combo like `fastapi==0.115.12` + `mcp==1.26.0`.
+**Status:** Open
+
+### BUG-068: Audit log hardcodes version "2.5.1" instead of app.__version__
+**Severity:** LOW — misleading log data
+**Where:** `backend/app.py` line 269
+**Root cause:** `audit_log.log("server_start", {"version": "2.5.1", ...})` — the version string was never updated when the app moved to v3.0.0. Should reference `__version__` variable.
+**Status:** Open
+
+### BUG-069: MessageRouter constructor mismatch in tests — latent hop-guard crash
+**Severity:** MEDIUM — will crash in production multi-agent conversations
+**Where:** `backend/tests/test_modules.py` lines 138, 151, 163; `backend/tests/test_integration.py` line 35
+**Root cause:** Tests call `MessageRouter(reg)` passing an `AgentRegistry` object as the first arg. The constructor signature is `__init__(self, max_hops: int = 4, default_routing: str = "none")`. Python silently accepts this (no runtime type enforcement). The tests pass because they never trigger the hop guard (`sender` is always `"You"`, not an agent). But in production, when an agent routes to another agent and `count > self.max_hops` is evaluated (router.py line 71), it compares `int > AgentRegistry`, which throws `TypeError`.
+**Fix needed:** Either update the tests to `MessageRouter()` (use defaults) or `MessageRouter(max_hops=4)`, OR update the constructor to optionally accept a registry.
+**Status:** Open
+
+### BUG-070: SQLite databases are empty (0 bytes) — data loss
+**Severity:** HIGH — server cannot start; all message history lost
+**Where:** `backend/data/ghostlink.db` (0 bytes), `backend/data/ghostlink_v2.db` (0 bytes)
+**Root cause:** Both primary database files are empty. `ghostlink.db-journal` (4616 bytes) and `ghostlink.db.bak` (57344 bytes with 4 messages) exist, suggesting a crash or unclean shutdown corrupted the WAL/journal. The server fails to start with `sqlite3.OperationalError: disk I/O error` when attempting `PRAGMA journal_mode=WAL` on the empty file.
+**Fix needed:** Restore from `.bak` if available (`cp ghostlink.db.bak ghostlink.db`), or add startup recovery logic that detects an empty/corrupt DB and rebuilds from backup.
+**Status:** Open
+
+### BUG-071: Version numbers out of sync across packages
+**Severity:** LOW — cosmetic / release hygiene
+**Where:** Multiple files
+**Details:**
+- `backend/app.py` → `__version__ = "3.0.0"`
+- `desktop/package.json` → `"version": "2.8.0"`
+- `frontend/package.json` → `"version": "0.0.0"`
+- `BUGS.md` header → `v3.3.0`
+- Audit log → `"2.5.1"`
+All should be synced to the same release version.
+**Status:** Open
+
+### BUG-072: 50 modified files uncommitted on master
+**Severity:** LOW — risk of accidental loss
+**Where:** Git working tree
+**Root cause:** Extensive v3.3.0 changes across backend, frontend, and desktop are modified but not staged or committed. Includes all route modules, core backend files, frontend components, and package.json files. A `git checkout .` or disk failure would lose all this work.
+**Recommendation:** Commit or stash the current working tree to preserve progress.
+**Status:** Open

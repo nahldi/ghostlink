@@ -1,0 +1,27 @@
+[server]
+port = 8300
+host = "127.0.0.1"
+data_dir = "/tmp/gl-data"
+static_dir = "../frontend/dist"
+
+[routing]
+default = "none"
+max_agent_hops = 4
+
+[images]
+upload_dir = "./uploads"
+max_size_mb = 10
+
+[mcp]
+http_port = 8200
+sse_port = 8201
+
+# Add agents via Settings > Persistent Agents in the UI.
+# Or uncomment below:
+#
+# [agents.claude]
+# command = "claude"
+# args = ["--dangerously-skip-permissions"]
+# cwd = "/path/to/your/project"
+# color = "#e8734a"
+# label = "Claude"
