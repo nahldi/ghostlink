@@ -22,6 +22,14 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+try:
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.primitives import hashes
+    HAS_FERNET = True
+except ImportError:
+    HAS_FERNET = False
+
 
 # ── Secrets Manager ─────────────────────────────────────────────────
 
@@ -45,12 +53,22 @@ class SecretsManager:
         material = f"{self._data_dir}:{os.getenv('USER', os.getenv('USERNAME', 'ghostlink'))}"
         return hashlib.sha256(material.encode()).digest()
 
+    def _fernet(self):
+        """Derive a Fernet instance from the machine key."""
+        kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=b"ghostlink-v1", iterations=100_000)
+        return Fernet(base64.urlsafe_b64encode(kdf.derive(self._key)))
+
     def _encrypt(self, plaintext: str) -> str:
+        if HAS_FERNET:
+            return "fernet:" + self._fernet().encrypt(plaintext.encode()).decode()
         key = self._key
         encrypted = bytes(b ^ key[i % len(key)] for i, b in enumerate(plaintext.encode()))
         return base64.b64encode(encrypted).decode()
 
     def _decrypt(self, ciphertext: str) -> str:
+        if HAS_FERNET and ciphertext.startswith("fernet:"):
+            return self._fernet().decrypt(ciphertext[7:].encode()).decode()
+        # XOR fallback — handles old data or when cryptography not installed
         key = self._key
         encrypted = base64.b64decode(ciphertext)
         decrypted = bytes(b ^ key[i % len(key)] for i, b in enumerate(encrypted))

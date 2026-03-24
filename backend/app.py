@@ -22,7 +22,16 @@ import logging
 import re
 import subprocess
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Request
+import secrets
+from datetime import datetime
+
+try:
+    import aiohttp
+    HAS_AIOHTTP = True
+except ImportError:
+    HAS_AIOHTTP = False
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -130,6 +139,41 @@ audit_log: AuditLog
 data_manager: DataManager
 registry = AgentRegistry()
 router = MessageRouter(max_hops=MAX_HOPS, default_routing=DEFAULT_ROUTING)
+_ws_token = secrets.token_urlsafe(32)
+
+# v2.4.0: Shared HTTP session for connection pooling
+_http_session: "aiohttp.ClientSession | None" = None
+
+# v2.4.0: Usage tracking
+_usage_log: list[dict] = []
+
+def _estimate_cost(provider: str, model: str, input_tok: int, output_tok: int) -> float:
+    """Estimate cost in USD based on rough per-1M-token pricing."""
+    PRICING = {
+        "anthropic": {"input": 3.0, "output": 15.0},
+        "openai": {"input": 2.5, "output": 10.0},
+        "google": {"input": 1.25, "output": 5.0},
+        "groq": {"input": 0.05, "output": 0.10},
+        "together": {"input": 0.20, "output": 0.20},
+        "deepseek": {"input": 0.14, "output": 0.28},
+        "mistral": {"input": 2.0, "output": 6.0},
+        "cohere": {"input": 0.50, "output": 1.50},
+        "perplexity": {"input": 1.0, "output": 5.0},
+    }
+    rates = PRICING.get(provider, {"input": 1.0, "output": 3.0})
+    return round((input_tok * rates["input"] + output_tok * rates["output"]) / 1_000_000, 6)
+
+async def _track_usage(agent: str, provider: str, model: str, input_tokens: int, output_tokens: int):
+    """Record token usage for cost tracking."""
+    _usage_log.append({
+        "ts": datetime.utcnow().isoformat(),
+        "agent": agent,
+        "provider": provider,
+        "model": model,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cost": _estimate_cost(provider, model, input_tokens, output_tokens),
+    })
 
 # Settings (in-memory, persisted to JSON)
 SETTINGS_PATH = DATA_DIR / "settings.json"
@@ -303,6 +347,9 @@ def _deliver_webhooks(event_type: str, data: dict):
             continue
         url = wh.get("url", "")
         if not url or not url.startswith(("http://", "https://")):
+            continue
+        if _is_private_url(url):
+            log.warning("Blocked webhook to private URL: %s", url)
             continue
         try:
             req = urllib.request.Request(
@@ -502,8 +549,20 @@ async def lifespan(_app: FastAPI):
         ok = plugin_loader.uninstall_plugin(name)
         return {"ok": ok}
 
+    # v2.4.0: Create shared HTTP connection pool
+    global _http_session
+    if HAS_AIOHTTP:
+        _http_session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30),
+            connector=aiohttp.TCPConnector(limit=100, ttl_dns_cache=300),
+        )
+        print("  HTTP connection pool started (100 connections)")
+
     yield
 
+    # Shutdown
+    if _http_session:
+        await _http_session.close()
     _schedule_stop.set()
     _health_stop.set()
     bridge_manager.stop_all()
@@ -560,8 +619,22 @@ async def rate_limit_middleware(request: Request, call_next):
 
 # ── WebSocket endpoint ──────────────────────────────────────────────
 
+@app.get("/api/ws-token")
+async def get_ws_token(request: Request):
+    client_host = request.client.host if request.client else "127.0.0.1"
+    if client_host not in ("127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="Localhost only")
+    return {"token": _ws_token}
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
+    client_host = ws.client.host if ws.client else "127.0.0.1"
+    if client_host not in ("127.0.0.1", "::1"):
+        token = ws.query_params.get("token")
+        if not token or not secrets.compare_digest(token, _ws_token):
+            await ws.close(code=4001, reason="Unauthorized")
+            return
     await ws.accept()
     _ws_clients.add(ws)
     try:
@@ -595,6 +668,10 @@ async def get_messages(channel: str = "general", since_id: int = 0, limit: int =
 
 @app.post("/api/send")
 async def send_message(request: Request):
+    # v2.3.0: Restrict /api/send to localhost
+    client_host = request.client.host if request.client else "127.0.0.1"
+    if client_host not in ("127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="External access denied")
     body = await request.json()
     sender = (body.get("sender", "You") or "").strip()
     text = (body.get("text", "") or "")
@@ -3122,6 +3199,20 @@ async def tunnel_status():
     if not active:
         return {"active": False, "url": None}
     return {"active": True, "url": _tunnel_url}
+
+
+# ── v2.4.0: Usage tracking endpoint ──────────────────────────────────
+
+@app.get("/api/usage")
+async def get_usage():
+    """Return token usage and cost data."""
+    return {
+        "entries": _usage_log[-1000:],
+        "total_cost": round(sum(e["cost"] for e in _usage_log), 4),
+        "total_input_tokens": sum(e["input_tokens"] for e in _usage_log),
+        "total_output_tokens": sum(e["output_tokens"] for e in _usage_log),
+        "entry_count": len(_usage_log),
+    }
 
 
 # ── Serve uploads ───────────────────────────────────────────────────

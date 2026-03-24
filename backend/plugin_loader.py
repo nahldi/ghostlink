@@ -151,10 +151,18 @@ def install_plugin(name: str, code: str, description: str = "", version: str = "
     PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Safety scan
-    dangerous = ["__import__(", "eval(", "exec("]
-    for pattern in dangerous:
-        if pattern in code:
-            return {"ok": False, "error": f"Blocked dangerous pattern: {pattern}"}
+    try:
+        from plugin_sdk import SafetyScanner
+        scanner = SafetyScanner()
+        issues = scanner.scan(code)
+        if issues:
+            return {"ok": False, "error": f"Safety scan failed: {issues}"}
+    except (ImportError, Exception) as e:
+        log.warning("SafetyScanner unavailable (%s), using fallback string check", e)
+        dangerous = ["__import__(", "eval(", "exec(", "compile(", "getattr(__builtins__", "subprocess", "os.system", "os.popen"]
+        for pattern in dangerous:
+            if pattern in code:
+                return {"ok": False, "error": f"Blocked dangerous pattern: {pattern}"}
 
     plugin_file = PLUGINS_DIR / f"{name}.py"
     plugin_file.write_text(code)

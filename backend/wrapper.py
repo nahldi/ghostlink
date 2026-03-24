@@ -264,6 +264,14 @@ _APPROVAL_PATTERNS = [
     re.compile(r'(?:Approve|Confirm|Continue)\??\s*[\[\(]([yYnNaA/]+)[\]\)]', re.MULTILINE | re.IGNORECASE),
 ]
 
+# Matches actual MCP tool prompt format: "ghostlink/chat_read" or "ghostlink.chat_send"
+_GHOSTLINK_MCP_RE = re.compile(
+    r'ghostlink[/.](?:chat_read|chat_send|chat_join|chat_who|chat_channels|chat_rules|'
+    r'chat_progress|chat_propose_job|chat_react|chat_claim|'
+    r'memory_save|memory_load|memory_list|memory_search|web_search|web_fetch|image_generate)',
+    re.IGNORECASE,
+)
+
 # Key mappings: what key to inject for each response, per agent base
 _APPROVAL_KEYMAPS: dict[str, dict[str, str]] = {
     "claude":   {"allow_once": "1", "allow_session": "2", "deny": "3"},
@@ -370,7 +378,7 @@ def _approval_watcher(
                         break  # Already sent this prompt
 
                     # Auto-approve GhostLink MCP tool prompts (our own tools)
-                    if 'ghostlink' in pane_text.lower() or 'chat_read' in pane_text or 'chat_send' in pane_text:
+                    if _GHOSTLINK_MCP_RE.search(pane_text):
                         # Use the agent-specific keymap for "allow session" (safest approach)
                         keymap = _APPROVAL_KEYMAPS.get(agent_base, _APPROVAL_KEYMAPS["_default"])
                         key = keymap.get("allow_session", "a")

@@ -1,7 +1,7 @@
 # GhostLink — Known Bugs & Issues
 
 **Last updated:** 2026-03-23
-**Version:** v2.2.0
+**Version:** v2.3.0
 **Source:** Full codebase audit + live API testing + deep code path audit + user-reported bugs + 3 fix rounds
 
 ---
@@ -229,3 +229,31 @@
 ### ~~SEC-004: Bash OR logic bug in OpenAI/Google auth checks~~ FIXED
 **Status:** FIXED (v1.0.0)
 **Fix:** Added proper parentheses around `test -d ... || test -d ...` in `openai.ts` and `google.ts` WSL directory checks.
+
+---
+
+## SECURITY FIXES (v2.3.0)
+
+### ~~SEC-005: XOR encryption too weak for secrets~~ FIXED
+**Status:** FIXED (v2.3.0)
+**Fix:** `SecretsManager` now uses Fernet (AES-128-CBC + HMAC-SHA256) via `cryptography` package. Key derived with PBKDF2-HMAC-SHA256 (100k iterations). Old XOR data still readable via fallback. Prefix detection (`fernet:`) distinguishes new vs. old ciphertext.
+
+### ~~SEC-006: /api/send accessible from external hosts~~ FIXED
+**Status:** FIXED (v2.3.0)
+**Fix:** Added localhost guard at top of `send_message`. Requests from non-127.0.0.1/::1 clients get HTTP 403. Prevents external message injection via tunnel/LAN.
+
+### ~~SEC-007: Webhook delivery vulnerable to SSRF~~ FIXED
+**Status:** FIXED (v2.3.0)
+**Fix:** `_deliver_webhooks` now calls `_is_private_url()` before each outbound POST. Private/loopback/link-local URLs are blocked and logged.
+
+### ~~SEC-008: WebSocket has no auth for external connections~~ FIXED
+**Status:** FIXED (v2.3.0)
+**Fix:** Non-localhost WebSocket clients must supply `?token=<token>`. Token generated at startup via `secrets.token_urlsafe(32)`, served at `GET /api/ws-token` (localhost only).
+
+### ~~SEC-009: MCP auto-approve too broad — fires on any "ghostlink" mention~~ FIXED
+**Status:** FIXED (v2.3.0)
+**Fix:** Replaced loose substring check with `_GHOSTLINK_MCP_RE` regex that matches `ghostlink/tool_name` format only.
+
+### ~~SEC-010: Plugin safety scanner only checked 3 patterns~~ FIXED
+**Status:** FIXED (v2.3.0)
+**Fix:** `install_plugin` now uses `SafetyScanner` (AST-based) from `plugin_sdk` first. Falls back to 8-pattern string check if unavailable.
