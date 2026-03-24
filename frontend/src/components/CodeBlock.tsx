@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 interface CodeBlockProps {
   code: string;
   language?: string;
+  highlighted?: ReactNode;
 }
 
-export function CodeBlock({ code, language }: CodeBlockProps) {
+export function CodeBlock({ code, language, highlighted }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -46,12 +47,14 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
       </div>
       <div className="bg-surface-container-lowest p-4 overflow-x-auto">
         <pre className="text-xs font-mono text-on-surface-variant leading-relaxed">
-          <code>{code.split('\n').map((line, i) => (
-            <div key={i} className="flex">
-              <span className="inline-block w-8 text-right mr-4 text-on-surface-variant/20 select-none shrink-0">{i + 1}</span>
-              <span>{line}</span>
-            </div>
-          ))}</code>
+          <code className={language ? `hljs language-${language}` : undefined}>
+            {highlighted || code.split('\n').map((line, i) => (
+              <div key={i} className="flex">
+                <span className="inline-block w-8 text-right mr-4 text-on-surface-variant/20 select-none shrink-0">{i + 1}</span>
+                <span>{line}</span>
+              </div>
+            ))}
+          </code>
         </pre>
       </div>
     </div>

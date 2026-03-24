@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import { CodeBlock } from './CodeBlock';
 import { DecisionCard } from './DecisionCard';
 import { JobProposal } from './JobProposal';
@@ -229,7 +230,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             ) : (
               <>
                 <div className="prose">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ code: MdCode, p: MdParagraph }}>{displayText}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={{ code: MdCode, p: MdParagraph }}>{displayText}</ReactMarkdown>
                 </div>
                 {message.text.length > COLLAPSE_THRESHOLD && (
                   <button
@@ -293,7 +294,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           }}
         >
           <div className="prose">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ code: MdCode, p: MdParagraph }}>{displayText}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={{ code: MdCode, p: MdParagraph }}>{displayText}</ReactMarkdown>
           </div>
           {message.text.length > COLLAPSE_THRESHOLD && (
             <button
@@ -419,10 +420,15 @@ function MdParagraph(props: any) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function MdCode(props: any) {
-  const { className, children, ...rest } = props;
+  const { className, children, node, ...rest } = props;
   const match = /language-(\w+)/.exec(className || '');
   const codeStr = String(children).replace(/\n$/, '');
-  if (match) return <CodeBlock code={codeStr} language={match[1]} />;
+  // For fenced code blocks: pass highlighted HTML from rehype-highlight
+  if (match) {
+    // rehype-highlight adds hljs classes to the children — pass raw HTML
+    const hasHljs = typeof children === 'object';
+    return <CodeBlock code={codeStr} language={match[1]} highlighted={hasHljs ? props.children : undefined} />;
+  }
   return <code className={className} {...rest}>{children}</code>;
 }
 

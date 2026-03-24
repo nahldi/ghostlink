@@ -1,5 +1,18 @@
 # GhostLink Changelog
 
+## v2.7.0 — 2026-03-24
+
+### Frontend
+- **Syntax highlighting** (`ChatMessage.tsx`, `CodeBlock.tsx`): Wired up `rehype-highlight` (already installed) to `ReactMarkdown`. Code blocks now render with colored syntax tokens via highlight.js `atom-one-dark` theme. Supports JS, Python, TS, HTML, CSS, bash, JSON, and 180+ other languages.
+- **Skeleton fix** (`Skeleton.tsx`): Replaced undefined `--bg-tertiary` CSS variable with themed `bg-outline-variant/15` for proper visibility across all themes.
+- **AnimatePresence on all panels** (`App.tsx`): Settings, Jobs, Rules panels now slide in/out with spring physics. Search, Shortcuts, Help, Session modals fade+scale. Mobile panel slides up/down. All exit animations work correctly.
+- **MotionConfig reducedMotion** (`App.tsx`): Added `<MotionConfig reducedMotion="user">` at app root. Framer Motion now respects OS `prefers-reduced-motion` setting.
+
+### Desktop
+- **Version bump**: `2.6.0` → `2.7.0`
+
+---
+
 ## v2.6.0 — 2026-03-24
 
 ### Bug Fixes

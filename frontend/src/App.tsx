@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { useChatStore } from './stores/chatStore';
 import { useWebSocket } from './hooks/useWebSocket';
 import { api } from './lib/api';
@@ -228,43 +229,61 @@ function ScrollArrow() {
 function RightPanel() {
   const panel = useChatStore((s) => s.sidebarPanel);
   const setSidebarPanel = useChatStore((s) => s.setSidebarPanel);
-  if (!panel) return null;
   return (
-    <>
-      {/* Click-away backdrop */}
-      <div className="fixed inset-0 z-[29] max-lg:hidden" onClick={() => setSidebarPanel(null)} />
-      <aside className="w-80 h-screen glass-strong fixed right-0 top-0 z-30 max-lg:hidden flex flex-col">
-        {/* Close button */}
-        <button
-          onClick={() => setSidebarPanel(null)}
-          className="absolute top-3 right-3 z-10 p-1.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant/40 hover:text-on-surface-variant/70 transition-colors"
-          title="Close panel"
-        >
-          <span className="material-symbols-outlined text-[18px]">close</span>
-        </button>
-        {panel === 'jobs' && <JobsPanel />}
-        {panel === 'rules' && <RulesPanel />}
-        {panel === 'settings' && <SettingsPanel />}
-      </aside>
-    </>
+    <AnimatePresence>
+      {panel && (
+        <>
+          <div className="fixed inset-0 z-[29] max-lg:hidden" onClick={() => setSidebarPanel(null)} />
+          <motion.aside
+            key="right-panel"
+            initial={{ x: 320, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 320, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="w-80 h-screen glass-strong fixed right-0 top-0 z-30 max-lg:hidden flex flex-col"
+          >
+            <button
+              onClick={() => setSidebarPanel(null)}
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant/40 hover:text-on-surface-variant/70 transition-colors"
+              title="Close panel"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+            {panel === 'jobs' && <JobsPanel />}
+            {panel === 'rules' && <RulesPanel />}
+            {panel === 'settings' && <SettingsPanel />}
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 
 function MobilePanel() {
   const panel = useChatStore((s) => s.sidebarPanel);
-  if (!panel) return null;
   return (
-    <div className="lg:hidden fixed inset-0 z-50 bg-surface/95 backdrop-blur-xl overflow-y-auto pt-14">
-      <button
-        onClick={() => useChatStore.getState().setSidebarPanel(null)}
-        className="absolute top-3 right-3 p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant/40"
-      >
-        <span className="material-symbols-outlined">close</span>
-      </button>
-      {panel === 'jobs' && <JobsPanel />}
-      {panel === 'rules' && <RulesPanel />}
-      {panel === 'settings' && <SettingsPanel />}
-    </div>
+    <AnimatePresence>
+      {panel && (
+        <motion.div
+          key="mobile-panel"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="lg:hidden fixed inset-0 z-50 bg-surface/95 backdrop-blur-xl overflow-y-auto pt-14"
+        >
+          <button
+            onClick={() => useChatStore.getState().setSidebarPanel(null)}
+            className="absolute top-3 right-3 p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant/40"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          {panel === 'jobs' && <JobsPanel />}
+          {panel === 'rules' && <RulesPanel />}
+          {panel === 'settings' && <SettingsPanel />}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -491,20 +510,46 @@ function AppInner() {
 
       <RightPanel />
       <MobilePanel />
-      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
-      {showShortcuts && <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />}
+      <AnimatePresence>
+        {showSearch && (
+          <motion.div key="search-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
+            <SearchModal onClose={() => setShowSearch(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showShortcuts && (
+          <motion.div key="shortcuts-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
+            <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
       <ConnectionBanner />
       <OnboardingTour />
-      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
-      {showSessionLauncher && <SessionLauncher onClose={() => setShowSessionLauncher(false)} />}
+      <AnimatePresence>
+        {showHelp && (
+          <motion.div key="help-panel" initial={{ opacity: 0, x: 320 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 320 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
+            <HelpPanel onClose={() => setShowHelp(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showSessionLauncher && (
+          <motion.div key="session-launcher" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
+            <SessionLauncher onClose={() => setShowSessionLauncher(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <AppInner />
-    </ErrorBoundary>
+    <MotionConfig reducedMotion="user">
+      <ErrorBoundary>
+        <AppInner />
+      </ErrorBoundary>
+    </MotionConfig>
   );
 }

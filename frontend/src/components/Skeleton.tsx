@@ -13,7 +13,7 @@ interface SkeletonProps {
 export function Skeleton({ className = '', width = '100%', height = '1rem' }: SkeletonProps) {
   return (
     <motion.div
-      className={`rounded bg-[var(--bg-tertiary)] ${className}`}
+      className={`rounded bg-outline-variant/15 ${className}`}
       style={{ width, height }}
       animate={{ opacity: [0.3, 0.6, 0.3] }}
       transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
