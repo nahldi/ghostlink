@@ -44,6 +44,8 @@ async def register_agent(request: Request):
     if not base:
         return JSONResponse({"error": "base required"}, 400)
     inst = deps.registry.register(base, label, color)
+    if hasattr(deps, "worktree_manager") and deps.worktree_manager:
+        deps.worktree_manager.create_worktree(inst.name)
     if wrapper_pid is not None:
         try:
             pid_int = int(wrapper_pid)
@@ -62,6 +64,9 @@ async def register_agent(request: Request):
 @router.post("/api/deregister/{name}")
 async def deregister_agent(name: str):
     import mcp_bridge
+    if hasattr(deps, "worktree_manager") and deps.worktree_manager:
+        deps.worktree_manager.merge_changes(name)
+        deps.worktree_manager.remove_worktree(name)
     ok = deps.registry.deregister(name)
     if ok:
         mcp_bridge.cleanup_agent(name)
@@ -305,6 +310,9 @@ async def spawn_agent(request: Request):
 async def kill_agent(name: str):
     """Kill a specific agent by name."""
     import mcp_bridge
+    if hasattr(deps, "worktree_manager") and deps.worktree_manager:
+        deps.worktree_manager.merge_changes(name)
+        deps.worktree_manager.remove_worktree(name)
     ok = deps.registry.deregister(name)
     if ok:
         mcp_bridge.cleanup_agent(name)
