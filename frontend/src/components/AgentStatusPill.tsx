@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Agent } from '../types';
 import { AgentIcon } from './AgentIcon';
 import { AgentInfoPanel } from './AgentInfoPanel';
@@ -18,10 +19,13 @@ export function AgentStatusPill({ agent }: { agent: Agent }) {
       >
         <div className="relative">
           <AgentIcon base={agent.base} color={isOffline ? '#6b6580' : agent.color} size={32} />
-          <div
-            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-[1.5px] transition-all ${
-              isOnline ? 'bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.5)]' : 'bg-gray-600'
-            }`}
+          <motion.div
+            animate={{
+              backgroundColor: isOnline ? 'rgb(74, 222, 128)' : 'rgb(75, 70, 96)',
+              boxShadow: isOnline ? '0 0 5px rgba(74,222,128,0.5)' : '0 0 0px transparent',
+            }}
+            transition={{ duration: 0.4, ease: 'easeInOut' }}
+            className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-[1.5px]"
             style={{ borderColor: '#08080f' }}
           />
         </div>
@@ -29,9 +33,18 @@ export function AgentStatusPill({ agent }: { agent: Agent }) {
           <div className={`text-xs font-semibold truncate ${isOffline ? 'text-on-surface-variant/50' : 'text-on-surface'}`}>
             {agent.label}
           </div>
-          <div className={`text-[10px] truncate ${isOffline ? 'text-on-surface-variant/40' : 'text-on-surface-variant/40'}`}>
-            {isOffline ? 'Offline' : agent.role || providerTag(agent.base)}
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={agent.state}
+              initial={{ opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -3 }}
+              transition={{ duration: 0.18 }}
+              className="text-[10px] truncate text-on-surface-variant/40"
+            >
+              {isOffline ? 'Offline' : agent.role || providerTag(agent.base)}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </button>
       {showInfo && <AgentInfoPanel agent={agent} onClose={() => setShowInfo(false)} />}

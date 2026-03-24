@@ -48,17 +48,25 @@ function parseReactions(raw: unknown): Record<string, string[]> {
 
 function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
   return (
-    <div className="absolute bottom-full mb-1 left-0 z-50 flex gap-0.5 bg-surface-container-high border border-outline-variant/20 rounded-lg p-1 shadow-xl">
+    <motion.div
+      initial={{ scale: 0.8, opacity: 0, y: 4 }}
+      animate={{ scale: 1, opacity: 1, y: 0 }}
+      exit={{ scale: 0.8, opacity: 0, y: 4 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      className="absolute bottom-full mb-1 left-0 z-50 flex gap-0.5 bg-surface-container-high border border-outline-variant/20 rounded-lg p-1 shadow-xl"
+    >
       {REACTION_EMOJIS.map((e) => (
-        <button
+        <motion.button
           key={e}
           onClick={() => { onPick(e); onClose(); }}
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
           className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-surface-container-highest text-sm transition-colors"
         >
           {e}
-        </button>
+        </motion.button>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
@@ -194,7 +202,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
             <MsgAction icon="delete" title="Select to delete" danger onClick={() => { setSelectMode(true); toggleSelected(message.id); }} />
           </>}
-          {showPicker && <ReactionPicker onPick={handleReact} onClose={() => setShowPicker(false)} />}
+          <AnimatePresence>{showPicker && <ReactionPicker onPick={handleReact} onClose={() => setShowPicker(false)} />}</AnimatePresence>
         </div>
         <div className="max-w-[70%] lg:max-w-[55%]">
           <div className="flex items-center justify-end gap-2 mb-0.5">
@@ -330,7 +338,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <MsgAction icon="push_pin" title={message.pinned ? 'Unpin' : 'Pin'} active={message.pinned} onClick={handlePin} />
             <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
             <MsgAction icon="delete" title="Select to delete" danger onClick={() => { setSelectMode(true); toggleSelected(message.id); }} />
-            {showPicker && <ReactionPicker onPick={handleReact} onClose={() => setShowPicker(false)} />}
+            <AnimatePresence>{showPicker && <ReactionPicker onPick={handleReact} onClose={() => setShowPicker(false)} />}</AnimatePresence>
           </div>
         )}
       </div>
@@ -342,8 +350,11 @@ function MsgAction({ icon, title, onClick, active, danger }: {
   icon: string; title: string; onClick: () => void; active?: boolean; danger?: boolean;
 }) {
   return (
-    <button
+    <motion.button
       onClick={onClick}
+      whileHover={{ scale: 1.15, y: -1 }}
+      whileTap={{ scale: 0.85 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
       className={`p-1 rounded-md transition-colors ${
         danger ? 'text-on-surface-variant/20 hover:text-red-400 hover:bg-red-400/10'
         : active ? 'text-tertiary'
@@ -352,7 +363,7 @@ function MsgAction({ icon, title, onClick, active, danger }: {
       title={title}
     >
       <span className="material-symbols-outlined text-[13px]">{icon}</span>
-    </button>
+    </motion.button>
   );
 }
 

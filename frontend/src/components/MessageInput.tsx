@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { motion } from 'framer-motion';
 import { useChatStore } from '../stores/chatStore';
 import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
 import { api } from '../lib/api';
@@ -821,13 +822,15 @@ export function MessageInput() {
             </span>
           </button>
         )}
-        <button
+        <motion.button
           onClick={handleSend}
           disabled={!text.trim()}
-          className="p-2 rounded-lg bg-primary-container text-primary-fixed hover:brightness-110 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+          whileTap={{ scale: 0.88 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+          className="p-2 rounded-lg bg-primary-container text-primary-fixed hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
         >
           <span className="material-symbols-outlined text-xl">send</span>
-        </button>
+        </motion.button>
       </div>
     </div>
   );
