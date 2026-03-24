@@ -102,6 +102,8 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
   const [error, setError] = useState('');
   const [pickingFolder, setPickingFolder] = useState(false);
   const [persistent, setPersistent] = useState(true);
+  const [bridgePlatform, setBridgePlatform] = useState('');
+  const [bridgeToken, setBridgeToken] = useState('');
   const agents = useChatStore((s) => s.agents);
   const setAgents = useChatStore((s) => s.setAgents);
   const updateSettings = useChatStore((s) => s.updateSettings);
@@ -170,6 +172,17 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
       }
 
       await api.spawnAgent(selected, finalLabel, finalCwd, finalArgs);
+
+      // v3.7.0: Configure bridge if selected
+      if (bridgePlatform && bridgeToken) {
+        try {
+          await api.configureBridge(bridgePlatform, { token: bridgeToken });
+          await api.startBridge(bridgePlatform);
+        } catch (e) {
+          console.warn('Bridge config after spawn:', e instanceof Error ? e.message : String(e));
+        }
+      }
+
       // v2.5.1: Use ref for cleanup on unmount
       spawnTimerRef.current = setTimeout(async () => {
         try {
@@ -370,6 +383,69 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
                     ))}
                   </div>
                 </Section>
+              )}
+            </div>
+          </details>
+
+          {/* Bridge Connection — connect agent to external chat platform */}
+          <details className="group">
+            <summary className="text-[10px] font-semibold text-on-surface-variant/40 uppercase tracking-wider cursor-pointer hover:text-on-surface-variant/60 select-none flex items-center gap-1 py-1">
+              <span className="material-symbols-outlined text-[14px] transition-transform group-open:rotate-90">chevron_right</span>
+              Bridge Connection
+              <span className="text-[8px] text-on-surface-variant/25 ml-1 font-normal normal-case tracking-normal">optional — connect to Discord, Telegram, etc.</span>
+            </summary>
+            <div className="space-y-3 mt-3">
+              <div className="text-[10px] text-on-surface-variant/40 mb-2">
+                Connect this agent to an external chat platform. Messages will sync bidirectionally.
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {([
+                  { id: '', icon: 'block', label: 'None' },
+                  { id: 'discord', icon: '🎮', label: 'Discord' },
+                  { id: 'telegram', icon: '✈️', label: 'Telegram' },
+                  { id: 'slack', icon: '💬', label: 'Slack' },
+                  { id: 'whatsapp', icon: '📱', label: 'WhatsApp' },
+                ] as const).map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => { setBridgePlatform(b.id); if (!b.id) setBridgeToken(''); }}
+                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl transition-all text-center ${
+                      bridgePlatform === b.id
+                        ? 'ring-1 ring-primary/30 bg-primary/8'
+                        : 'bg-surface-container/30 hover:bg-surface-container/50'
+                    }`}
+                  >
+                    {b.id ? (
+                      <span className="text-base">{b.icon}</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-base text-on-surface-variant/30">{b.icon}</span>
+                    )}
+                    <span className="text-[8px] font-medium text-on-surface-variant/60">{b.label}</span>
+                  </button>
+                ))}
+              </div>
+              {bridgePlatform && (
+                <div className="space-y-2">
+                  <Section label={`${bridgePlatform.charAt(0).toUpperCase() + bridgePlatform.slice(1)} Bot Token`}>
+                    <input
+                      type="password"
+                      value={bridgeToken}
+                      onChange={(e) => setBridgeToken(e.target.value)}
+                      placeholder={bridgePlatform === 'discord' ? 'Bot token from Discord Developer Portal' :
+                                   bridgePlatform === 'telegram' ? 'Bot token from @BotFather' :
+                                   bridgePlatform === 'slack' ? 'Incoming webhook URL' :
+                                   'API token'}
+                      className="setting-input text-[12px] font-mono"
+                    />
+                  </Section>
+                  <div className="text-[9px] text-on-surface-variant/30 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">info</span>
+                    {bridgePlatform === 'discord' ? 'Get a bot token at discord.com/developers → Bot → Token' :
+                     bridgePlatform === 'telegram' ? 'Message @BotFather on Telegram → /newbot → copy token' :
+                     bridgePlatform === 'slack' ? 'Create an incoming webhook at api.slack.com/apps' :
+                     'Get your API credentials from the platform dashboard'}
+                  </div>
+                </div>
               )}
             </div>
           </details>
