@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-23
-**Version:** v2.1.4
+**Version:** v2.2.0
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,7 +66,7 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v2.1.0)
+## CURRENT STATE (v2.2.0)
 
 ### Numbers
 - **90+ completed features** (see FEATURES.md for full list)
@@ -318,7 +318,7 @@ npm run build:win   # Windows .exe
 
 ## KNOWN ISSUES
 
-See BUGS.md for full list. 52 bugs fixed as of v2.1.0. Remaining open items:
+See BUGS.md for full list. 52 bugs fixed as of v2.2.0. Remaining open items:
 - BUG-007: OneDrive paths need /tmp copy (handled but slow)
 - BUG-011: Frontend dist path mismatch in packaged app (fallback exists)
 - ARCH-003: Desktop app requires WSL on Windows (no native Python support yet)
