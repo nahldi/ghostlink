@@ -101,10 +101,20 @@ def _ensure_loop():
 
 
 def _run_async(coro):
-    """Run an async coroutine from sync context using our dedicated loop."""
+    """Run an async coroutine from sync context using our dedicated loop.
+
+    Times out after 5 seconds to prevent MCP tool handlers from blocking indefinitely
+    if the main event loop is slow or a broadcast callback hangs (backpressure guard).
+    """
+    import concurrent.futures
     _ensure_loop()
     future = asyncio.run_coroutine_threadsafe(coro, _loop)
-    return future.result(timeout=10)
+    try:
+        return future.result(timeout=5)
+    except concurrent.futures.TimeoutError:
+        future.cancel()
+        log.warning("_run_async: coroutine timed out after 5s (backpressure)")
+        raise TimeoutError("MCP bridge async operation timed out")
 
 
 # ── Helpers ─────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ How it works:
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -226,7 +227,7 @@ def _apply_mcp_inject(
         template = inject_cfg.get("mcp_proxy_flag_template",
                                   '-c mcp_servers.{server}.url="{url}"')
         expanded = template.format(server=SERVER_NAME, url=proxy_url or "")
-        launch_args = expanded.split()
+        launch_args = shlex.split(expanded)  # shlex handles quoted URLs with spaces/special chars
 
     return launch_args, inject_env, settings_path
 
@@ -235,7 +236,9 @@ def _apply_mcp_inject(
 
 def _register(server_port: int, base: str, label: str = "") -> dict:
     import urllib.request
-    body = json.dumps({"base": base, "label": label}).encode()
+    # Include our own pid so the server can link this process to the registered name.
+    # This fixes the {base}_{pid} keying race in process tracking.
+    body = json.dumps({"base": base, "label": label, "pid": os.getpid()}).encode()
     req = urllib.request.Request(
         f"http://127.0.0.1:{server_port}/api/register",
         method="POST",
@@ -907,17 +910,23 @@ def main():
 
     threading.Thread(target=_activity_monitor, daemon=True).start()
 
-    # Approval prompt watcher — detects CLI permission prompts in tmux
+    # Approval prompt watcher — detects CLI permission prompts in tmux.
+    # Skip when --dangerously-skip-permissions is active (all prompts auto-approved).
     session_name = f"ghostlink-{assigned_name}"
-    threading.Thread(
-        target=_approval_watcher,
-        args=(session_name, get_identity, agent),
-        kwargs={
-            "server_port": server_port,
-            "data_dir": data_dir,
-        },
-        daemon=True,
-    ).start()
+    _auto_approve = any(
+        "dangerously-skip-permissions" in a
+        for a in (extra + agent_args)
+    )
+    if not _auto_approve:
+        threading.Thread(
+            target=_approval_watcher,
+            args=(session_name, get_identity, agent),
+            kwargs={
+                "server_port": server_port,
+                "data_dir": data_dir,
+            },
+            daemon=True,
+        ).start()
 
     # Run agent
     from wrapper_unix import get_activity_checker, run_agent

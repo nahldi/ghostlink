@@ -1,8 +1,8 @@
 """GhostLink — FastAPI backend with WebSocket hub."""
 
-__version__ = "2.6.0"
-
 from __future__ import annotations
+
+__version__ = "2.9.0"
 
 import json
 import os
@@ -40,9 +40,16 @@ from fastapi.staticfiles import StaticFiles
 log = logging.getLogger(__name__)
 
 # Track spawned agent processes
+# After spawn, processes are in _pending_spawns[pid] until the wrapper registers.
+# On registration the process moves to _agent_processes[registered_name].
 _agent_processes: dict[str, subprocess.Popen] = {}
+_pending_spawns: dict[int, subprocess.Popen] = {}
 _agent_lock = asyncio.Lock()
 _last_heartbeats: dict[str, float] = {}
+
+# Module-level agent availability cache — avoids re-running slow WSL checks on every call
+_AGENT_DETECTION_CACHE: dict[str, tuple[bool, float]] = {}
+_AGENT_DETECTION_CACHE_TTL = 60.0
 
 
 def _drain_pipe(pipe, agent_base: str, buf: list | None = None) -> None:
@@ -994,28 +1001,30 @@ async def create_channel(request: Request):
     name = body.get("name", "").strip().lower()
     if not name or len(name) > 20:
         return JSONResponse({"error": "invalid name"}, 400)
-    channels = _settings.get("channels", ["general"])
-    if name in channels:
-        return JSONResponse({"error": "exists"}, 409)
-    if len(channels) >= 8:
-        return JSONResponse({"error": "max 8 channels"}, 400)
-    channels.append(name)
-    _settings["channels"] = channels
-    _save_settings()
+    async with _settings_lock:
+        channels = list(_settings.get("channels", ["general"]))
+        if name in channels:
+            return JSONResponse({"error": "exists"}, 409)
+        if len(channels) >= 8:
+            return JSONResponse({"error": "max 8 channels"}, 400)
+        channels.append(name)
+        _settings["channels"] = channels
+        _save_settings()
     await broadcast("channel_update", {"channels": [{"name": c, "unread": 0} for c in channels]})
     return {"channels": channels}
 
 
 @app.delete("/api/channels/{name}")
 async def delete_channel(name: str):
-    channels = _settings.get("channels", ["general"])
     if name == "general":
         return JSONResponse({"error": "cannot delete general"}, 400)
-    if name not in channels:
-        return JSONResponse({"error": "not found"}, 404)
-    channels.remove(name)
-    _settings["channels"] = channels
-    _save_settings()
+    async with _settings_lock:
+        channels = list(_settings.get("channels", ["general"]))
+        if name not in channels:
+            return JSONResponse({"error": "not found"}, 404)
+        channels.remove(name)
+        _settings["channels"] = channels
+        _save_settings()
     await broadcast("channel_update", {"channels": [{"name": c, "unread": 0} for c in channels]})
     return {"channels": channels}
 
@@ -1026,15 +1035,16 @@ async def rename_channel(name: str, request: Request):
     new_name = body.get("name", "").strip().lower()
     if not new_name or len(new_name) > 20:
         return JSONResponse({"error": "invalid name"}, 400)
-    channels = _settings.get("channels", ["general"])
-    if name not in channels:
-        return JSONResponse({"error": "not found"}, 404)
-    if new_name in channels:
-        return JSONResponse({"error": "name already exists"}, 409)
-    idx = channels.index(name)
-    channels[idx] = new_name
-    _settings["channels"] = channels
-    _save_settings()
+    async with _settings_lock:
+        channels = list(_settings.get("channels", ["general"]))
+        if name not in channels:
+            return JSONResponse({"error": "not found"}, 404)
+        if new_name in channels:
+            return JSONResponse({"error": "name already exists"}, 409)
+        idx = channels.index(name)
+        channels[idx] = new_name
+        _settings["channels"] = channels
+        _save_settings()
     # Update messages in the renamed channel
     await store.rename_channel(name, new_name)
     await broadcast("channel_update", {"channels": [{"name": c, "unread": 0} for c in channels]})
@@ -1101,9 +1111,22 @@ async def register_agent(request: Request):
     base = body.get("base", body.get("name", ""))
     label = body.get("label", "")
     color = body.get("color", "")
+    wrapper_pid = body.get("pid")  # wrapper sends its own pid so we can link process to name
     if not base:
         return JSONResponse({"error": "base required"}, 400)
     inst = registry.register(base, label, color)
+    # Move the pending spawn process into _agent_processes keyed by registered name.
+    # This lets kill_agent find the process by exact name, fixing the {base}_{pid} race.
+    if wrapper_pid is not None:
+        try:
+            pid_int = int(wrapper_pid)
+        except (TypeError, ValueError):
+            pid_int = None
+        if pid_int is not None:
+            async with _agent_lock:
+                proc = _pending_spawns.pop(pid_int, None)
+                if proc is not None:
+                    _agent_processes[inst.name] = proc
     await broadcast("status", {"agents": _get_full_agent_list()})
     return inst.to_dict()
 
@@ -1159,13 +1182,23 @@ async def agent_templates(connected: str = ""):
         return result
 
     def _check_available(name: str, cmd: str) -> bool:
+        # Module-level cache (60-second TTL) — avoids re-running slow WSL checks on every call
+        cached = _AGENT_DETECTION_CACHE.get(name)
+        if cached is not None and time.time() - cached[1] < _AGENT_DETECTION_CACHE_TTL:
+            return cached[0]
+
+        result = _do_check_available(name, cmd)
+        _AGENT_DETECTION_CACHE[name] = (result, time.time())
+        return result
+
+    def _do_check_available(name: str, cmd: str) -> bool:
         if _shutil.which(cmd):
             return True
         # Check API keys
         for key in _API_KEY_ENV.get(name, []):
             if os.environ.get(key):
                 return True
-        # Check in WSL — try multiple methods for maximum compatibility
+        # Check in WSL — use -ic (interactive+login) for full PATH including nvm/npm globals
         wsl_checks = [
             f'which {cmd} 2>/dev/null',
             f'command -v {cmd} 2>/dev/null',
@@ -1177,7 +1210,7 @@ async def agent_templates(connected: str = ""):
         for check in wsl_checks:
             try:
                 r = subprocess.run(
-                    ['wsl', 'bash', '-lc', check],
+                    ['wsl', 'bash', '-ic', check],
                     capture_output=True, timeout=8,
                 )
                 if r.returncode == 0 and r.stdout.strip():
@@ -1305,7 +1338,7 @@ async def spawn_agent(request: Request):
         found_in_wsl = False
         for check in [f'which {command} 2>/dev/null', f'command -v {command} 2>/dev/null']:
             try:
-                r = subprocess.run(['wsl', 'bash', '-lc', check], capture_output=True, timeout=8)
+                r = subprocess.run(['wsl', 'bash', '-ic', check], capture_output=True, timeout=8)
                 if r.returncode == 0 and r.stdout.strip():
                     found_in_wsl = True
                     break
@@ -1363,9 +1396,10 @@ async def spawn_agent(request: Request):
         _th.Thread(target=_drain_pipe, args=(proc.stdout, base), daemon=True).start()
         _th.Thread(target=_drain_pipe, args=(proc.stderr, base, _stderr_buf), daemon=True).start()
 
-        # Store by base name — wrapper will register with a unique instance name
+        # Store in pending spawns by pid — register_agent will move it to
+        # _agent_processes[registered_name] once the wrapper calls /api/register
         async with _agent_lock:
-            _agent_processes[f"{base}_{proc.pid}"] = proc
+            _pending_spawns[proc.pid] = proc
 
         import asyncio
         await asyncio.sleep(3)
@@ -1378,7 +1412,7 @@ async def spawn_agent(request: Request):
             error_msg = stderr_output or f"Agent '{base}' exited immediately. Is the '{command}' CLI installed and authenticated?"
             log.warning("Agent spawn failed for %s: %s", base, error_msg)
             async with _agent_lock:
-                _agent_processes.pop(f"{base}_{proc.pid}", None)
+                _pending_spawns.pop(proc.pid, None)
             return JSONResponse({"error": error_msg}, 400)
 
         return {
@@ -1424,6 +1458,16 @@ async def kill_agent(name: str):
             proc.terminate()
         except Exception as e:
             log.debug("Process terminate for %s: %s", name, e)
+        # SIGKILL escalation — if process ignores SIGTERM, force-kill after 5 seconds
+        async def _sigkill_escalation(_proc=proc, _name=name):
+            await asyncio.sleep(5)
+            try:
+                if _proc.poll() is None:
+                    _proc.kill()
+                    log.info("SIGKILL sent to %s (SIGTERM was ignored)", _name)
+            except Exception as _e:
+                log.debug("SIGKILL escalation for %s: %s", _name, _e)
+        asyncio.get_running_loop().create_task(_sigkill_escalation())
 
     if ok:
         await broadcast("status", {"agents": _get_full_agent_list()})
@@ -1473,15 +1517,26 @@ async def shutdown_server():
     """Gracefully stop the backend server. Kills all agents first, then exits."""
     import asyncio, signal
 
-    # Kill all running agents first
+    # Kill all running agents first (SIGTERM + SIGKILL escalation after 5s)
+    procs_to_kill = []
     async with _agent_lock:
         for inst in list(registry.get_all()):
             try:
                 proc = _agent_processes.get(inst.name)
                 if proc and proc.poll() is None:
                     proc.terminate()
+                    procs_to_kill.append(proc)
             except Exception as e:
                 log.debug("Shutdown: failed to terminate %s: %s", inst.name, e)
+    # Brief wait, then SIGKILL any survivors
+    if procs_to_kill:
+        await asyncio.sleep(5)
+        for proc in procs_to_kill:
+            try:
+                if proc.poll() is None:
+                    proc.kill()
+            except Exception:
+                pass
 
     # Broadcast shutdown notice to all connected WebSocket clients
     try:
@@ -1692,13 +1747,17 @@ async def respond_approval(request: Request):
     if response not in ("allow_once", "allow_session", "deny"):
         return JSONResponse({"error": "response must be allow_once, allow_session, or deny"}, 400)
 
-    # Write response file that the wrapper polls for
+    # Write response file that the wrapper polls for.
+    # Use atomic write (write to .tmp then os.replace) to prevent partial reads.
     response_file = DATA_DIR / f"{agent_name}_approval.json"
-    response_file.write_text(json.dumps({
+    response_data = json.dumps({
         "response": response,
         "message_id": message_id,
         "timestamp": time.time(),
-    }))
+    })
+    tmp_path = response_file.with_suffix(".tmp")
+    tmp_path.write_text(response_data)
+    os.replace(str(tmp_path), str(response_file))
 
     # Update the approval message metadata to mark it as responded
     if message_id and store._db:
@@ -3076,16 +3135,16 @@ async def import_snapshot(request: Request):
         "notificationSounds": lambda v: isinstance(v, bool),
         "autoRoute": lambda v: isinstance(v, (str, bool)),
     }
-    for k, validator in _safe_validators.items():
-        if k in imported_settings and validator(imported_settings[k]):
-            _settings[k] = imported_settings[k]
-
-    # Merge channels
-    existing = set(_settings.get("channels", ["general"]))
-    for ch in imported_channels:
-        existing.add(ch)
-    _settings["channels"] = sorted(existing)
-    _save_settings()
+    async with _settings_lock:
+        for k, validator in _safe_validators.items():
+            if k in imported_settings and validator(imported_settings[k]):
+                _settings[k] = imported_settings[k]
+        # Merge channels
+        existing = set(_settings.get("channels", ["general"]))
+        for ch in imported_channels:
+            existing.add(ch)
+        _settings["channels"] = sorted(existing)
+        _save_settings()
 
     # Import messages (skip duplicates by uid)
     if store._db is None:
@@ -3176,11 +3235,15 @@ async def create_dm_channel(request: Request):
     pair = sorted([agent1, agent2])
     dm_name = f"dm-{pair[0]}-{pair[1]}"
     # Add to channels if not exists
-    channels = _settings.get("channels", ["general"])
-    if dm_name not in channels:
-        channels.append(dm_name)
-        _settings["channels"] = channels
-        _save_settings()
+    broadcast_needed = False
+    async with _settings_lock:
+        channels = list(_settings.get("channels", ["general"]))
+        if dm_name not in channels:
+            channels.append(dm_name)
+            _settings["channels"] = channels
+            _save_settings()
+            broadcast_needed = True
+    if broadcast_needed:
         await broadcast("channel_update", {"channels": [{"name": c, "unread": 0} for c in channels]})
     return {"channel": dm_name, "agents": pair}
 

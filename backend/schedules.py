@@ -118,7 +118,8 @@ def cron_matches(cron_expr: str, ts: float | None = None) -> bool:
     import datetime
     if ts is None:
         ts = time.time()
-    dt = datetime.datetime.fromtimestamp(ts)
+    # Use UTC consistently so cron expressions behave the same regardless of server timezone
+    dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
     parts = cron_expr.strip().split()
     if len(parts) != 5:
         return False
