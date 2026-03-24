@@ -55,7 +55,8 @@ def cleanup_agent(name: str):
         _activity_ts.pop(name, None)
     with _cursors_lock:
         _cursors.pop(name, None)
-    _empty_read_count.pop(name, None)
+    with _presence_lock:
+        _empty_read_count.pop(name, None)
 
 
 def configure(
@@ -540,8 +541,9 @@ def chat_read(
 
     # Escalating empty-read hints to discourage polling loops
     if not serialized and sender:
-        _empty_read_count[sender] = _empty_read_count.get(sender, 0) + 1
-        n = _empty_read_count[sender]
+        with _presence_lock:
+            _empty_read_count[sender] = _empty_read_count.get(sender, 0) + 1
+            n = _empty_read_count[sender]
         if n == 1:
             serialized = "No new messages. Do not poll — wait for your next prompt."
         elif n == 2:
@@ -551,7 +553,8 @@ def chat_read(
             serialized = ("No new messages. STOP. Repeated empty reads waste tokens. "
                           "Wait for your next prompt.")
     elif sender:
-        _empty_read_count[sender] = 0
+        with _presence_lock:
+            _empty_read_count[sender] = 0
 
     return serialized
 
@@ -568,9 +571,33 @@ def chat_join(name: str, channel: str = "general", ctx: Context | None = None) -
 
 
 def chat_who(ctx: Context | None = None) -> str:
-    """Check who's currently online in GhostLink."""
+    """Check who's currently online in GhostLink. Returns each agent's name, label, role, and base type."""
     online = _get_online()
-    return f"Online: {', '.join(online)}" if online else "Nobody online."
+    if not online:
+        return "Nobody online."
+
+    # Enrich with agent metadata so agents know who their teammates are
+    lines = ["Online agents:"]
+    for name in online:
+        inst = _registry.get(name) if _registry else None
+        if inst:
+            parts = [f"  @{name}"]
+            if inst.label and inst.label != name:
+                parts.append(f'"{inst.label}"')
+            if inst.role:
+                parts.append(f"(role: {inst.role})")
+            if inst.base and inst.base != name:
+                parts.append(f"[{inst.base}]")
+            lines.append(" ".join(parts))
+        else:
+            lines.append(f"  @{name}")
+
+    # Also note non-agent users
+    if _settings:
+        username = _settings.get("username", "You")
+        lines.append(f"  @{username} (human user)")
+
+    return "\n".join(lines)
 
 
 def chat_channels(ctx: Context | None = None) -> str:

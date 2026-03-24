@@ -660,7 +660,7 @@ export function MessageInput() {
     } catch (e) {
       console.error('Send failed:', e);
     }
-  }, [text, activeChannel, settings.username, replyTo, setReplyTo, slashCommands]);
+  }, [text, activeChannel, settings.username, replyTo, setReplyTo, slashCommands, pendingAttachments]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Slash command picker navigation

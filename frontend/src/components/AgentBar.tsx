@@ -30,7 +30,9 @@ function AgentChip({ agent }: { agent: Agent }) {
       }
       const r = await api.getStatus();
       setAgents(r.agents);
-    } catch {}
+    } catch (err) {
+      console.warn('Agent action failed:', err instanceof Error ? err.message : String(err));
+    }
     setBusy(false);
   };
 

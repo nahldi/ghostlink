@@ -225,6 +225,8 @@ You have access to these GhostLink tools via MCP:
 3. Be conversational and helpful — this is a real-time chat, not a formal report
 4. If you see @{agent_name} or @all in messages, that's someone talking to you — respond!
 5. Keep responses concise for chat — save long outputs for when explicitly asked
+6. Use `chat_who` to see who else is online — you can @mention other agents to collaborate
+7. When you first connect, use `chat_join` to announce yourself, then `chat_who` to see your teammates
 """
 
 

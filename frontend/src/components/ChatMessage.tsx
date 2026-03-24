@@ -194,11 +194,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
   if (isUser) {
     // ── USER MESSAGE (right side) ──
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className={`group flex justify-end gap-2 py-1.5 msg-enter ${selectMode ? 'pl-2' : ''} ${isSelected ? 'bg-red-500/5' : ''}`}>
+      <div
+        className={`group flex justify-end gap-2 py-1.5 ${selectMode ? 'pl-2' : ''} ${isSelected ? 'bg-red-500/5' : ''}`}>
         {selectMode && (
           <button onClick={() => toggleSelected(message.id)} className="shrink-0 self-center">
             <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-red-500 border-red-500' : 'border-outline-variant/30 hover:border-red-400'}`}>
@@ -270,17 +267,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <ReactionBar reactions={reactions} messageId={message.id} username={settings.username} />
           </div>
         </div>
-      </motion.div>
+      </div>
     );
   }
 
   // ── AGENT MESSAGE (left side) ──
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`group flex gap-3 py-1.5 msg-enter ${isSelected ? 'bg-red-500/5' : ''}`}
+    <div
+      className={`group flex gap-3 py-1.5 ${isSelected ? 'bg-red-500/5' : ''}`}
       {...longPress}
     >
       {selectMode && (
@@ -393,7 +387,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
         </AnimatePresence>
       </div>
-    </motion.div>
+    </div>
   );
 }
 

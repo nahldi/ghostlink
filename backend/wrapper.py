@@ -152,6 +152,27 @@ _BUILTIN_DEFAULTS: dict[str, dict] = {
         "mcp_inject": "proxy_flag",
         "mcp_proxy_flag_template": '-c mcp_servers.{server}.url="{url}"',
     },
+    "grok": {
+        "mcp_inject": "flag",
+        "mcp_flag": "--mcp-config",
+        "mcp_transport": "http",
+        "mcp_merge_project": True,
+    },
+    "aider": {
+        # Aider doesn't natively support MCP — uses proxy
+        "mcp_inject": "proxy_flag",
+        "mcp_proxy_flag_template": "",
+    },
+    "goose": {
+        "mcp_inject": "env",
+        "mcp_env_var": "GOOSE_MCP_CONFIG",
+        "mcp_transport": "http",
+    },
+    "copilot": {
+        # gh copilot doesn't support MCP — uses proxy
+        "mcp_inject": "proxy_flag",
+        "mcp_proxy_flag_template": "",
+    },
 }
 
 _VALID_INJECT_MODES = {"settings_file", "env", "flag", "proxy_flag", "env_content"}
@@ -532,8 +553,34 @@ def _build_trigger_prompt(channel: str, agent_name: str, server_port: int,
     except Exception:
         pass
 
+    # Fetch online agents for peer awareness
+    online_agents = []
+    try:
+        url = f"http://127.0.0.1:{server_port}/api/status"
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            data = json.loads(resp.read())
+            for a in data.get("agents", []):
+                aname = a.get("name", "")
+                if aname and aname != agent_name and a.get("state") in ("active", "idle", "pending"):
+                    label = a.get("label", aname)
+                    role = a.get("role", "")
+                    base = a.get("base", "")
+                    desc = f"@{aname}"
+                    if label and label != aname:
+                        desc += f' "{label}"'
+                    if role:
+                        desc += f" ({role})"
+                    if base and base != aname:
+                        desc += f" [{base}]"
+                    online_agents.append(desc)
+    except Exception:
+        pass
+
     # Build the context
     parts = [f"[GhostLink #{channel}]"]
+
+    if online_agents:
+        parts.append(f"Online teammates: {', '.join(online_agents)}")
 
     if recent_msgs:
         parts.append("Recent messages:")
@@ -809,6 +856,30 @@ def main():
                     print(f"  Gemini system instruction injected")
                 except Exception as e:
                     print(f"  Warning: failed to inject Gemini system instruction: {e}")
+
+        elif agent in ("aider",):
+            # Aider reads .aider.conf.yml or AIDER_* env vars
+            # Write conventions file that aider reads automatically
+            conventions_file = project_dir / ".aider.conventions.md"
+            if not conventions_file.exists() or conventions_file.read_text("utf-8").startswith("# GhostLink Agent Context"):
+                conventions_file.write_text(context_content, "utf-8")
+                print(f"  Aider conventions: {conventions_file}")
+
+        elif agent in ("grok",):
+            # Grok: write instructions to .grok/instructions.md
+            grok_dir = project_dir / ".grok"
+            grok_dir.mkdir(parents=True, exist_ok=True)
+            instructions_file = grok_dir / "instructions.md"
+            if not instructions_file.exists() or instructions_file.read_text("utf-8").startswith("# GhostLink Agent Context"):
+                instructions_file.write_text(context_content, "utf-8")
+                print(f"  Grok instructions: {instructions_file}")
+
+        else:
+            # Generic fallback: write INSTRUCTIONS.md that many agents auto-discover
+            instructions_file = project_dir / "INSTRUCTIONS.md"
+            if not instructions_file.exists() or instructions_file.read_text("utf-8").startswith("# GhostLink Agent Context"):
+                instructions_file.write_text(context_content, "utf-8")
+                print(f"  Generic instructions: {instructions_file}")
 
     except Exception as e:
         print(f"  Warning: identity injection failed: {e}")

@@ -17,7 +17,11 @@ export function TypingIndicator({ channel }: { channel?: string }) {
       const active = Object.entries(channelTyping)
         .filter(([, ts]) => now - ts < 3000)
         .map(([name]) => name);
-      setVisible(active);
+      setVisible(prev => {
+        // Only update if the list actually changed to avoid re-renders
+        if (prev.length === active.length && prev.every((n, i) => n === active[i])) return prev;
+        return active;
+      });
     }, 500);
     return () => clearInterval(interval);
   }, [typingAgents, targetChannel]);

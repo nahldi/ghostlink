@@ -195,6 +195,18 @@ body {
   50% { box-shadow: 0 0 20px color-mix(in srgb, var(--agent-color) 25%, transparent); }
 }
 
+/* ── Thinking dots animation ── */
+.thinking-dots::after {
+  content: '...';
+  animation: thinking-dots-anim 1.4s steps(4, end) infinite;
+}
+@keyframes thinking-dots-anim {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
 /* ── Skeleton shimmer ── */
 @keyframes shimmer {
   0%   { background-position: -200% center; }

@@ -208,16 +208,24 @@ async def spawn_agent(request: Request):
     import shutil as _shutil
     if not _shutil.which(command):
         found_in_wsl = False
-        for check in [f'which {command} 2>/dev/null', f'command -v {command} 2>/dev/null']:
+        wsl_checks = [
+            f'which {command} 2>/dev/null',
+            f'command -v {command} 2>/dev/null',
+            f'npx --yes {command} --version 2>/dev/null && echo found',
+            f'test -f "$HOME/.nvm/versions/node/*/bin/{command}" 2>/dev/null && echo found',
+            f'ls $(npm root -g 2>/dev/null)/.bin/{command} 2>/dev/null',
+            f'pip show {command} 2>/dev/null && echo found',
+        ]
+        for check in wsl_checks:
             try:
-                r = subprocess.run(['wsl', 'bash', '-ic', check], capture_output=True, timeout=8)
+                r = subprocess.run(['wsl', 'bash', '-ic', check], capture_output=True, timeout=10)
                 if r.returncode == 0 and r.stdout.strip():
                     found_in_wsl = True
                     break
             except Exception:
                 pass
         if not found_in_wsl:
-            return JSONResponse({"error": f"'{command}' not found on PATH or in WSL"}, 400)
+            return JSONResponse({"error": f"'{command}' not found on PATH or in WSL. Install it first: check the agent's documentation for install instructions."}, 400)
 
     # Update in-memory config for this session
     if cwd or extra_args:

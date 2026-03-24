@@ -25,7 +25,7 @@ import { BulkDeleteBar } from './components/BulkDeleteBar';
 import { SoundManager } from './lib/sounds';
 import { SessionBar } from './components/SessionBar';
 import { SessionLauncher } from './components/SessionLauncher';
-import { ThinkingParticles } from './components/ThinkingParticles';
+// ThinkingParticles still used by AgentBar — keep export but not imported here
 
 const CONVERSATION_STARTERS = [
   { text: 'Ask @claude to review your code', icon: 'code' },
@@ -49,26 +49,26 @@ function ThinkingBubbles() {
         const agent = agents.find(a => a.name === agentName);
         const color = agent?.color || '#a78bfa';
         const label = agent?.label || agentName;
-        // Show last 8 non-empty lines of thinking output
-        const lines = stream.text.split('\n').filter(l => l.trim()).slice(-8);
+        // Show last 4 non-empty lines — keep it compact
+        const lines = stream.text.split('\n').filter(l => l.trim()).slice(-4);
 
         return (
-          <div key={agentName} className="flex gap-3 py-2 msg-enter">
-            <div className="relative w-8 h-8 rounded-full flex items-center justify-center shrink-0 agent-chip-thinking"
-              style={{ background: `${color}20`, '--agent-color': color } as React.CSSProperties}>
-              <span className="text-xs font-bold" style={{ color }}>{label[0]}</span>
-              <div className="agent-spin-border" />
-              <ThinkingParticles color={color} size={32} />
+          <div key={agentName} className="flex items-start gap-2.5 py-1.5">
+            <div className="relative w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+              style={{ background: `${color}15` }}>
+              <span className="text-[10px] font-bold" style={{ color }}>{label[0]}</span>
+              <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: color }} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
-                <span className="text-[9px] text-on-surface-variant/40 italic">thinking...</span>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-[10px] font-semibold" style={{ color }}>{label}</span>
+                <span className="thinking-dots text-[9px] text-on-surface-variant/30">thinking</span>
               </div>
-              <div className="bg-surface-container/30 rounded-xl px-3 py-2 border border-outline-variant/5">
-                <pre className="text-[10px] font-mono text-on-surface-variant/50 leading-relaxed whitespace-pre-wrap overflow-hidden max-h-[120px]">
-                  {lines.join('\n')}
-                </pre>
+              <div className="rounded-lg px-2.5 py-1.5 text-[10px] text-on-surface-variant/40 leading-relaxed overflow-hidden max-h-[72px]"
+                style={{ background: `${color}06`, border: `1px solid ${color}10` }}>
+                {lines.map((line, i) => (
+                  <div key={i} className="truncate">{line}</div>
+                ))}
               </div>
             </div>
           </div>
@@ -167,15 +167,6 @@ function ChatFeed() {
     prevMsgCount.current = channelMessages.length;
   }, [activeChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const listVariants = {
-    hidden: {},
-    visible: { transition: { staggerChildren: 0.025, delayChildren: 0 } },
-  };
-  const itemVariants = {
-    hidden:  { opacity: 0, y: 10, scale: 0.98 },
-    visible: { opacity: 1, y: 0,  scale: 1, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] } },
-  };
-
   return (
     <div ref={feedRef} onScroll={handleScroll} onWheel={handleScroll} data-chat-feed className="flex-1 overflow-y-auto overflow-x-hidden py-3 relative min-h-0">
       <div className="px-4 lg:px-6">
@@ -196,19 +187,13 @@ function ChatFeed() {
           ))}
         </>
       ) : (
-        // v2.9.0: Stagger on initial channel load only — key resets animation on channel switch
-        <motion.div
-          key={activeChannel}
-          variants={listVariants}
-          initial="hidden"
-          animate="visible"
-        >
+        // Render messages without stagger animation to prevent glitch/shake on rapid sends.
+        // Only new messages get a subtle entrance via AnimatePresence.
+        <div>
           {channelMessages.map((msg) => (
-            <motion.div key={msg.id} variants={itemVariants}>
-              <ChatMessage message={msg} />
-            </motion.div>
+            <ChatMessage key={msg.id} message={msg} />
           ))}
-        </motion.div>
+        </div>
       )}
       <ThinkingBubbles />
       </div>
