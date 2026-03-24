@@ -15,7 +15,7 @@ import pytest_asyncio
 def test_version():
     """Backend version string is set."""
     import app
-    assert app.__version__ == "2.9.0"
+    assert app.__version__ == "3.0.0"
 
 
 def test_imports_clean():
@@ -65,14 +65,14 @@ def test_rate_limit_deque_per_ip():
 
 def test_pending_spawns_exists():
     """_pending_spawns dict is present and separate from _agent_processes."""
-    from app import _agent_processes, _pending_spawns
+    from deps import _agent_processes, _pending_spawns
     assert isinstance(_pending_spawns, dict)
     assert _pending_spawns is not _agent_processes
 
 
 def test_agent_detection_cache_exists():
     """Module-level agent detection cache is present."""
-    from app import _AGENT_DETECTION_CACHE, _AGENT_DETECTION_CACHE_TTL
+    from deps import _AGENT_DETECTION_CACHE, _AGENT_DETECTION_CACHE_TTL
     assert isinstance(_AGENT_DETECTION_CACHE, dict)
     assert _AGENT_DETECTION_CACHE_TTL == 60.0
 
@@ -133,7 +133,7 @@ def test_approval_write_atomic(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_settings_lock_exists():
     """_settings_lock is an asyncio.Lock and is used for channel mutations."""
-    from app import _settings_lock
+    from deps import _settings_lock
     import asyncio
     assert isinstance(_settings_lock, asyncio.Lock)
 
