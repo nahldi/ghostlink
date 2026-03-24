@@ -959,6 +959,76 @@ input:focus, select:focus, textarea:focus {
   40% { transform: translateY(-4px); }
 }
 
+/* ── v2.4.0: Premium micro-interactions ─────────────────────────── */
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.hover-glow {
+  transition: box-shadow 0.3s ease;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(var(--accent-rgb, 168, 85, 247), 0.3);
+}
+
+.press-scale {
+  transition: transform 0.1s ease;
+}
+.press-scale:active {
+  transform: scale(0.97);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary, #333);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted, #888);
+}
+
+/* Focus ring animation */
+*:focus-visible {
+  outline: 2px solid var(--accent, #a855f7);
+  outline-offset: 2px;
+  border-radius: 4px;
+  transition: outline-offset 0.15s ease;
+}
+
+/* Smooth theme transitions */
+body, .theme-transition {
+  transition: background-color 0.3s ease, color 0.2s ease, border-color 0.3s ease;
+}
+
+/* Typing dots animation */
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+.typing-dot {
+  animation: typing-bounce 1.4s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Skeleton pulse */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

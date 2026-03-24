@@ -68,6 +68,10 @@ class MessageStore:
     async def init(self):
         self._db = await aiosqlite.connect(self.db_path)
         self._db.row_factory = aiosqlite.Row
+        # v2.4.0: WAL mode for better concurrent read performance
+        await self._db.execute("PRAGMA journal_mode=WAL")
+        await self._db.execute("PRAGMA synchronous=NORMAL")
+        await self._db.execute("PRAGMA cache_size=-64000")  # 64MB cache
         await self._db.executescript(DB_SCHEMA)
         await self._db.commit()
         # Migrate: add reactions column if missing

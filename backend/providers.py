@@ -6,6 +6,7 @@ for each capability, and falls back to free alternatives when possible.
 
 import json
 import os
+import time
 import logging
 from pathlib import Path
 
@@ -122,19 +123,93 @@ PROVIDERS = {
             "deepseek-coder-v2": {"label": "DeepSeek Coder v2", "tier": "code"},
         },
     },
+    # v2.4.0: New providers
+    "mistral": {
+        "name": "Mistral AI",
+        "env_keys": ["MISTRAL_API_KEY"],
+        "capabilities": ["chat", "code", "vision"],
+        "setup_url": "https://console.mistral.ai/",
+        "setup_instructions": "1. Sign up at console.mistral.ai\n2. Go to API Keys\n3. Create a new key\n4. Paste it here",
+        "models": {
+            "mistral-large-latest": {"label": "Mistral Large", "tier": "premium"},
+            "codestral-latest": {"label": "Codestral", "tier": "code"},
+            "pixtral-large-latest": {"label": "Pixtral Large", "tier": "vision"},
+        },
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "env_keys": ["OPENROUTER_API_KEY"],
+        "capabilities": ["chat", "code", "vision", "image"],
+        "setup_url": "https://openrouter.ai/keys",
+        "setup_instructions": "1. Sign up at openrouter.ai\n2. Go to Keys\n3. Create a new key\n4. Paste it here\n\nAccess 200+ models with a single API key",
+        "models": {
+            "auto": {"label": "Auto (best available)", "tier": "standard"},
+        },
+    },
+    "deepseek": {
+        "name": "DeepSeek",
+        "env_keys": ["DEEPSEEK_API_KEY"],
+        "capabilities": ["chat", "code", "reasoning"],
+        "setup_url": "https://platform.deepseek.com/",
+        "setup_instructions": "1. Sign up at platform.deepseek.com\n2. Go to API Keys\n3. Create a new key\n4. Paste it here",
+        "models": {
+            "deepseek-chat": {"label": "DeepSeek Chat", "tier": "standard"},
+            "deepseek-reasoner": {"label": "DeepSeek Reasoner", "tier": "reasoning"},
+        },
+    },
+    "perplexity": {
+        "name": "Perplexity",
+        "env_keys": ["PERPLEXITY_API_KEY"],
+        "capabilities": ["chat", "search"],
+        "setup_url": "https://www.perplexity.ai/settings/api",
+        "setup_instructions": "1. Sign up at perplexity.ai\n2. Go to Settings > API\n3. Create a new key\n4. Paste it here\n\nSearch-augmented generation with real-time web access",
+        "models": {
+            "sonar-pro": {"label": "Sonar Pro", "tier": "premium"},
+            "sonar": {"label": "Sonar", "tier": "standard"},
+        },
+    },
+    "cohere": {
+        "name": "Cohere",
+        "env_keys": ["COHERE_API_KEY"],
+        "capabilities": ["chat", "embedding"],
+        "setup_url": "https://dashboard.cohere.com/api-keys",
+        "setup_instructions": "1. Sign up at cohere.com\n2. Go to Dashboard > API Keys\n3. Create a new key\n4. Paste it here\n\nEnterprise RAG with Command R+ and embeddings",
+        "models": {
+            "command-r-plus": {"label": "Command R+", "tier": "premium"},
+            "command-r": {"label": "Command R", "tier": "standard"},
+            "embed-english-v3.0": {"label": "Embed v3", "tier": "embedding"},
+        },
+    },
 }
 
 # Capability → provider preference order (best first)
 CAPABILITY_PRIORITY = {
-    "chat": ["anthropic", "openai", "google", "xai", "groq", "together", "huggingface", "ollama"],
-    "code": ["anthropic", "openai", "google", "ollama"],
-    "image": ["google", "openai", "together", "huggingface"],
+    "chat": ["anthropic", "openai", "google", "xai", "mistral", "deepseek", "perplexity", "cohere", "groq", "together", "huggingface", "openrouter", "ollama"],
+    "code": ["anthropic", "openai", "google", "mistral", "deepseek", "openrouter", "ollama"],
+    "image": ["google", "openai", "together", "huggingface", "openrouter"],
     "video": ["google"],
     "tts": ["google", "openai"],
     "stt": ["google", "openai", "groq", "huggingface"],
     "code_exec": ["google"],
-    "embedding": ["google", "openai", "ollama"],
+    "embedding": ["google", "openai", "cohere", "ollama"],
+    "vision": ["google", "openai", "mistral", "openrouter"],
+    "reasoning": ["openai", "deepseek"],
+    "search": ["perplexity"],
 }
+
+# ── v2.4.0: Model catalog cache ──────────────────────────────────────
+_model_cache: dict = {}
+_model_cache_ts: float = 0
+MODEL_CACHE_TTL = 300  # 5 minutes
+
+def get_cached_models() -> dict:
+    """Return cached provider listing (refreshes every 5 min)."""
+    global _model_cache, _model_cache_ts
+    if time.time() - _model_cache_ts < MODEL_CACHE_TTL and _model_cache:
+        return _model_cache
+    _model_cache = {name: p for name, p in PROVIDERS.items()}
+    _model_cache_ts = time.time()
+    return _model_cache
 
 
 class ProviderRegistry:
@@ -239,3 +314,19 @@ class ProviderRegistry:
             "total_configured": sum(1 for p in available if p["configured"]),
             "user_preferences": {k: v for k, v in self._user_config.items() if k.startswith("preferred_")},
         }
+
+    def resolve_with_failover(self, capability: str, exclude: list[str] | None = None) -> dict | None:
+        """v2.4.0: Try providers in priority order, skipping excluded ones.
+
+        Use after a provider returns an error to automatically fail over to the next.
+        """
+        exclude = exclude or []
+        for pid in CAPABILITY_PRIORITY.get(capability, []):
+            if pid in exclude or pid not in PROVIDERS:
+                continue
+            pdef = PROVIDERS[pid]
+            if capability not in pdef["capabilities"]:
+                continue
+            if self.get_api_key(pid) or pdef.get("local"):
+                return {"provider": pid, "name": pdef["name"], "models": pdef["models"]}
+        return None
