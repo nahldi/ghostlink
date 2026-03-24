@@ -1,4 +1,24 @@
+import { useEffect, useRef } from 'react';
 import { useChatStore } from '../stores/chatStore';
+
+function useAnimatedValue(target: number) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const prev = useRef(target);
+  useEffect(() => {
+    if (!ref.current || prev.current === target) return;
+    const el = ref.current;
+    el.style.transition = 'none';
+    el.style.transform = target > prev.current ? 'translateY(-4px)' : 'translateY(4px)';
+    el.style.opacity = '0.5';
+    requestAnimationFrame(() => {
+      el.style.transition = 'all 0.3s ease-out';
+      el.style.transform = 'translateY(0)';
+      el.style.opacity = '1';
+    });
+    prev.current = target;
+  }, [target]);
+  return ref;
+}
 
 export function StatsPanel() {
   const agents = useChatStore((s) => s.agents);
@@ -129,10 +149,12 @@ function StatCard({ title, children }: { title: string; children: React.ReactNod
 }
 
 function StatRow({ label, value, color }: { label: string; value: string; color: string }) {
+  const num = parseFloat(value.replace(/[^0-9.]/g, ''));
+  const ref = useAnimatedValue(isNaN(num) ? 0 : num);
   return (
     <div className="flex items-center justify-between gap-2 py-1 min-w-0 overflow-hidden">
       <span className="text-[11px] text-on-surface-variant/50 shrink-0">{label}</span>
-      <span className="text-[11px] font-semibold truncate text-right" style={{ color }}>{value}</span>
+      <span ref={ref} className="text-[11px] font-semibold truncate text-right" style={{ color }}>{value}</span>
     </div>
   );
 }

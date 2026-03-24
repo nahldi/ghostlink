@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { api } from '../lib/api';
 import { useChatStore } from '../stores/chatStore';
 import { timeAgo } from '../lib/timeago';
@@ -234,8 +235,11 @@ export function SearchModal({ onClose }: SearchModalProps) {
               {results.map((msg, i) => {
                 const agent = agents.find(a => a.name === msg.sender);
                 return (
-                  <button
+                  <motion.button
                     key={msg.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.03, duration: 0.2 }}
                     onClick={() => handleSelect(msg)}
                     className={`w-full text-left px-5 py-3 transition-colors border-b border-outline-variant/4 ${
                       i === selectedIdx ? 'bg-primary-container/15' : 'hover:bg-surface-container-high/30'
@@ -251,7 +255,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
                     <div className="text-[12px] text-on-surface-variant/60 line-clamp-2">
                       {highlightMatch(msg.text, query)}
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
             </>

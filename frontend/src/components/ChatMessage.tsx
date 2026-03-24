@@ -287,7 +287,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         )}
 
         <div
-          className="p-3 rounded-2xl rounded-tl-md text-sm text-on-surface leading-relaxed"
+          className="p-3 rounded-2xl rounded-tl-md text-sm text-on-surface leading-relaxed bubble-glow"
           style={{
             background: `color-mix(in srgb, ${agentColor} 5%, rgba(17,17,25,0.5))`,
             border: `1px solid color-mix(in srgb, ${agentColor} 8%, transparent)`,

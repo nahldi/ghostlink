@@ -1,5 +1,18 @@
 # GhostLink Changelog
 
+## v2.8.0 — 2026-03-24
+
+### Animations & Polish
+- **Bubble glow** (`ChatMessage.tsx`): Agent message bubbles now have the `bubble-glow` hover effect (subtle lift + glow). The CSS class was defined since v2.4.0 but never applied.
+- **ConnectionBanner slide** (`ConnectionBanner.tsx`): Banner now slides down with spring physics on disconnect and slides up on reconnect. Reconnecting state shows spinning sync icon.
+- **Search result stagger** (`SearchModal.tsx`): Message search results now cascade in with 30ms stagger per item using Framer Motion.
+- **StatsPanel animated values** (`StatsPanel.tsx`): Stat numbers now animate with a subtle slide+fade when values change.
+
+### Desktop
+- **Version bump**: `2.7.0` → `2.8.0`
+
+---
+
 ## v2.7.0 — 2026-03-24
 
 ### Frontend
