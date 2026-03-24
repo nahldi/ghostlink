@@ -633,6 +633,8 @@ def main():
     parser.add_argument("--headless", action="store_true",
                         help="Don't attach to tmux (for non-TTY environments)")
     args, extra = parser.parse_known_args()
+    # Strip the '--' separator that argparse leaves in extra
+    extra = [a for a in extra if a != "--"]
 
     agent = args.agent
     agent_cfg = config.get("agents", {}).get(agent, {})
@@ -758,7 +760,12 @@ def main():
     )
 
     # Permission/model flags first, then MCP config (CLI parsers expect flags before config)
-    launch_args = list(agent_args) + extra + mcp_args
+    # Deduplicate: if extra args overlap with agent_args from config, use config's
+    combined_args = list(agent_args)
+    for a in extra:
+        if a not in combined_args:
+            combined_args.append(a)
+    launch_args = combined_args + mcp_args
 
     # ── v2.5.0: Agent identity injection ──────────────────────────────
     # Write context files so agents know who they are and what GhostLink is

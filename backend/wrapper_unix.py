@@ -124,11 +124,11 @@ def run_agent(
                 capture_output=True,
             )
 
-            # v3.9.0: Use shell command format so tmux properly passes all args
-            # to the agent CLI (not as tmux send-keys input)
+            # v3.9.1: Pass entire command as a single shell string to tmux.
+            # tmux new-session expects a single command string when using shell execution.
             result = subprocess.run(
                 ["tmux", "new-session", "-d", "-s", session_name,
-                 "-c", abs_cwd, "bash", "-c", agent_cmd],
+                 "-c", abs_cwd, agent_cmd],
                 env=env,
             )
             if result.returncode != 0:
