@@ -487,6 +487,13 @@ document.querySelectorAll('#settings-body input, #settings-body select').forEach
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 window.addEventListener('DOMContentLoaded', async () => {
+  // v2.5.5: Global error wrapper for diagnostics
+  try {
+  if (typeof window.api === 'undefined') {
+    document.getElementById('version').textContent = 'PRELOAD FAILED';
+    document.getElementById('footer-status').textContent = 'window.api is undefined';
+    return;
+  }
   // Request initial state from main process
   const status = await api.invoke('server:status');
   if (status && status.running) {
@@ -518,6 +525,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Check for updates
   api.invoke('update:check');
+  } catch (initErr) {
+    // v2.5.5: Show initialization error visually
+    var el = document.getElementById('version');
+    if (el) el.textContent = 'INIT ERR';
+    var fs = document.getElementById('footer-status');
+    if (fs) fs.textContent = String(initErr);
+    console.error('Init error:', initErr);
+  }
 });
 
 // ── Agents toggle ─────────────────────────────────────────────────────────
