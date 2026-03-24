@@ -21,10 +21,12 @@ export const api = {
       body: JSON.stringify({ sender, text, channel, reply_to: replyTo, attachments }),
     }),
 
-  uploadImage: (file: File) => {
+  uploadImage: async (file: File) => {
     const fd = new FormData();
     fd.append('file', file);
-    return fetch('/api/upload', { method: 'POST', body: fd }).then(r => r.json());
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+    return res.json();
   },
 
   pinMessage: (msgId: number, pinned: boolean) =>

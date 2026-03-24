@@ -89,7 +89,9 @@ export function useWebSocket() {
             state.addMessage(msg);
           }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('Failed to fetch missed messages on reconnect:', e instanceof Error ? e.message : String(e));
+      }
     });
 
     const unsub = client.subscribe((event) => {
