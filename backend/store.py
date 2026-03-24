@@ -209,6 +209,11 @@ class MessageStore:
         if sender in users:
             users.remove(sender)
         else:
+            # Cap unique emoji at 50 and users per emoji at 100
+            if emoji not in reactions and len(reactions) >= 50:
+                return reactions
+            if len(users) >= 100:
+                return reactions
             users.append(sender)
         if users:
             reactions[emoji] = users

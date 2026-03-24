@@ -44,10 +44,6 @@ PRESENCE_TIMEOUT = 15
 _cursors: dict[str, dict[str, int]] = {}
 _cursors_lock = threading.Lock()
 
-# Empty-read escalation
-_empty_read_count: dict[str, int] = {}
-
-
 def cleanup_agent(name: str):
     """Remove all tracked state for a deregistered agent."""
     with _presence_lock:
@@ -56,7 +52,6 @@ def cleanup_agent(name: str):
         _activity_ts.pop(name, None)
     with _cursors_lock:
         _cursors.pop(name, None)
-    _empty_read_count.pop(name, None)
 
 
 def configure(

@@ -42,6 +42,27 @@ _agent_processes: dict[str, subprocess.Popen] = {}
 _agent_lock = asyncio.Lock()
 _last_heartbeats: dict[str, float] = {}
 
+
+def _drain_pipe(pipe, agent_base: str, buf: list | None = None) -> None:
+    """Drain a subprocess pipe line-by-line, logging output at DEBUG.
+
+    Runs in a background daemon thread so the pipe never fills and
+    blocks the wrapper process.  If *buf* is provided each decoded
+    line is also appended there (useful to capture stderr for error
+    reporting).
+    """
+    import threading as _th  # local import avoids top-level dependency order issues
+    _ = _th  # noqa — imported for type clarity; used by caller via Thread
+    try:
+        for raw in iter(pipe.readline, b""):
+            line = raw.decode("utf-8", errors="replace").rstrip()
+            if line:
+                log.debug("[wrapper/%s] %s", agent_base, line)
+                if buf is not None:
+                    buf.append(line)
+    except Exception:
+        pass
+
 # Agent name validation (prevents path traversal)
 _VALID_AGENT_NAME = re.compile(r'^[a-zA-Z0-9_-]{1,50}$')
 
@@ -374,7 +395,8 @@ async def lifespan(_app: FastAPI):
     _load_settings()
     _settings["_server_start"] = time.time()
 
-    db_path = DATA_DIR / "ghostlink.db"
+    # v2.5.2: Use ghostlink_v2.db to avoid stale journal corruption
+    db_path = DATA_DIR / "ghostlink_v2.db"
     store = MessageStore(db_path)
     await store.init()
 
@@ -593,31 +615,35 @@ async def _rate_limit_lifespan(_app: FastAPI):
 app = FastAPI(title="GhostLink", lifespan=lifespan)
 
 
+_LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost"}
+
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    """Simple IP-based rate limiting for API endpoints."""
+    """Simple IP-based rate limiting for API endpoints. Localhost is exempt."""
     global _rate_limit_last_cleanup
     if request.url.path.startswith("/api/"):
         client_ip = request.client.host if request.client else "unknown"
-        now = time.time()
-        if client_ip not in _rate_limits:
-            _rate_limits[client_ip] = collections.deque()
-        dq = _rate_limits[client_ip]
-        # Remove old entries
-        while dq and dq[0] < now - _RATE_LIMIT_WINDOW:
-            dq.popleft()
-        if len(dq) >= _RATE_LIMIT_MAX:
-            return JSONResponse(
-                {"error": "Rate limit exceeded. Try again later."},
-                status_code=429,
-            )
-        dq.append(now)
-        # Periodic cleanup of stale IP entries (every 5 minutes)
-        if now - _rate_limit_last_cleanup > 300:
-            _rate_limit_last_cleanup = now
-            stale = [ip for ip, dq in _rate_limits.items() if not dq or dq[-1] < now - _RATE_LIMIT_WINDOW]
-            for ip in stale:
-                _rate_limits.pop(ip, None)
+        # Exempt localhost — local agents and UI should never be rate-limited
+        if client_ip not in _LOCALHOST_IPS:
+            now = time.time()
+            if client_ip not in _rate_limits:
+                _rate_limits[client_ip] = collections.deque()
+            dq = _rate_limits[client_ip]
+            while dq and dq[0] < now - _RATE_LIMIT_WINDOW:
+                dq.popleft()
+            if len(dq) >= _RATE_LIMIT_MAX:
+                return JSONResponse(
+                    {"error": "Rate limit exceeded. Try again later."},
+                    status_code=429,
+                )
+            dq.append(now)
+            # Periodic cleanup of stale IP entries (every 5 minutes)
+            if now - _rate_limit_last_cleanup > 300:
+                _rate_limit_last_cleanup = now
+                stale = [ip for ip, d in _rate_limits.items() if not d or d[-1] < now - _RATE_LIMIT_WINDOW]
+                for ip in stale:
+                    _rate_limits.pop(ip, None)
     return await call_next(request)
 
 
@@ -846,6 +872,16 @@ async def bulk_delete_messages(request: Request):
     return {"ok": True, "deleted": deleted or []}
 
 
+_IMAGE_MAGIC = {
+    b"\x89PNG": "png",
+    b"\xff\xd8\xff": "jpg",
+    b"GIF87a": "gif",
+    b"GIF89a": "gif",
+    b"RIFF": "webp",  # WebP starts with RIFF....WEBP
+}
+_ALLOWED_IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
+
+
 @app.post("/api/upload")
 async def upload_image(file: UploadFile = File(...)):
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -855,7 +891,27 @@ async def upload_image(file: UploadFile = File(...)):
     if len(data) > MAX_SIZE_MB * 1024 * 1024:
         return JSONResponse({"error": f"max {MAX_SIZE_MB}MB"}, 400)
 
-    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "png"
+    # Validate file magic bytes — don't trust client Content-Type alone
+    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "png"
+    if ext == "svg":
+        # SVGs are text-based, check for opening tag
+        if not data[:256].lstrip().lower().startswith((b"<?xml", b"<svg")):
+            return JSONResponse({"error": "invalid SVG file"}, 400)
+    else:
+        magic_ok = False
+        for magic, _ in _IMAGE_MAGIC.items():
+            if data[:len(magic)] == magic:
+                magic_ok = True
+                break
+        if not magic_ok:
+            return JSONResponse({"error": "invalid image file — magic bytes mismatch"}, 400)
+        # Extra check for WebP: bytes 8-12 must be "WEBP"
+        if data[:4] == b"RIFF" and data[8:12] != b"WEBP":
+            return JSONResponse({"error": "invalid image file — not a valid WebP"}, 400)
+
+    if ext not in _ALLOWED_IMAGE_EXTS:
+        return JSONResponse({"error": f"unsupported extension: {ext}"}, 400)
+
     name = f"{_uuid.uuid4().hex[:12]}.{ext}"
     path = UPLOAD_DIR / name
     with open(path, "wb") as f:
@@ -1222,6 +1278,19 @@ async def spawn_agent(request: Request):
     if not base:
         return JSONResponse({"error": "base is required"}, 400)
 
+    # Validate workspace path — block directory traversal
+    if cwd:
+        resolved_cwd = Path(cwd).resolve()
+        if not resolved_cwd.exists() or not resolved_cwd.is_dir():
+            return JSONResponse({"error": f"workspace path does not exist: {cwd}"}, 400)
+        # Block traversal to system directories
+        cwd_str = str(resolved_cwd)
+        blocked = ("/etc", "/bin", "/sbin", "/usr", "/boot", "/dev", "/proc", "/sys",
+                   "C:\\Windows", "C:\\Program Files")
+        if any(cwd_str.startswith(b) for b in blocked):
+            return JSONResponse({"error": "workspace path not allowed"}, 400)
+        cwd = cwd_str  # Use resolved absolute path
+
     # Resolve the agent command
     agents_cfg = CONFIG.get("agents", {})
     cfg = agents_cfg.get(base, {})
@@ -1284,6 +1353,13 @@ async def spawn_agent(request: Request):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        # Drain stdout/stderr in background threads so the pipe buffers never fill.
+        # stderr lines are also collected in _stderr_buf for early-exit error reporting.
+        import threading as _th
+        _stderr_buf: list[str] = []
+        _th.Thread(target=_drain_pipe, args=(proc.stdout, base), daemon=True).start()
+        _th.Thread(target=_drain_pipe, args=(proc.stderr, base, _stderr_buf), daemon=True).start()
+
         # Store by base name — wrapper will register with a unique instance name
         async with _agent_lock:
             _agent_processes[f"{base}_{proc.pid}"] = proc
@@ -1293,11 +1369,9 @@ async def spawn_agent(request: Request):
 
         # Check if process died immediately (CLI not found, etc)
         if proc.poll() is not None:
-            stderr_output = ""
-            try:
-                stderr_output = proc.stderr.read().decode("utf-8", errors="replace").strip() if proc.stderr else ""
-            except Exception:
-                pass
+            # Brief pause so the drain thread can flush remaining stderr lines
+            await asyncio.sleep(0.2)
+            stderr_output = "\n".join(_stderr_buf[-30:]).strip()
             error_msg = stderr_output or f"Agent '{base}' exited immediately. Is the '{command}' CLI installed and authenticated?"
             log.warning("Agent spawn failed for %s: %s", base, error_msg)
             async with _agent_lock:

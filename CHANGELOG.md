@@ -1,5 +1,21 @@
 # GhostLink Changelog
 
+## v2.5.2 — 2026-03-24
+
+### Security
+- **Random key derivation** (`backend/security.py`): Replaced predictable SHA256(data_dir+username) key material with a random 32-byte master key persisted at `.master_key`. Each installation now has a unique encryption key. Old secrets are auto-migrated on first load.
+- **Random per-install Fernet salt** (`backend/security.py`): Replaced hardcoded `"ghostlink-v1"` salt with a random 16-byte salt persisted at `.salt`. Prevents cross-installation decryption.
+- **XOR fallback removed** (`backend/security.py`): `cryptography` is now a hard dependency. XOR encryption path removed for new secrets. Legacy XOR data is still readable for migration only.
+- **Image upload magic byte validation** (`backend/app.py`): Upload endpoint now validates file magic bytes (PNG, JPEG, GIF, WebP, SVG) instead of trusting client Content-Type header. Blocks spoofed uploads.
+- **Workspace path traversal guard** (`backend/app.py`): Agent spawn endpoint now validates and resolves workspace paths. Blocks traversal to system directories (`/etc`, `/usr`, `C:\Windows`, etc.).
+- **Localhost rate limit exemption** (`backend/app.py`): Local clients (127.0.0.1, ::1) are now exempt from IP-based rate limiting. Prevents MCP proxy agents from exhausting the shared rate limit.
+
+### Stability
+- **Dead code removal** (`backend/mcp_bridge.py`): Removed unused `_empty_read_count` dict that was declared but never incremented.
+- **Reaction cap** (`backend/store.py`): Reactions now capped at 50 unique emoji per message and 100 users per emoji to prevent abuse.
+
+---
+
 ## v2.5.1 — 2026-03-23
 
 ### Security

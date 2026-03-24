@@ -26,9 +26,11 @@ try:
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
-    HAS_FERNET = True
 except ImportError:
-    HAS_FERNET = False
+    raise ImportError(
+        "cryptography package is required for GhostLink secrets encryption. "
+        "Install it: pip install cryptography"
+    )
 
 
 # ── Secrets Manager ─────────────────────────────────────────────────
@@ -36,9 +38,9 @@ except ImportError:
 class SecretsManager:
     """Encrypted storage for API keys and sensitive tokens.
 
-    Uses XOR encryption with a machine-derived key.
-    Secrets are never logged, never exposed in API responses,
-    and never included in exports.
+    Uses Fernet (AES-128-CBC + HMAC-SHA256) with a random per-installation
+    master key and salt.  Secrets are never logged, never exposed in API
+    responses, and never included in exports.
     """
 
     def __init__(self, data_dir: Path):
@@ -48,37 +50,104 @@ class SecretsManager:
         self._key = self._derive_key()
         self._load()
 
+    # ── Key derivation ────────────────────────────────────────────
+
     def _derive_key(self) -> bytes:
-        """Derive an encryption key from machine-specific data."""
+        """Return a random 32-byte master key, persisted per installation."""
+        key_file = self._data_dir / ".master_key"
+        key_file.parent.mkdir(parents=True, exist_ok=True)
+        if key_file.exists() and key_file.stat().st_size == 32:
+            return key_file.read_bytes()
+        # Check for legacy key material — need it for migration
+        if self._secrets_file.exists():
+            # Store both legacy and new key so _load() can migrate
+            self._legacy_key = self._legacy_derive_key()
+        key = os.urandom(32)
+        key_file.write_bytes(key)
+        try:
+            os.chmod(key_file, 0o600)
+        except OSError:
+            pass  # Windows doesn't support chmod
+        return key
+
+    def _legacy_derive_key(self) -> bytes:
+        """Old predictable key derivation — used only for migration."""
         material = f"{self._data_dir}:{os.getenv('USER', os.getenv('USERNAME', 'ghostlink'))}"
         return hashlib.sha256(material.encode()).digest()
 
-    def _fernet(self):
-        """Derive a Fernet instance from the machine key."""
-        kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=b"ghostlink-v1", iterations=100_000)
-        return Fernet(base64.urlsafe_b64encode(kdf.derive(self._key)))
+    def _get_salt(self) -> bytes:
+        """Return a random 16-byte salt, persisted per installation."""
+        salt_file = self._data_dir / ".salt"
+        if salt_file.exists() and salt_file.stat().st_size == 16:
+            return salt_file.read_bytes()
+        salt = os.urandom(16)
+        salt_file.parent.mkdir(parents=True, exist_ok=True)
+        salt_file.write_bytes(salt)
+        try:
+            os.chmod(salt_file, 0o600)
+        except OSError:
+            pass
+        return salt
+
+    def _fernet(self, key: bytes | None = None) -> Fernet:
+        """Derive a Fernet instance from the given key (or master key) + salt."""
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(), length=32,
+            salt=self._get_salt(), iterations=100_000,
+        )
+        return Fernet(base64.urlsafe_b64encode(kdf.derive(key or self._key)))
+
+    def _legacy_fernet(self) -> Fernet:
+        """Fernet using the old hardcoded salt + predictable key — for migration only."""
+        legacy_key = getattr(self, "_legacy_key", self._legacy_derive_key())
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(), length=32,
+            salt=b"ghostlink-v1", iterations=100_000,
+        )
+        return Fernet(base64.urlsafe_b64encode(kdf.derive(legacy_key)))
+
+    # ── Encrypt / decrypt ─────────────────────────────────────────
 
     def _encrypt(self, plaintext: str) -> str:
-        if HAS_FERNET:
-            return "fernet:" + self._fernet().encrypt(plaintext.encode()).decode()
-        key = self._key
-        encrypted = bytes(b ^ key[i % len(key)] for i, b in enumerate(plaintext.encode()))
-        return base64.b64encode(encrypted).decode()
+        return "fernet:" + self._fernet().encrypt(plaintext.encode()).decode()
 
     def _decrypt(self, ciphertext: str) -> str:
-        if HAS_FERNET and ciphertext.startswith("fernet:"):
-            return self._fernet().decrypt(ciphertext[7:].encode()).decode()
-        # XOR fallback — handles old data or when cryptography not installed
-        key = self._key
+        if ciphertext.startswith("fernet:"):
+            token = ciphertext[7:].encode()
+            # Try current key + salt first
+            try:
+                return self._fernet().decrypt(token).decode()
+            except Exception:
+                pass
+            # Try legacy key + old salt for migration
+            try:
+                return self._legacy_fernet().decrypt(token).decode()
+            except Exception:
+                pass
+            raise ValueError("Cannot decrypt secret — key mismatch")
+        # XOR legacy data — migrate on read
+        legacy_key = getattr(self, "_legacy_key", self._legacy_derive_key())
         encrypted = base64.b64decode(ciphertext)
-        decrypted = bytes(b ^ key[i % len(key)] for i, b in enumerate(encrypted))
+        decrypted = bytes(b ^ legacy_key[i % len(legacy_key)] for i, b in enumerate(encrypted))
         return decrypted.decode()
 
     def _load(self):
         if self._secrets_file.exists():
             try:
                 raw = json.loads(self._secrets_file.read_text())
-                self._secrets = {k: self._decrypt(v) for k, v in raw.items()}
+                self._secrets = {}
+                needs_migration = False
+                for k, v in raw.items():
+                    try:
+                        self._secrets[k] = self._decrypt(v)
+                        # If it was XOR-encoded (no fernet: prefix) or legacy-fernet, re-encrypt
+                        if not v.startswith("fernet:"):
+                            needs_migration = True
+                    except Exception as e:
+                        log.warning("Failed to decrypt secret '%s': %s", k, e)
+                if needs_migration:
+                    log.info("Migrating secrets to new encryption key...")
+                    self._save()
             except Exception as e:
                 log.warning("Failed to load secrets: %s", e)
                 self._secrets = {}
@@ -358,7 +427,7 @@ class DataManager:
                     pass
 
             zf.writestr("manifest.json", json.dumps({
-                "exported_at": time.time(), "version": "2.5.1", "format": "ghostlink-export-v1",
+                "exported_at": time.time(), "version": "2.5.2", "format": "ghostlink-export-v1",
             }, indent=2))
 
         return buf.getvalue()
