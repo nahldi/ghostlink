@@ -827,3 +827,231 @@ async def receive_automation_webhook(source: str, request: Request):
             route_mentions("system", msg_text, action["channel"])
 
     return {"processed": len(actions), "actions": actions}
+
+
+# ── Voice & Multimodal (v3.9.0) ──────────────────────────────────
+
+@router.post("/api/transcribe")
+async def transcribe_audio(request: Request):
+    """Transcribe audio to text using the best available STT provider.
+
+    Accepts audio file upload (wav, mp3, webm, m4a). Routes to Groq Whisper
+    (free), OpenAI Whisper, or Google STT based on configured providers.
+    """
+    import aiohttp
+
+    form = await request.form()
+    audio = form.get("audio")
+    if not audio:
+        return JSONResponse({"error": "audio file required"}, 400)
+
+    audio_bytes = await audio.read()
+    if len(audio_bytes) > 25 * 1024 * 1024:  # 25MB limit
+        return JSONResponse({"error": "Audio file too large (max 25MB)"}, 413)
+
+    # Try providers in priority order
+    providers_to_try = []
+
+    # Check configured providers
+    settings = deps._settings
+    configured = settings.get("providers", {})
+
+    # Groq (free STT)
+    groq_key = configured.get("groq", {}).get("apiKey", "")
+    if groq_key:
+        providers_to_try.append(("groq", groq_key))
+
+    # OpenAI Whisper
+    openai_key = configured.get("openai", {}).get("apiKey", "")
+    if openai_key:
+        providers_to_try.append(("openai", openai_key))
+
+    if not providers_to_try:
+        return JSONResponse({"error": "No STT provider configured. Add a Groq or OpenAI API key in Settings > AI."}, 400)
+
+    for provider, api_key in providers_to_try:
+        try:
+            if provider == "groq":
+                url = "https://api.groq.com/openai/v1/audio/transcriptions"
+            elif provider == "openai":
+                url = "https://api.openai.com/v1/audio/transcriptions"
+            else:
+                continue
+
+            import aiohttp
+            form_data = aiohttp.FormData()
+            form_data.add_field("file", audio_bytes, filename="audio.webm", content_type="audio/webm")
+            form_data.add_field("model", "whisper-large-v3" if provider == "groq" else "whisper-1")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=form_data, headers={"Authorization": f"Bearer {api_key}"}, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        return {"text": result.get("text", ""), "provider": provider}
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("STT %s failed: %s", provider, e)
+            continue
+
+    return JSONResponse({"error": "All STT providers failed"}, 502)
+
+
+@router.post("/api/tts")
+async def text_to_speech(request: Request):
+    """Convert text to speech audio using the best available TTS provider.
+
+    Returns audio as base64-encoded data URI or binary stream.
+    """
+    import aiohttp
+    import base64
+
+    body = await request.json()
+    text = body.get("text", "")
+    voice = body.get("voice", "alloy")
+
+    if not text:
+        return JSONResponse({"error": "text required"}, 400)
+    if len(text) > 4096:
+        return JSONResponse({"error": "Text too long (max 4096 chars)"}, 400)
+
+    settings = deps._settings
+    configured = settings.get("providers", {})
+
+    # OpenAI TTS
+    openai_key = configured.get("openai", {}).get("apiKey", "")
+    if openai_key:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://api.openai.com/v1/audio/speech",
+                    json={"model": "tts-1", "input": text, "voice": voice},
+                    headers={"Authorization": f"Bearer {openai_key}"},
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
+                    if resp.status == 200:
+                        audio_bytes = await resp.read()
+                        audio_b64 = base64.b64encode(audio_bytes).decode()
+                        return {"audio": f"data:audio/mp3;base64,{audio_b64}", "provider": "openai"}
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("TTS openai failed: %s", e)
+
+    return JSONResponse({"error": "No TTS provider configured. Add an OpenAI API key in Settings > AI."}, 400)
+
+
+@router.post("/api/analyze-image")
+async def analyze_image(request: Request):
+    """Analyze an uploaded image using a vision-capable AI provider.
+
+    Routes to Claude (vision), Gemini (vision), or GPT-4 (vision) based
+    on configured providers.
+    """
+    import aiohttp
+    import base64
+
+    form = await request.form()
+    image = form.get("image")
+    prompt = form.get("prompt", "Describe this image in detail.")
+
+    if not image:
+        return JSONResponse({"error": "image file required"}, 400)
+
+    image_bytes = await image.read()
+    if len(image_bytes) > 10 * 1024 * 1024:
+        return JSONResponse({"error": "Image too large (max 10MB)"}, 413)
+
+    image_b64 = base64.b64encode(image_bytes).decode()
+
+    # Detect content type
+    content_type = getattr(image, 'content_type', 'image/png') or 'image/png'
+
+    settings = deps._settings
+    configured = settings.get("providers", {})
+
+    # Try OpenAI GPT-4 Vision
+    openai_key = configured.get("openai", {}).get("apiKey", "")
+    if openai_key:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    json={
+                        "model": "gpt-4o",
+                        "messages": [{
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": str(prompt)},
+                                {"type": "image_url", "image_url": {"url": f"data:{content_type};base64,{image_b64}"}},
+                            ],
+                        }],
+                        "max_tokens": 1000,
+                    },
+                    headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        return {"analysis": text, "provider": "openai"}
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Vision openai failed: %s", e)
+
+    # Try Google Gemini Vision
+    google_key = configured.get("google", {}).get("apiKey", "")
+    if google_key:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={google_key}",
+                    json={
+                        "contents": [{"parts": [
+                            {"text": str(prompt)},
+                            {"inline_data": {"mime_type": content_type, "data": image_b64}},
+                        ]}],
+                    },
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        return {"analysis": text, "provider": "google"}
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Vision google failed: %s", e)
+
+    return JSONResponse({"error": "No vision provider configured. Add an OpenAI or Google AI API key in Settings > AI."}, 400)
+
+
+@router.post("/api/parse-document")
+async def parse_document(request: Request):
+    """Upload and parse a document (PDF, DOCX, TXT, etc.) for context injection.
+
+    Returns extracted text, chunks for RAG, and document summary.
+    """
+    form = await request.form()
+    doc = form.get("document")
+    if not doc:
+        return JSONResponse({"error": "document file required"}, 400)
+
+    doc_bytes = await doc.read()
+    filename = getattr(doc, 'filename', 'document.txt') or 'document.txt'
+
+    if len(doc_bytes) > 50 * 1024 * 1024:  # 50MB limit
+        return JSONResponse({"error": "Document too large (max 50MB)"}, 413)
+
+    from document_parser import extract_text, chunk_text, summarize_document
+
+    text = extract_text(doc_bytes, filename)
+    chunks = chunk_text(text)
+    summary = summarize_document(text)
+
+    return {
+        "filename": filename,
+        "text_length": len(text),
+        "chunks": len(chunks),
+        "summary": summary,
+        "text": text[:10000],  # First 10K chars for preview
+        "all_chunks": chunks[:50],  # First 50 chunks
+    }
