@@ -156,35 +156,6 @@
     <span id="footer-status">Ready</span>
   </div>
 
-  
-  <!-- v2.5.5: Diagnostic error catcher — shows errors visually -->
-  <script>
-    // Catch ALL errors and show them in the version bar
-    window.onerror = function(msg, src, line, col, err) {
-      var el = document.getElementById('version');
-      if (el) el.textContent = 'ERR: ' + msg;
-      var fs = document.getElementById('footer-status');
-      if (fs) fs.textContent = (src||'') + ':' + line;
-    };
-    window.onunhandledrejection = function(e) {
-      var el = document.getElementById('version');
-      if (el) el.textContent = 'ERR: ' + (e.reason && e.reason.message || e.reason || 'unknown');
-    };
-    // Check if preload bridge exists
-    window.addEventListener('DOMContentLoaded', function() {
-      var el = document.getElementById('version');
-      if (typeof window.api === 'undefined') {
-        if (el) el.textContent = 'PRELOAD MISSING';
-        var fs = document.getElementById('footer-status');
-        if (fs) fs.textContent = 'window.api is undefined — preload.js failed to load';
-        var us = document.getElementById('update-status');
-        if (us) us.textContent = 'Preload bridge not available';
-      } else {
-        if (el) el.textContent = 'v(loading...)';
-      }
-    });
-  </script>
-
   <script src="launcher.js"></script>
 </body>
 </html>

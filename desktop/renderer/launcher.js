@@ -9,9 +9,12 @@
  *   - Window controls (minimize / close)
  */
 
-// v2.5.0: IPC bridge via contextBridge preload (secure — no nodeIntegration)
-// window.api is exposed by preload.ts with channel allowlisting
-const api = window.api;
+// IPC bridge — nodeIntegration is enabled for wizard/launcher windows
+const { ipcRenderer } = require('electron');
+const api = {
+  invoke: (ch, ...args) => ipcRenderer.invoke(ch, ...args),
+  on: (ch, cb) => { ipcRenderer.on(ch, (_e, ...args) => cb(...args)); return () => ipcRenderer.removeAllListeners(ch); },
+};
 // IPC ready
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
@@ -487,13 +490,6 @@ document.querySelectorAll('#settings-body input, #settings-body select').forEach
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 window.addEventListener('DOMContentLoaded', async () => {
-  // v2.5.5: Global error wrapper for diagnostics
-  try {
-  if (typeof window.api === 'undefined') {
-    document.getElementById('version').textContent = 'PRELOAD FAILED';
-    document.getElementById('footer-status').textContent = 'window.api is undefined';
-    return;
-  }
   // Request initial state from main process
   const status = await api.invoke('server:status');
   if (status && status.running) {
@@ -513,26 +509,19 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Fetch auth statuses
   api.invoke('auth:check-all');
 
-  // Fetch version (v2.5.4: hardened with try/catch — never show stale fallback)
+  // Fetch version
+  // v2.5.6: Robust version display
   try {
     const ver = await api.invoke('app:get-version');
     if (ver) $version.textContent = 'v' + ver;
     else $version.textContent = 'v?';
   } catch (e) {
-    console.warn('Failed to fetch app version:', e);
+    console.warn('Version fetch failed:', e);
     $version.textContent = 'v?';
   }
 
   // Check for updates
   api.invoke('update:check');
-  } catch (initErr) {
-    // v2.5.5: Show initialization error visually
-    var el = document.getElementById('version');
-    if (el) el.textContent = 'INIT ERR';
-    var fs = document.getElementById('footer-status');
-    if (fs) fs.textContent = String(initErr);
-    console.error('Init error:', initErr);
-  }
 });
 
 // ── Agents toggle ─────────────────────────────────────────────────────────
