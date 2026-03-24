@@ -1,5 +1,66 @@
 # GhostLink Changelog
 
+## v3.9.4 — 2026-03-24
+
+### Agent Identity Fix
+- **Preset labels/roles injected into agent context** — spawning a "Code Reviewer" now writes a soul like "You are Code Reviewer. Your role: Reviews PRs and suggests improvements."
+- Frontend passes `roleDescription` from preset to spawn API
+- Backend passes `GHOSTLINK_AGENT_LABEL` and `GHOSTLINK_AGENT_ROLE` env vars to wrapper
+- Soul auto-persisted to `data/{agent}/soul.txt` so it survives restarts
+- Context template now leads with soul identity, not generic "You are claude-2"
+- `chat_join` message shows label (e.g. "Code Reviewer (@claude) is online")
+
+---
+
+## v3.9.3 — 2026-03-24
+
+### Settings Panel Redesign
+- **Collapsible `Section` component** — reusable card with icon + title + chevron toggle, smooth CSS transition
+- **General tab**: Profile (open), Date & Time, Voice, Notifications sections
+- **Agents tab**: Routing (open), Persistent Agents (open), Supported Agents, Marketplace, Skill Packs, Hooks
+- **Appearance tab**: Theme (open), Typography, Info Panel
+- **AI tab**: Capabilities (open), Providers (open)
+- **Security tab**: Secrets (open), Data Retention, Data Management, Audit Log
+- **Advanced tab**: Debug (open), Server Config, Server Logs, Maintenance
+- Tab bar icons bumped 16px → 18px, labels 10px → 11px
+- SettingField labels bumped 10px → 11px
+- Net -59 lines: cleaner code, better visual hierarchy
+
+---
+
+## v3.9.2 — 2026-03-24
+
+### Thinking UI Redesign
+- Removed ugly `<pre>` monospace block with raw terminal output
+- Removed oversized SVG ThinkingParticles orbiting circles
+- New: compact bubbles with agent-colored tint, animated "thinking..." dots, max 4 truncated lines
+- Added `thinking-dots` CSS keyframe animation
+
+### Message Send Shake/Glitch Fix
+- **Root cause**: Triple animation conflict — CSS `msg-enter`, Framer Motion `itemVariants`, and ChatMessage's own `motion.div` all fighting
+- Removed `msg-enter` CSS class from ChatMessage
+- Removed duplicate `motion.div` wrappers from ChatMessage (replaced with plain `<div>`)
+- Removed stagger animation list in ChatFeed that re-triggered ALL animations on every new message
+
+### Agent Identity (chat_who + context)
+- `chat_who` now returns rich metadata: name, label, role, base type, human user
+- Context template instructs agents to use `chat_join`/`chat_who` for teammate discovery
+- Trigger prompts inject online teammate info when agents get @mentioned
+
+### Multi-Agent Support
+- Added MCP builtin defaults for grok, aider, goose, copilot
+- Added identity injection for aider (`.aider.conventions.md`), grok (`.grok/instructions.md`), generic fallback (`INSTRUCTIONS.md`)
+- Enhanced WSL detection: npx, nvm paths, npm global bins, pip
+- Better error messages when agent CLI not found
+
+### Backend Fixes
+- Thread safety: `_empty_read_count` protected with `_presence_lock`
+- AgentBar: no longer swallows errors silently
+- TypingIndicator: only updates state when visible list changes (perf)
+- MessageInput: fixed stale `pendingAttachments` closure
+
+---
+
 ## v3.3.2 — 2026-03-24
 
 ### Bug Fixes (13 fixes)

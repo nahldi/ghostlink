@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-24
-**Version:** v3.7.0
+**Version:** v3.9.4
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,11 +66,16 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v3.3.0)
+## CURRENT STATE (v3.9.4)
+
+### Recent Changes (v3.9.2 → v3.9.4)
+- **v3.9.4**: Agent identity fix — preset labels/roles/descriptions injected into agent context. Code Reviewer now actually knows it's a Code Reviewer.
+- **v3.9.3**: Settings panel redesign — collapsible Section cards, only primary settings visible, rest collapsed. Bigger text, better hierarchy.
+- **v3.9.2**: Thinking UI redesign (compact dots, no SVG clutter), message shake/glitch fix (triple animation conflict), agent identity (chat_who returns metadata), multi-agent MCP support (grok/aider/goose/copilot), thread safety fixes.
 
 ### Numbers
 - **90+ completed features** (see FEATURES.md for full list)
-- **46 React components** (StreamingText, ThinkingParticles, Toast, etc.)
+- **51 React components** (StreamingText, ThinkingParticles, Toast, Section, etc.)
 - **132+ API endpoints** (split into 13 route modules)
 - **17 MCP tools** (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_load, memory_list, memory_search, web_search, web_fetch, image_generate)
 - **13 known AI agents** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)
@@ -318,9 +323,12 @@ npm run build:win   # Windows .exe
 
 ## KNOWN ISSUES
 
-See BUGS.md for full list. 72+ bugs fixed as of v3.3.2. All code bugs resolved. Remaining items are future enhancements (OAuth) and acknowledged edge cases:
-- BUG-007: OneDrive paths need /tmp copy (handled but slow)
+See BUGS.md for full list. 72+ bugs fixed as of v3.9.4. All critical/high code bugs resolved. Remaining items:
+- BUG-007: OneDrive paths need /tmp copy (handled but slow — OS limitation)
 - BUG-011: Frontend dist path mismatch in packaged app (fallback exists)
+- BUG-087: ESLint 89 errors (cosmetic — `no-explicit-any`, empty catch blocks, no runtime impact)
+- BUG-088: WorktreeManager code exists but not wired into agent spawn/deregister lifecycle
+- BUG-046: OAuth sign-in not implemented (all providers work via API keys)
 - ARCH-003: Desktop app requires WSL on Windows (no native Python support yet)
 
 ---

@@ -4,12 +4,12 @@
 > **For any AI picking this up: follow the phases IN ORDER within each track. Each item has acceptance criteria.**
 
 **Last updated:** 2026-03-24
-**Current version:** v3.3.2
+**Current version:** v3.9.4
 **Owner:** Finn (nahldi)
 
 ---
 
-## Completed Work (v1.0 → v3.3.2)
+## Completed Work (v1.0 → v3.9.4)
 
 ### Foundation (v1.0–v1.8)
 Core chat, WebSocket, agent spawning, MCP bridge, desktop app, setup wizard, system tray, auto-updates, 13 agent CLIs, security hardening, approval interception, thinking streams, skills system, session templates, channel bridges.
@@ -20,7 +20,10 @@ Plugin system, Fernet encryption, 13 providers, model failover, Framer Motion an
 ### Architecture & Polish (v3.0–v3.3.2)
 Route split (3400→612 line app.py), 13 route modules, micro-interactions, integration tests (56 total), StreamingText word reveal, ThinkingParticles, mobile sidebar gestures, dependency conflict fix, DB recovery, version sync, deque log rotation, memory cache TTL, save_settings deduplication, FTS fallback logging.
 
-**Stats:** 72+ bugs fixed | 132+ API endpoints | 17 MCP tools | 13 agents | 13 providers | 46 React components | 56 tests | 9 themes
+### UX & Agent Identity (v3.9.2–v3.9.4)
+Thinking bubbles redesign (compact dots, no SVG clutter). Message shake/glitch fix (removed triple animation conflict: CSS + Framer Motion + component motion.div). Agent identity: `chat_who` returns label/role/base, trigger prompts inject teammate info, preset labels/roles written to agent soul on spawn. Settings panel redesign with collapsible Section cards (7 tabs restructured). MCP defaults added for grok/aider/goose/copilot. Identity injection for aider/grok + generic fallback. Enhanced WSL agent detection. Thread safety fix (`_empty_read_count` lock). Frontend audit fixes (AgentBar error handling, TypingIndicator perf, MessageInput stale closure).
+
+**Stats:** 72+ bugs fixed | 132+ API endpoints | 17 MCP tools | 13 agents | 13 providers | 51 React components | 56 tests | 9 themes
 
 ---
 
