@@ -90,8 +90,17 @@ class AgentMemory:
         return entries
 
     def search(self, query: str) -> list[dict]:
-        """Search memories by keyword (case-insensitive substring match)."""
-        query_lower = query.lower()
+        """Search memories by keyword with relevance scoring.
+
+        Splits query into words, scores each memory by:
+        - Key exact match: +10 points
+        - Key word match: +5 per word
+        - Content word match: +1 per occurrence
+        Results sorted by relevance (highest first).
+        """
+        words = [w.lower() for w in query.lower().split() if len(w) >= 2]
+        if not words:
+            return []
         results = []
         with self._lock:
             if not self.memory_dir.exists():
@@ -101,15 +110,28 @@ class AgentMemory:
                     data = json.loads(f.read_text("utf-8"))
                     key = data.get("key", f.stem)
                     content = data.get("content", "")
-                    if query_lower in key.lower() or query_lower in content.lower():
+                    key_lower = key.lower()
+                    content_lower = content.lower()
+                    score = 0
+                    # Exact query match in key
+                    if query.lower() in key_lower:
+                        score += 10
+                    # Per-word scoring
+                    for w in words:
+                        if w in key_lower:
+                            score += 5
+                        score += content_lower.count(w)
+                    if score > 0:
                         preview = content[:200] + ("..." if len(content) > 200 else "")
                         results.append({
                             "key": key,
                             "preview": preview,
                             "updated_at": data.get("updated_at", 0),
+                            "score": score,
                         })
                 except Exception:
-                    pass  # Corrupt file — use new created_at
+                    pass
+        results.sort(key=lambda r: r["score"], reverse=True)
         return results
 
     def delete(self, key: str) -> bool:

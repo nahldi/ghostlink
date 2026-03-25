@@ -11,7 +11,14 @@ interface Session {
   current_turn: number;
   status: string;
   cast: Record<string, string>;
+  execution_mode?: string;
 }
+
+const MODE_STYLES: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  plan: { label: 'Plan', color: 'text-yellow-400', bg: 'bg-yellow-400/10 border-yellow-400/20', icon: 'edit_note' },
+  execute: { label: 'Execute', color: 'text-green-400', bg: 'bg-green-400/10 border-green-400/20', icon: 'play_arrow' },
+  review: { label: 'Review', color: 'text-blue-400', bg: 'bg-blue-400/10 border-blue-400/20', icon: 'visibility' },
+};
 
 export function SessionBar() {
   const activeChannel = useChatStore((s) => s.activeChannel);
@@ -70,6 +77,18 @@ export function SessionBar() {
     } catch {}
   };
 
+  const currentMode = session.execution_mode || 'execute';
+  const modeStyle = MODE_STYLES[currentMode] || MODE_STYLES.execute;
+
+  const cycleMode = async () => {
+    const modes = ['plan', 'execute', 'review'];
+    const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
+    try {
+      const r = await api.setSessionMode(activeChannel, modes[nextIdx]);
+      setSession(r.session);
+    } catch {}
+  };
+
   return (
     <div className="px-4 py-2 glass border-b border-primary/10 flex items-center gap-3">
       <div className="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden shrink-0">
@@ -78,6 +97,16 @@ export function SessionBar() {
           style={{ width: `${Math.min(progress, 100)}%` }}
         />
       </div>
+
+      {/* Execution mode badge */}
+      <button
+        onClick={cycleMode}
+        className={`px-2 py-1 rounded-md border text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all hover:brightness-125 shrink-0 ${modeStyle.bg} ${modeStyle.color}`}
+        title={`Mode: ${modeStyle.label}. Click to cycle.`}
+      >
+        <span className="material-symbols-outlined text-[12px]">{modeStyle.icon}</span>
+        {modeStyle.label}
+      </button>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

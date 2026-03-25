@@ -120,7 +120,7 @@ def on_post_tool_use(data: dict):
         return
 
     tool = data.get("tool", "")
-    if tool not in ("code_execute",):
+    if tool not in ("code_execute", "delegate"):
         return
 
     agent = data.get("agent", "unknown")

@@ -342,6 +342,12 @@ export const api = {
   resumeSession: (channel: string) =>
     request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}/resume`, { method: 'POST' }),
 
+  setSessionMode: (channel: string, mode: string) =>
+    request<{ session: any }>(`/api/sessions/${encodeURIComponent(channel)}/mode`, {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    }),
+
   // Providers
   getProviders: () =>
     request<{
