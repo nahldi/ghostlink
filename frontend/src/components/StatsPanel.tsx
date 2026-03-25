@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../stores/chatStore';
 
 function useAnimatedValue(target: number) {
@@ -37,7 +37,8 @@ export function StatsPanel() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const messagesToday = messages.filter(m => m.timestamp * 1000 >= todayStart.getTime()).length;
-  const sessionMinutes = Math.floor((Date.now() - sessionStart) / 60000);
+  const [mountTime] = useState(() => Date.now());
+  const sessionMinutes = Math.floor((mountTime - sessionStart) / 60000);
   const sessionDisplay = sessionMinutes < 60 ? `${sessionMinutes}m` : `${Math.floor(sessionMinutes / 60)}h ${sessionMinutes % 60}m`;
 
   // Estimated token usage (rough: ~4 chars per token)

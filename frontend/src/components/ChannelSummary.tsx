@@ -16,12 +16,18 @@ export function ChannelSummary({ channel, onClose }: { channel: string; onClose:
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError('');
-    setData(null);
-    api.getChannelSummary(channel)
-      .then((r) => { if (!cancelled) { setData(r); setLoading(false); } })
-      .catch(() => { if (!cancelled) { setError('Failed to load summary'); setLoading(false); } });
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      setData(null);
+      try {
+        const r = await api.getChannelSummary(channel);
+        if (!cancelled) { setData(r); setLoading(false); }
+      } catch {
+        if (!cancelled) { setError('Failed to load summary'); setLoading(false); }
+      }
+    };
+    load();
     return () => { cancelled = true; };
   }, [channel]);
 

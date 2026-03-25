@@ -350,8 +350,9 @@ function ContextPanel({ agent }: { agent: Agent }) {
   const estimatedTokens = Math.round(totalChars / 4);
   const contextInfo = MODEL_CONTEXT[agent.base] || { tokens: 128000, label: '128K tokens' };
   const usagePct = Math.min(100, (estimatedTokens / contextInfo.tokens) * 100);
+  const [nowTs] = useState(() => Date.now());
   const sessionMinutes = agent.registered_at
-    ? Math.floor((Date.now() / 1000 - agent.registered_at) / 60)
+    ? Math.floor((nowTs / 1000 - agent.registered_at) / 60)
     : 0;
   const sessionDisplay = sessionMinutes < 60 ? `${sessionMinutes}m` : `${Math.floor(sessionMinutes / 60)}h ${sessionMinutes % 60}m`;
   const estimatedCost = (estimatedTokens / 1_000_000) * contextInfo.costPerMTok;

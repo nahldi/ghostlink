@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { useChatStore } from './stores/chatStore';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -11,21 +11,23 @@ import { ChannelTabs } from './components/ChannelTabs';
 import { ChatMessage } from './components/ChatMessage';
 import { MessageInput } from './components/MessageInput';
 import { TypingIndicator } from './components/TypingIndicator';
-import { JobsPanel } from './components/JobsPanel';
-import { RulesPanel } from './components/RulesPanel';
-import { SettingsPanel } from './components/SettingsPanel';
 import { StatsPanel } from './components/StatsPanel';
-import { SearchModal } from './components/SearchModal';
 import { ConnectionBanner } from './components/ConnectionBanner';
-import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
-import { RemoteSession } from './components/RemoteSession';
-import { OnboardingTour } from './components/OnboardingTour';
-import { HelpPanel } from './components/HelpPanel';
 import { BulkDeleteBar } from './components/BulkDeleteBar';
 import { SoundManager } from './lib/sounds';
 import { SessionBar } from './components/SessionBar';
-import { SessionLauncher } from './components/SessionLauncher';
 // ThinkingParticles still used by AgentBar — keep export but not imported here
+
+// Lazy-loaded components (reduce initial bundle from ~900KB)
+const JobsPanel = lazy(() => import('./components/JobsPanel').then(m => ({ default: m.JobsPanel })));
+const RulesPanel = lazy(() => import('./components/RulesPanel').then(m => ({ default: m.RulesPanel })));
+const SettingsPanel = lazy(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
+const SearchModal = lazy(() => import('./components/SearchModal').then(m => ({ default: m.SearchModal })));
+const KeyboardShortcutsModal = lazy(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
+const RemoteSession = lazy(() => import('./components/RemoteSession').then(m => ({ default: m.RemoteSession })));
+const OnboardingTour = lazy(() => import('./components/OnboardingTour').then(m => ({ default: m.OnboardingTour })));
+const HelpPanel = lazy(() => import('./components/HelpPanel').then(m => ({ default: m.HelpPanel })));
+const SessionLauncher = lazy(() => import('./components/SessionLauncher').then(m => ({ default: m.SessionLauncher })));
 
 const CONVERSATION_STARTERS = [
   { text: 'Ask @claude to review your code', icon: 'code' },
@@ -260,9 +262,11 @@ function RightPanel() {
             >
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
-            {panel === 'jobs' && <JobsPanel />}
-            {panel === 'rules' && <RulesPanel />}
-            {panel === 'settings' && <SettingsPanel />}
+            <Suspense fallback={null}>
+              {panel === 'jobs' && <JobsPanel />}
+              {panel === 'rules' && <RulesPanel />}
+              {panel === 'settings' && <SettingsPanel />}
+            </Suspense>
           </motion.aside>
         </>
       )}
@@ -487,7 +491,7 @@ function AppInner() {
               <AgentBar />
             </div>
             <div className="ml-3 shrink-0">
-              <RemoteSession />
+              <Suspense fallback={null}><RemoteSession /></Suspense>
             </div>
           </div>
           {/* Channel tabs */}
@@ -497,7 +501,7 @@ function AppInner() {
         </header>
         {/* Remote session — mobile */}
         <div className="lg:hidden flex items-center justify-end px-4 py-1 border-b border-outline-variant/6">
-          <RemoteSession />
+          <Suspense fallback={null}><RemoteSession /></Suspense>
         </div>
         {/* Mobile spacer for fixed header */}
         <div className="lg:hidden h-14" />
@@ -524,30 +528,30 @@ function AppInner() {
       <AnimatePresence>
         {showSearch && (
           <motion.div key="search-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
-            <SearchModal onClose={() => setShowSearch(false)} />
+            <Suspense fallback={null}><SearchModal onClose={() => setShowSearch(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showShortcuts && (
           <motion.div key="shortcuts-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
-            <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
+            <Suspense fallback={null}><KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>
       <ConnectionBanner />
-      <OnboardingTour />
+      <Suspense fallback={null}><OnboardingTour /></Suspense>
       <AnimatePresence>
         {showHelp && (
           <motion.div key="help-panel" initial={{ opacity: 0, x: 320 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 320 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
-            <HelpPanel onClose={() => setShowHelp(false)} />
+            <Suspense fallback={null}><HelpPanel onClose={() => setShowHelp(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showSessionLauncher && (
           <motion.div key="session-launcher" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
-            <SessionLauncher onClose={() => setShowSessionLauncher(false)} />
+            <Suspense fallback={null}><SessionLauncher onClose={() => setShowSessionLauncher(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>

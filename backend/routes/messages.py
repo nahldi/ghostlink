@@ -105,6 +105,10 @@ async def react_message(msg_id: int, request: Request):
     sender = body.get("sender", "You")
     if not emoji:
         return JSONResponse({"error": "emoji required"}, 400)
+    # Validate emoji is an actual emoji character (not plain ASCII text)
+    import unicodedata
+    if len(emoji) > 10 or all(ord(c) < 256 and unicodedata.category(c) not in ('So',) for c in emoji):
+        return JSONResponse({"error": "invalid emoji"}, 400)
     reactions = await deps.store.react(msg_id, emoji, sender)
     if reactions is None:
         return JSONResponse({"error": "not found"}, 404)

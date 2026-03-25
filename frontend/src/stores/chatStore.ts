@@ -211,6 +211,9 @@ export const useChatStore = create<ChatState>((set) => ({
     debugMode: false,
     showStatsPanel: true,
     statsSections: { session: true, tokens: true, agents: true, activity: true },
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeFormat: '12h' as const,
+    voiceLanguage: 'en-US',
   },
   updateSettings: (updates) =>
     set((s) => ({ settings: { ...s.settings, ...updates } })),

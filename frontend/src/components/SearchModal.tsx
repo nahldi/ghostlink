@@ -75,7 +75,11 @@ export function SearchModal({ onClose }: SearchModalProps) {
   }, [query, mode]);
 
   // Reset selection when query changes
-  useEffect(() => setSelectedIdx(0), [query]);
+  const prevQueryRef = useRef(query);
+  if (prevQueryRef.current !== query) {
+    prevQueryRef.current = query;
+    if (selectedIdx !== 0) setSelectedIdx(0);
+  }
 
   const handleSelect = (msg: Message) => {
     setActiveChannel(msg.channel);

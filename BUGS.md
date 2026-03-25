@@ -1,7 +1,7 @@
 # GhostLink — Known Bugs & Issues
 
-**Last updated:** 2026-03-24
-**Version:** v3.9.4
+**Last updated:** 2026-03-25
+**Version:** v3.9.7
 **Source:** Full codebase audit + live API testing + deep code path audit + user-reported bugs + automated audit + 7 fix rounds
 
 ---
@@ -686,3 +686,162 @@ The dist JS bundle hash changed from `index-DkpFt3Lu.js` (previous session) to `
 
 ### No regressions detected
 All previously fixed bugs remain fixed. No new runtime errors, no new console errors, no new test failures. The app is stable at v3.9.4 (frontend/desktop) / v3.9.0 (backend).
+
+---
+
+## HOURLY HEALTH AUDIT — 2026-03-25T07:10 UTC
+
+**Audit type:** Automated scheduled audit (no code edits — issues logged only)
+**Auditor:** Cowork automated health check
+
+### Test & Build Summary
+| Check | Result |
+|---|---|
+| Backend Python syntax (AST check, 51 files) | **0 syntax errors** — all parse cleanly ✅ |
+| Backend tests (pytest) | **56/57 passed, 1 FAILED** (see BUG-093 below) |
+| TypeScript compilation (`tsc --noEmit`) | **0 errors** — clean ✅ |
+| ESLint | **96 errors, 2 warnings** (up from 95 — see BUG-089 update) |
+| npm audit | **0 vulnerabilities** ✅ |
+| Frontend dist | Present — `index-kLpUYpci.js` + `index-D8yFcNhU.css` ✅ |
+| Git status | On `master`, up to date with `origin/master`. Clean working tree. 14 untracked files (screenshots, config backup, audit docx — all non-critical). |
+
+### Server & UI Audit
+- **Backend starts successfully** — MCP bridge (HTTP 8200, SSE 8201), schedule checker, health monitor all initialize. Clean startup log (no warnings, no errors). ✅
+- **API endpoints tested OK:**
+  - `/api/status` (200) — returns 1 agent (claude, offline) ✅
+  - `/api/channels` (200) — returns 3 channels (general, backend, stress-test) ✅
+  - `/api/settings` (200) — returns full settings JSON ✅
+  - `/api/rules` (200) — returns 2 rules ✅
+  - `/api/jobs` (200) — returns 2 jobs ✅
+  - `/api/messages` (200) — returns 17 messages ✅
+- **Frontend HTML served correctly** from dist/ — proper meta tags, CSS/JS asset links present ✅
+- **No TODO/FIXME/HACK/XXX/BROKEN comments** in backend Python code ✅
+
+### Version Sync Check
+| Component | Version |
+|---|---|
+| Backend `__version__` (app.py) | **3.9.4** |
+| Frontend `package.json` | **3.9.7** |
+| Desktop `package.json` | **3.9.7** |
+
+### BUG-093: test_version assertion hardcodes "3.9.0" — fails against actual "3.9.4"
+**Severity:** Low — test bug, not a runtime bug
+**Found:** 2026-03-25T07:10 UTC
+**Where:** `backend/tests/test_core.py` line 18 — `assert app.__version__ == "3.9.0"`
+**Root cause:** The test hardcodes the expected version string as `"3.9.0"`. When `app.py` was updated to `__version__ = "3.9.4"` (fixing BUG-090), the test was not updated to match. Test now fails with `AssertionError: assert '3.9.4' == '3.9.0'`.
+**Fix needed:** Update `test_core.py` line 18 to `assert app.__version__ == "3.9.4"` — or better, just assert the version is a non-empty string matching semver pattern.
+**Status:** OPEN
+
+### BUG-090 update: Backend version still 3 patches behind frontend/desktop
+**Severity:** Low — cosmetic version mismatch, persists from previous audits
+**Where:** `backend/app.py` line 5 — `__version__ = "3.9.4"` vs frontend/desktop at `3.9.7`
+**Root cause:** Commits v3.9.5, v3.9.6, v3.9.7 synced frontend/desktop versions but missed backend `__version__`. Gap is 3 patches.
+**Status:** OPEN — worsening trend since first reported
+
+### BUG-089 update: ESLint errors now at 96 (was 95 in previous audit)
+**Delta:** +1 error since last audit (96 errors, 2 warnings across ~27 files)
+**Breakdown unchanged:** Dominated by `no-explicit-any` (44+), `no-empty` (25+), `react-hooks/purity` (5), `set-state-in-effect` (5), `globals` (2), `exhaustive-deps` (2 warnings)
+**Status:** OPEN — slight upward trend continues
+
+### Previously open bugs — status re-check:
+- **BUG-086** (auto-lint/commit tool triggers): Still open — only triggers on `code_execute`. Acknowledged.
+- **BUG-088** (WorktreeManager not called from routes): Previously reported as FIXED. ✅
+- **BUG-089** (ESLint errors): Still open — now 96 errors (was 95). See update above.
+- **BUG-090** (Backend version not synced): Still open — gap widened to 3 patches (3.9.4 vs 3.9.7).
+- **BUG-046** (OAuth not available): Still open — future enhancement.
+- **BUG-077** (Silent exception swallowing): Still open — observability gap, low priority.
+- **NOTE-002 item 4** (`_processed_comments` memory growth in `file_watcher.py`): Still open.
+
+### NOTE-007: Feature/update opportunities for v3.10.0
+**Type:** Enhancement notes (not bugs)
+1. **Sync backend version to 3.9.7** (BUG-090) — single line change in `app.py`.
+2. **Fix test_version assertion** (BUG-093) — update hardcoded version or use pattern match.
+3. **ESLint cleanup** (BUG-089) — prioritize `react-hooks/purity` (5) and `set-state-in-effect` (5) errors.
+4. **Code-split frontend bundle** — JS chunk still above Vite's 500KB recommendation.
+5. **Type API responses** — replace 44+ `any` types with proper interfaces.
+
+### No regressions detected
+All previously fixed bugs remain fixed. Server starts cleanly, all API endpoints respond correctly, frontend dist is present and valid, TypeScript compiles without errors. The app is stable at v3.9.7 (frontend/desktop) / v3.9.4 (backend).
+
+---
+
+## LIVE UI AUDIT — 2026-03-25T07:00 UTC
+
+**Audit type:** Manual Playwright browser automation — full click-through stress test
+**Auditor:** Claude Opus 4.6 (Playwright automated)
+**Server:** Running on localhost:8300
+**Browser:** Chromium (Playwright headless)
+
+### Test Coverage
+- Main chat view (messages, reactions, system messages, timestamps)
+- Sidebar navigation (Chat, Jobs, Rules, Settings)
+- Channel switching (general, backend, stress-test)
+- Settings panel (all 7 tabs: General, Look, Agents, AI, Bridges, Security, Advanced)
+- Theme switching (Dark → Light → Dark)
+- Jobs panel (2 existing jobs)
+- Message sending (typed + sent via button)
+- Search modal (Ctrl+K)
+- Mobile responsive view (375x812)
+- Desktop wide view (1280x800) with stats panel
+- API stress test (25 endpoints, all respond 200 except 2 documented routes)
+- Concurrent request test (10 parallel requests, all served in <13ms)
+- Console error check (0 errors)
+
+### Results Summary
+| Area | Status |
+|------|--------|
+| Core chat rendering | Works ✅ |
+| Message sending | Instant, appears in chat ✅ |
+| WebSocket real-time | Connected, no drops ✅ |
+| Sidebar navigation | Clean ✅ |
+| Channel switching | Works, empty state renders ✅ |
+| Settings (all 7 tabs) | All render correctly ✅ |
+| Theme switching | Works ✅ |
+| Jobs panel | Renders with data ✅ |
+| Search modal (Ctrl+K) | Opens, accepts input ✅ |
+| Mobile responsive | Layout adapts correctly ✅ |
+| Desktop wide (stats panel) | Stats panel shows correct data ✅ |
+| API endpoints (25 tested) | 23/25 return 200 ✅ |
+| Concurrent requests (10x) | All <13ms ✅ |
+| Console errors | 0 ✅ |
+| Agent bar | Shows Claude offline correctly ✅ |
+| Empty channel state | Conversation starters render ✅ |
+
+### BUG-094: System messages render raw markdown instead of formatted text
+**Severity:** Medium — cosmetic but visible on every session-related message
+**Found:** 2026-03-25T07:00 UTC (live Playwright audit)
+**Where:** `frontend/src/components/ChatMessage.tsx` — system message rendering path
+**What happens:** System messages like "Session started: **Code Review**" display with literal `**` asterisks and ALL CAPS text instead of rendering "Code Review" in bold. Also affects execution mode messages ("Execution mode set to **Plan (read-only)**") and phase messages.
+**Root cause:** System messages are rendered as plain text with `text-transform: uppercase` CSS applied, bypassing the ReactMarkdown renderer used for regular chat messages.
+**Screenshots:** `/tmp/ghostlink-audit/01-main-view.png`, `/tmp/ghostlink-audit/14-mobile-view.png`
+**Fix needed:** Route system message text through the same markdown renderer used for chat messages, or at minimum strip `**` markers and apply `<strong>` tags.
+**Status:** OPEN
+
+### BUG-095: Some emoji reactions render as "??" in reaction badge
+**Severity:** Medium — affects visual quality of reaction display
+**Found:** 2026-03-25T07:00 UTC (live Playwright audit)
+**Where:** `frontend/src/components/ChatMessage.tsx` — reaction badge rendering
+**What happens:** A reaction on the "Stress test v3.9.4" message shows "?? 1" instead of the actual emoji. The 👍 emoji on another message renders correctly, so the issue is specific to certain emoji characters.
+**Root cause:** The emoji may have been stored as a Unicode character sequence that the system font can't render in the small reaction badge, or there's a character encoding issue when the emoji was originally stored via the API.
+**Screenshots:** `/tmp/ghostlink-audit/01-main-view.png` (visible in lower-right area)
+**Fix needed:** Investigate what emoji is stored in the DB for that reaction. May need to normalize emoji storage to standard Unicode sequences, or use an emoji rendering library (e.g., Twemoji) for consistent cross-platform display.
+**Status:** OPEN
+
+### BUG-096: Timezone defaults to "Africa/Abidjan" instead of auto-detecting
+**Severity:** Low — first-run UX issue
+**Found:** 2026-03-25T07:00 UTC (live Playwright audit)
+**Where:** `frontend/src/stores/chatStore.ts` (settings defaults) and `frontend/src/components/SettingsPanel.tsx` (Date & Time section)
+**What happens:** Settings > General > Date & Time shows timezone defaulting to "Africa/Abidjan" (first alphabetically in the `<select>` list) instead of the user's actual timezone. This means timestamps may display in the wrong timezone for all users who haven't manually changed the setting.
+**Root cause:** The timezone setting default is an empty string or "auto" which causes the `<select>` to show the first option alphabetically. Should default to `Intl.DateTimeFormat().resolvedOptions().timeZone` on first load.
+**Fix needed:** In chatStore.ts, set the initial timezone default to the browser's detected timezone. In SettingsPanel.tsx, ensure the combobox shows the detected timezone as selected.
+**Status:** OPEN
+
+### NOTE-008: Audit observations (not bugs)
+**Type:** Observations from live testing
+1. **Performance excellent:** 10 concurrent API requests served in <13ms. Server is very responsive.
+2. **Zero console errors:** No JavaScript errors in the browser console during full test session.
+3. **Empty catch blocks:** Noted in snapshot but not causing runtime issues (covered by BUG-089).
+4. **Claude emoji box character:** Claude's message "I'm here and ready. 👋" shows the wave emoji as a box character (□) in some fonts. This is a font/rendering issue, not a code bug.
+5. **Stats panel data accurate:** Session stats (Agents: 0/1, Messages: 17, Channels: 3, Open Jobs: 2, Token Usage: 204, Est. Cost: $0.0006) all match actual data.
+6. **API route naming inconsistency:** `/api/sessions` returns 404 (actual route is `/api/sessions/list`), `/api/server-logs` returns 404 (actual route is `/api/logs`). These are not bugs per se (frontend uses the correct routes) but are developer ergonomics issues.
+7. **Message hover actions:** Hover action buttons (edit, react, pin, bookmark) are CSS-hidden and only appear on `:hover`. They don't appear in accessibility snapshots, meaning screen readers can't access them. This is an a11y concern for Phase 5.

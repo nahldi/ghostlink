@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import { ChatMessage } from './ChatMessage';
 import { api } from '../lib/api';
-import type { Message } from '../types';
 
 interface SplitViewProps {
   channel1: string;
@@ -12,23 +11,19 @@ interface SplitViewProps {
 
 export function SplitView({ channel1, channel2, onClose }: SplitViewProps) {
   const messages = useChatStore((s) => s.messages);
-  const [ch1Msgs, setCh1Msgs] = useState<Message[]>([]);
-  const [ch2Msgs, setCh2Msgs] = useState<Message[]>([]);
+  const setMessages = useChatStore((s) => s.setMessages);
+  const ch1Msgs = useMemo(() => messages.filter(m => m.channel === channel1).slice(-50), [messages, channel1]);
+  const ch2Msgs = useMemo(() => messages.filter(m => m.channel === channel2).slice(-50), [messages, channel2]);
 
-  useEffect(() => {
-    setCh1Msgs(messages.filter(m => m.channel === channel1).slice(-50));
-    setCh2Msgs(messages.filter(m => m.channel === channel2).slice(-50));
-  }, [messages, channel1, channel2]);
-
-  // Also fetch from API on mount
+  // Fetch from API on mount to ensure data is in store
   useEffect(() => {
     api.getMessages(channel1, 0, 50).then(r => {
-      if (r.messages.length > 0) setCh1Msgs(r.messages);
+      if (r.messages.length > 0) setMessages(r.messages);
     }).catch((e) => console.warn('SplitView ch1 fetch:', e.message || e));
     api.getMessages(channel2, 0, 50).then(r => {
-      if (r.messages.length > 0) setCh2Msgs(r.messages);
+      if (r.messages.length > 0) setMessages(r.messages);
     }).catch((e) => console.warn('SplitView ch2 fetch:', e.message || e));
-  }, [channel1, channel2]);
+  }, [channel1, channel2, setMessages]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col" onClick={onClose}>

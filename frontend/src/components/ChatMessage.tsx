@@ -111,9 +111,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
   // Streaming: agent messages <3s old that haven't streamed yet
-  const isNewAgentMsg = !_streamedIds.has(message.id)
-    && (Date.now() / 1000 - message.timestamp) < 3;
-  const [streaming, setStreaming] = useState(isNewAgentMsg);
+  const [streaming, setStreaming] = useState(() => {
+    const isNew = !_streamedIds.has(message.id) && (Date.now() / 1000 - message.timestamp) < 3;
+    return isNew;
+  });
   // Mobile long-press action menu
   const [showMobileActions, setShowMobileActions] = useState(false);
   // TTS playback
@@ -142,10 +143,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isSystem = message.type === 'system' || message.type === 'join';
 
   if (isSystem) {
+    // Render inline **bold** markdown as <strong> elements, uppercase the rest
+    const systemParts = message.text.split(/(\*\*.+?\*\*)/g).map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="text-on-surface-variant/60 font-semibold">{part.slice(2, -2)}</strong>;
+      }
+      return <span key={i} className="uppercase">{part}</span>;
+    });
     return (
       <div className="flex justify-center py-2">
-        <div className="text-[10px] text-on-surface-variant/30 uppercase tracking-widest bg-surface-container/30 px-4 py-1 rounded-full">
-          {message.text}
+        <div className="text-[10px] text-on-surface-variant/30 tracking-widest bg-surface-container/30 px-4 py-1 rounded-full">
+          {systemParts}
         </div>
       </div>
     );
