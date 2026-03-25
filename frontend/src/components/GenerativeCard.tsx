@@ -6,7 +6,7 @@
  */
 
 interface CardData {
-  type: 'table' | 'list' | 'kv' | 'buttons' | 'metric' | 'code';
+  type: 'table' | 'list' | 'kv' | 'buttons' | 'metric' | 'code' | 'diff' | 'chart';
   title?: string;
   // table: { headers: string[], rows: string[][] }
   headers?: string[];
@@ -25,6 +25,10 @@ interface CardData {
   // code: { language: string, code: string }
   language?: string;
   code?: string;
+  // diff: { diff: string } — unified diff format with +/- lines
+  diff?: string;
+  // chart: { data: { label: string, value: number }[] } — simple bar chart
+  data?: { label: string; value: number }[];
 }
 
 interface GenerativeCardProps {
@@ -40,7 +44,7 @@ export function GenerativeCard({ card, agentColor }: GenerativeCardProps) {
       {card.title && (
         <div className="px-4 py-2.5 border-b border-outline-variant/10 flex items-center gap-2">
           <span className="material-symbols-outlined text-[14px]" style={{ color }}>
-            {card.type === 'table' ? 'table_chart' : card.type === 'list' ? 'list' : card.type === 'kv' ? 'data_object' : card.type === 'metric' ? 'speed' : card.type === 'code' ? 'code' : 'widgets'}
+            {card.type === 'table' ? 'table_chart' : card.type === 'list' ? 'list' : card.type === 'kv' ? 'data_object' : card.type === 'metric' ? 'speed' : card.type === 'code' ? 'code' : card.type === 'diff' ? 'difference' : card.type === 'chart' ? 'bar_chart' : 'widgets'}
           </span>
           <span className="text-[11px] font-semibold text-on-surface">{card.title}</span>
         </div>
@@ -126,6 +130,44 @@ export function GenerativeCard({ card, agentColor }: GenerativeCardProps) {
           <pre className="text-xs font-mono bg-surface-container/60 rounded-lg p-3 overflow-x-auto text-on-surface/80">
             <code>{card.code}</code>
           </pre>
+        )}
+
+        {card.type === 'diff' && card.diff && (
+          <pre className="text-xs font-mono rounded-lg p-3 overflow-x-auto space-y-0">
+            {card.diff.split('\n').map((line, i) => (
+              <div
+                key={i}
+                className={`px-2 py-0.5 ${
+                  line.startsWith('+') ? 'bg-green-500/10 text-green-400' :
+                  line.startsWith('-') ? 'bg-red-500/10 text-red-400' :
+                  line.startsWith('@@') ? 'bg-blue-500/10 text-blue-400' :
+                  'text-on-surface/60'
+                }`}
+              >
+                {line}
+              </div>
+            ))}
+          </pre>
+        )}
+
+        {card.type === 'chart' && card.data && (
+          <div className="space-y-2">
+            {(() => {
+              const maxVal = Math.max(...card.data.map(d => d.value), 1);
+              return card.data.map((d, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-[10px] text-on-surface-variant/60 w-20 truncate text-right">{d.label}</span>
+                  <div className="flex-1 h-5 bg-surface-container-high rounded overflow-hidden">
+                    <div
+                      className="h-full rounded transition-all"
+                      style={{ width: `${(d.value / maxVal) * 100}%`, background: color }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-on-surface/70 font-mono w-10">{d.value}</span>
+                </div>
+              ));
+            })()}
+          </div>
         )}
       </div>
     </div>

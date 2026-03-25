@@ -41,6 +41,8 @@ def _create_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--output", choices=["json", "text", "quiet"], default="text", help="Output format")
     run_p.add_argument("--timeout", type=int, default=120, help="Max seconds to wait for response (default: 120)")
     run_p.add_argument("--port", type=int, default=8300, help="Server port (default: 8300)")
+    run_p.add_argument("--full-auto", action="store_true", help="Auto-approve all agent permission requests")
+    run_p.add_argument("--no-stream", action="store_true", help="Wait for final response only, don't stream intermediate events")
 
     # ghostlink status
     status_p = sub.add_parser("status", help="Check server and agent status")
@@ -111,6 +113,10 @@ async def cmd_run(args):
 
     _emit(output, "status", {"info": f"Connected to GhostLink on port {port}"})
 
+    # In full-auto mode, auto-approve all pending approval requests
+    if args.full_auto:
+        _emit(output, "status", {"info": "Full-auto mode: will auto-approve all permission requests"})
+
     # Build the message text with @mention if agent specified
     text = args.prompt
     if args.agent:
@@ -159,6 +165,17 @@ async def cmd_run(args):
                         got_response = True
         except Exception:
             pass
+
+        # In full-auto mode, auto-approve any pending approval requests
+        if args.full_auto:
+            try:
+                new_msgs_check = await _http_get(port, f"/api/messages?channel={args.channel}&since_id={max(0, last_id - 5)}")
+                for m in new_msgs_check.get("messages", []):
+                    if m.get("type") == "approval_request" and m["id"] not in seen_ids:
+                        await _http_post(port, f"/api/messages/{m['id']}/approve", {"response": "allow"})
+                        _emit(output, "status", {"info": f"Auto-approved: {m.get('text', '')[:80]}"})
+            except Exception:
+                pass
 
         # If we got a response and no new messages for 5s, assume done
         if got_response and time.time() - start > 10:
