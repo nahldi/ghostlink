@@ -23,7 +23,8 @@ export function FirstRunWizard() {
   const [theme, setTheme] = useState<Settings['theme']>('dark');
   const [visible, setVisible] = useState(true);
 
-  if (!visible || settings.setupComplete) return null;
+  // Check both store and localStorage for persistence across reloads
+  if (!visible || settings.setupComplete || localStorage.getItem('ghostlink_setup_complete')) return null;
 
   const finish = async () => {
     const updates: Partial<Settings> = {
@@ -32,6 +33,7 @@ export function FirstRunWizard() {
       setupComplete: true,
     };
     updateSettings(updates);
+    localStorage.setItem('ghostlink_setup_complete', 'true');
     try { await api.saveSettings({ ...settings, ...updates }); } catch {}
     document.documentElement.setAttribute('data-theme', theme);
     setVisible(false);
