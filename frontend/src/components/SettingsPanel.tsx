@@ -777,6 +777,12 @@ function SecurityTab() {
       <Section title="Secrets" icon="key" defaultOpen>
         <SecretsSection />
       </Section>
+      <Section title="Permission Presets" icon="shield">
+        <PermissionPresetsSection />
+      </Section>
+      <Section title="Tool Usage Log" icon="build">
+        <ToolLogSection />
+      </Section>
       <Section title="Data Retention" icon="schedule">
         <RetentionSection />
       </Section>
@@ -787,6 +793,64 @@ function SecurityTab() {
         <AuditLogSection />
       </Section>
     </>
+  );
+}
+
+function PermissionPresetsSection() {
+  const [presets, setPresets] = useState<{ id: string; name: string; description: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/security/permission-presets').then(r => r.json()).then(d => setPresets(d.presets || [])).catch(() => {});
+  }, []);
+  return (
+    <div>
+      <div className="text-[10px] text-on-surface-variant/50 mb-2">Available presets for agent permissions. Assign via agent config.</div>
+      <div className="space-y-1.5">
+        {presets.map(p => (
+          <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-container/30">
+            <span className="material-symbols-outlined text-[14px] text-primary/60">verified_user</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] font-semibold text-on-surface">{p.name}</div>
+              <div className="text-[9px] text-on-surface-variant/40">{p.description}</div>
+            </div>
+          </div>
+        ))}
+        {presets.length === 0 && <div className="text-[10px] text-on-surface-variant/40 text-center py-2">Loading presets...</div>}
+      </div>
+    </div>
+  );
+}
+
+function ToolLogSection() {
+  const [entries, setEntries] = useState<{ tool: string; actor: string; timestamp: string; details: Record<string, unknown> }[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/security/tool-log?limit=50').then(r => r.json()).then(d => setEntries(d.entries || [])).catch(() => {});
+  }, [open]);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">MCP Tool Calls</span>
+        <button onClick={() => setOpen(!open)} className="text-[10px] font-medium text-primary hover:text-primary/80">{open ? 'Hide' : 'Show'}</button>
+      </div>
+      {open && (
+        <div className="rounded-xl bg-surface-container-lowest border border-outline-variant/8 max-h-[200px] overflow-auto">
+          {entries.length === 0 ? (
+            <div className="text-[10px] text-on-surface-variant/30 text-center py-4">No tool calls recorded</div>
+          ) : (
+            <div className="divide-y divide-outline-variant/5">
+              {entries.map((e, i) => (
+                <div key={i} className="px-3 py-1.5 flex items-center gap-2">
+                  <span className="text-[9px] text-on-surface-variant/30 w-16 shrink-0 font-mono">{new Date(e.timestamp).toLocaleTimeString()}</span>
+                  <span className="text-[10px] font-medium text-primary/70 w-20 shrink-0 truncate">{e.actor}</span>
+                  <span className="text-[10px] text-on-surface/70 font-mono">{e.tool || (e.details as Record<string, string>)?.tool || '?'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
