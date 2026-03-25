@@ -98,11 +98,14 @@ async def agent_templates(connected: str = ""):
     _available_cache: dict[str, bool] = {}
 
     def _is_available(name: str, cmd: str) -> bool:
-        if name in _connected_set:
-            return True
-        _PROVIDER_TO_BASE = {"anthropic": "claude", "openai": "codex", "google": "gemini", "github": "copilot"}
-        if _PROVIDER_TO_BASE.get(name, name) in _connected_set or name in [_PROVIDER_TO_BASE.get(c, c) for c in _connected_set]:
-            return True
+        # For agents with subcommand requirements, always do the deep check
+        _NEEDS_DEEP_CHECK = {"copilot"}
+        if name not in _NEEDS_DEEP_CHECK:
+            if name in _connected_set:
+                return True
+            _PROVIDER_TO_BASE = {"anthropic": "claude", "openai": "codex", "google": "gemini", "github": "copilot"}
+            if _PROVIDER_TO_BASE.get(name, name) in _connected_set or name in [_PROVIDER_TO_BASE.get(c, c) for c in _connected_set]:
+                return True
         if name in _available_cache:
             return _available_cache[name]
         result = _check_available(name, cmd)
@@ -119,6 +122,14 @@ async def agent_templates(connected: str = ""):
 
     def _do_check_available(name: str, cmd: str) -> bool:
         if _shutil.which(cmd):
+            # Extra validation for agents that need subcommands/extensions
+            if name == "copilot" and cmd == "gh":
+                try:
+                    r = subprocess.run(["gh", "copilot", "--help"], capture_output=True, timeout=5)
+                    if r.returncode != 0:
+                        return False
+                except Exception:
+                    return False
             return True
         for key in _API_KEY_ENV.get(name, []):
             if os.environ.get(key):
@@ -222,6 +233,16 @@ async def spawn_agent(request: Request):
     command = cfg.get("command") or _KNOWN_COMMANDS.get(base, base)
 
     import shutil as _shutil
+
+    # Extra check for agents that need subcommands/extensions
+    if base == "copilot" and _shutil.which("gh"):
+        try:
+            r = subprocess.run(["gh", "copilot", "--help"], capture_output=True, timeout=5)
+            if r.returncode != 0:
+                return JSONResponse({"error": "GitHub Copilot extension not installed. Run: gh extension install github/gh-copilot"}, 400)
+        except Exception:
+            return JSONResponse({"error": "GitHub Copilot extension not installed. Run: gh extension install github/gh-copilot"}, 400)
+
     if not _shutil.which(command):
         found_in_wsl = False
         wsl_checks = [
