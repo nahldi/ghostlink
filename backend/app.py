@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "3.9.8"
+__version__ = "4.0.0"
 
 import json
 import os
