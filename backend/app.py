@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "4.4.0"
+__version__ = "4.5.0"
 
 import json
 import os
@@ -299,6 +299,14 @@ async def lifespan(_app: FastAPI):
     from a2a_bridge import A2ABridge, setup_routes as setup_a2a
     deps.a2a_bridge = A2ABridge(server_version=__version__)
     setup_a2a(app, deps.a2a_bridge)
+    from autonomous import AutonomousManager
+    deps.autonomous_manager = AutonomousManager()
+    from memory_graph import MemoryGraph
+    deps.memory_graph = MemoryGraph(DATA_DIR)
+    from specialization import SpecializationEngine
+    deps.specialization = SpecializationEngine(DATA_DIR)
+    from rag import RAGPipeline
+    deps.rag_pipeline = RAGPipeline(DATA_DIR)
 
     # Broadcast new messages via WebSocket
     async def on_msg(msg: dict):

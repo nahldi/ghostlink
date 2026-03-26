@@ -50,6 +50,10 @@ automation_manager: "AutomationManager | None" = None  # v3.6.0
 remote_runner: "RemoteRunner | None" = None  # v4.4.0
 user_manager: "UserManager | None" = None  # v4.4.0
 a2a_bridge: "A2ABridge | None" = None  # v4.4.0
+autonomous_manager: "AutonomousManager | None" = None  # v4.5.0
+memory_graph: "MemoryGraph | None" = None  # v4.5.0
+specialization: "SpecializationEngine | None" = None  # v4.5.0
+rag_pipeline: "RAGPipeline | None" = None  # v4.5.0
 
 # ── Process tracking (set by spawn/register routes) ──────────────────
 

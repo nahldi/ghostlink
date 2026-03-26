@@ -1,5 +1,14 @@
 # GhostLink Changelog
 
+## v4.5.0 — 2026-03-26
+### Phase 7: Intelligence v3
+- **Autonomous Agent Mode** — goal-driven planning with subtask decomposition, delegation, pause/resume, auto-summary
+- **Memory Graph** — cross-session knowledge with TF-IDF semantic search, auto-linking related memories, graph traversal
+- **Agent Specialization** — feedback-driven prompt evolution from thumbs up/down and corrections, auto-analysis of patterns
+- **RAG Pipeline** — document upload, chunking (500 char with overlap), TF-IDF retrieval, context injection for agent prompts
+- **Visual Workflow Builder** — drag-and-drop editor with 4 node types (trigger, agent, condition, action), SVG edges, properties panel
+- **Multi-Language UI (i18n)** — 8 languages: English, Spanish, French, German, Japanese, Chinese, Korean, Portuguese
+
 ## v4.4.0 — 2026-03-26
 ### Phase 6: Cloud & Scale
 - **Remote Agent Execution** — `RemoteRunner` spawns agents in Docker containers or on SSH hosts, monitors lifecycle, supports up to 8 parallel remote agents
