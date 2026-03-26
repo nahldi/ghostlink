@@ -10,11 +10,15 @@ html, body, #root {
   color: #e0dff0;
 }
 
-/* Smooth scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Dark scrollbar everywhere */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 139, 250, 0.15) transparent;
+}
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(167, 139, 250, 0.12); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(167, 139, 250, 0.25); }
+::-webkit-scrollbar-thumb { background: rgba(167, 139, 250, 0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(167, 139, 250, 0.3); }
 
 @theme {
   --color-primary: #a78bfa;
