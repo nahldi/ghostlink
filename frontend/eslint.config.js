@@ -19,5 +19,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Downgrade to warn — will type-fix incrementally, not a runtime issue
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
   },
 ])

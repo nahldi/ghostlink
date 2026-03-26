@@ -70,7 +70,7 @@ export function JobsPanel() {
       useChatStore.getState().setJobs(res.jobs);
       setTitle('');
       setShowForm(false);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   const handleDragStart = (e: React.DragEvent, job: Job) => {

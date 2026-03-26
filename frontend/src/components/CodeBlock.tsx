@@ -26,7 +26,7 @@ export function CodeBlock({ code, language, highlighted }: CodeBlockProps) {
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   return (

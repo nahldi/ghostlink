@@ -18,6 +18,7 @@ const MAX_TOASTS = 5;
 
 let _addToast: (msg: string, type: ToastType) => void = () => {};
 
+// eslint-disable-next-line react-refresh/only-export-components -- toast() is the public API, must coexist with Toast component
 export function toast(message: string, type: ToastType = 'info') {
   _addToast(message, type);
 }

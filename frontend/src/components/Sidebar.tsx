@@ -61,7 +61,7 @@ export function Sidebar() {
       const r = await api.createChannel(name) as { channels: string[] };
       setChannels(mergeChannels(r.channels));
       setNewName(''); setAdding(false);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   const handleDelete = async (name: string) => {
@@ -70,7 +70,7 @@ export function Sidebar() {
       const r = await api.deleteChannel(name) as { channels: string[] };
       setChannels(mergeChannels(r.channels));
       if (activeChannel === name) setActiveChannel('general');
-    } catch {}
+    } catch { /* ignored */ }
     setContextMenu(null);
   };
 
@@ -81,7 +81,7 @@ export function Sidebar() {
       const r = await api.renameChannel(oldName, name) as { channels: string[] };
       setChannels(r.channels.map((n: string) => ({ name: n, unread: 0 })));
       if (activeChannel === oldName) setActiveChannel(name);
-    } catch {}
+    } catch { /* ignored */ }
     setEditingChannel(null);
   };
 

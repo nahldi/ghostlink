@@ -120,7 +120,8 @@ def on_post_tool_use(data: dict):
         return
 
     tool = data.get("tool", "")
-    if tool not in ("code_execute", "delegate"):
+    # Trigger on any tool that may write files
+    if tool not in ("code_execute", "delegate", "gemini_image", "image_generate", "text_to_speech"):
         return
 
     agent = data.get("agent", "unknown")

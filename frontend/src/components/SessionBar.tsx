@@ -55,7 +55,7 @@ export function SessionBar() {
     try {
       const r = await api.advanceSession(activeChannel);
       setSession(r.session);
-    } catch {}
+    } catch { /* ignored */ }
     setAdvancing(false);
   };
 
@@ -63,7 +63,7 @@ export function SessionBar() {
     try {
       const r = await api.endSession(activeChannel);
       setSession(r.session);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   const isPaused = session.status === 'paused';
@@ -74,7 +74,7 @@ export function SessionBar() {
         ? await api.resumeSession(activeChannel)
         : await api.pauseSession(activeChannel);
       setSession(r.session);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   const currentMode = session.execution_mode || 'execute';
@@ -86,7 +86,7 @@ export function SessionBar() {
     try {
       const r = await api.setSessionMode(activeChannel, modes[nextIdx]);
       setSession(r.session);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   return (

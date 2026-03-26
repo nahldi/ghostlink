@@ -68,7 +68,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
       try {
         const r = await api.searchMessages(query);
         setResults(r.results);
-      } catch {}
+      } catch { /* ignored */ }
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);

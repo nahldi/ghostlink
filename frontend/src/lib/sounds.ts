@@ -50,7 +50,7 @@ export const SoundManager = {
       audio.volume = volume;
       audio.currentTime = 0;
       audio.play().catch(() => { /* browser autoplay policy */ });
-    } catch {}
+    } catch { /* ignored */ }
   },
 
   preview(soundId: string) {
@@ -61,7 +61,7 @@ export const SoundManager = {
       audio.volume = volume;
       audio.currentTime = 0;
       audio.play().catch(() => { /* browser autoplay policy */ });
-    } catch {}
+    } catch { /* ignored */ }
   },
 
   setVolume(v: number) {

@@ -34,7 +34,7 @@ export function CanvasView({ content, language, title, onClose }: CanvasViewProp
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   return (

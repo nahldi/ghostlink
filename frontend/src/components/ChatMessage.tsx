@@ -89,7 +89,7 @@ function ReactionBar({ reactions, messageId, username }: { reactions: Record<str
                 : 'bg-surface-container-high/50 border border-outline-variant/10 text-on-surface-variant/60 hover:bg-surface-container-highest/60'
             }`}
           >
-            <span>{emoji}</span>
+            <span style={{ fontFamily: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif' }}>{emoji}</span>
             <span className="font-medium">{users.length}</span>
           </button>
         );

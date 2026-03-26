@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
 
 // Cache previews to avoid re-fetching (bounded to 200 entries)
 const _cache: Record<string, { title: string; description: string; image: string; site_name: string } | null> = {};

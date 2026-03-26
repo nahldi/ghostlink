@@ -29,7 +29,7 @@ export function RulesPanel() {
       useChatStore.getState().setRules(res.rules);
       setText('');
       setShowForm(false);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   const handleDragStart = (e: React.DragEvent, rule: Rule) => {
@@ -67,7 +67,7 @@ export function RulesPanel() {
       await api.updateRule(ruleId, { status: targetStatus as Rule['status'] });
       const res = await api.getRules();
       useChatStore.getState().setRules(res.rules);
-    } catch {}
+    } catch { /* ignored */ }
   };
 
   return (

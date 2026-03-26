@@ -27,7 +27,7 @@ export class WebSocketClient {
   private setState(s: WSState) {
     this._state = s;
     this.stateListeners.forEach((cb) => {
-      try { cb(s); } catch {}
+      try { cb(s); } catch { /* ignored */ }
     });
   }
 
@@ -40,7 +40,7 @@ export class WebSocketClient {
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send('{"type":"ping"}');
         }
-      } catch {}
+      } catch { /* ignored */ }
     }, 25000);
   }
 
@@ -64,13 +64,13 @@ export class WebSocketClient {
         this.startPing();
         if (isReconnect) {
           this.reconnectListeners.forEach((cb) => {
-            try { cb(); } catch {}
+            try { cb(); } catch { /* ignored */ }
           });
         }
       };
       this.ws.onmessage = (event) => {
         this.listeners.forEach((cb) => {
-          try { cb(event); } catch {}
+          try { cb(event); } catch { /* ignored */ }
         });
       };
       this.ws.onclose = () => {
@@ -79,7 +79,7 @@ export class WebSocketClient {
         if (this.shouldReconnect) this.scheduleReconnect();
       };
       this.ws.onerror = () => {
-        try { this.ws?.close(); } catch {}
+        try { this.ws?.close(); } catch { /* ignored */ }
       };
     } catch {
       this.setState('disconnected');
@@ -101,7 +101,7 @@ export class WebSocketClient {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify(data));
       }
-    } catch {}
+    } catch { /* ignored */ }
   }
 
   subscribe(cb: WSCallback) {
@@ -123,7 +123,7 @@ export class WebSocketClient {
     this.shouldReconnect = false;
     this.stopPing();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    try { this.ws?.close(); } catch {}
+    try { this.ws?.close(); } catch { /* ignored */ }
     this.setState('disconnected');
   }
 }

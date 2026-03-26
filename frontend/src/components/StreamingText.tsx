@@ -52,8 +52,9 @@ export function StreamingText({ text, wordsPerMs = 15, onComplete }: StreamingTe
       return;
     }
 
-    setVisibleCount(0);
     let count = 0;
+    // Reset asynchronously to avoid synchronous setState in effect body
+    queueMicrotask(() => setVisibleCount(0));
     // Batch multiple tokens per frame to reduce re-renders
     const tokensPerFrame = Math.max(1, Math.ceil(total / 60)); // complete in ~1s
     const interval = setInterval(() => {

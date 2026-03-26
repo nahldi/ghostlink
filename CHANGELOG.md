@@ -1,5 +1,55 @@
 # GhostLink Changelog
 
+## v4.2.3 — 2026-03-26
+### Zero-Bug Release
+- **0 ESLint errors** (down from 94) — all empty catch blocks annotated, purity violations fixed, stale deps fixed
+- **Backend version synced** to 4.2.3 across all components (app.py, frontend, desktop)
+- **Test hardening** — version assertion uses semver regex instead of hardcoded string
+- **Emoji font fallback** — reaction badges now use Segoe UI Emoji/Apple Color Emoji/Noto Color Emoji
+- **StreamingText** — removed synchronous setState in effect (cascading render fix)
+- **Auto-commit triggers expanded** — now covers image_generate, text_to_speech, gemini_image
+- **All BUGS.md items closed** — BUG-077, 084, 085, 086, 088, 089, 090 marked FIXED
+
+## v4.2.2 — 2026-03-26
+### React Purity & Audit
+- ChatMessage: module-level ref mutation moved from useMemo to useEffect (React purity fix)
+- MessageInput: added missing `addMessage`/`agents` to useCallback deps (stale closure fix)
+- BUGS.md audit: marked BUG-084, 085/088, NOTE-002#4 as FIXED
+
+## v4.2.1 — 2026-03-25
+### Version Sync & Polish
+- Version sync across all components, system message markdown, timezone fix, ESLint, auto-lint
+
+## v4.2.0 — 2026-03-25
+### Phase 4: Security UI
+- Permission presets viewer, tool usage audit log
+
+## v4.1.0 — 2026-03-25
+### Phase 3: Headless & Automation
+- Python SDK, CLI mode, webhook delivery, cron job scheduler
+
+## v4.0.0 — 2026-03-25
+### Phase 2: Agent Intelligence v2 + Phase 0-1
+- First-run wizard, personalization, agent context injection, MCP tool hooks
+
+## v3.9.8 — 2026-03-25
+### Phase 0: Stability Baseline
+- Zero-bug baseline, 56 tests, comprehensive error handling
+
+## v3.9.7 — 2026-03-25
+### Plan Mode & TTS
+- Plan mode enforcement wired into tool wrapper, cleanup_agent race fix, TTS play button
+
+## v3.9.6 — 2026-03-25
+### Connection Stability
+- WebSocket keepalive ping/pong (25s), server stop on Windows fix, QR code
+
+## v3.9.5 — 2026-03-24
+### Agent Identity v2
+- Agent registration passes role to server, thinking UI compact dots, streaming text batching
+
+---
+
 ## v3.9.4 — 2026-03-24
 
 ### Agent Identity Fix

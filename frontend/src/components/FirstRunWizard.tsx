@@ -34,7 +34,7 @@ export function FirstRunWizard() {
     };
     updateSettings(updates);
     localStorage.setItem('ghostlink_setup_complete', 'true');
-    try { await api.saveSettings({ ...settings, ...updates }); } catch {}
+    try { await api.saveSettings({ ...settings, ...updates }); } catch { /* best-effort */ }
     document.documentElement.setAttribute('data-theme', theme);
     setVisible(false);
   };

@@ -200,7 +200,7 @@ export function useWebSocket() {
         unsubState();
         unsubReconnect();
         client.disconnect();
-      } catch {}
+      } catch { /* ignored */ }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

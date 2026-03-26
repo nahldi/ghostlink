@@ -123,6 +123,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
         setSelected(available[0].base);
       }
     }).catch((e) => console.warn('Agent templates fetch:', e.message || e));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run only on mount
   }, []);
 
   const template = templates.find(t => t.base === selected);

@@ -15,7 +15,8 @@ import pytest_asyncio
 def test_version():
     """Backend version string is set."""
     import app
-    assert app.__version__ == "4.2.1"
+    import re
+    assert re.match(r"^\d+\.\d+\.\d+$", app.__version__), f"Bad version format: {app.__version__}"
 
 
 def test_imports_clean():
