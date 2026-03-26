@@ -42,7 +42,7 @@ export function WorkspaceViewer({ agentName, workspace, onClose }: WorkspaceView
     setLoading(false);
   }, [agentName]);
 
-  useEffect(() => { loadFiles(); }, [loadFiles]);
+  useEffect(() => { queueMicrotask(loadFiles); }, [loadFiles]);
 
   const toggleDir = (path: string) => {
     setExpandedDirs(prev => {

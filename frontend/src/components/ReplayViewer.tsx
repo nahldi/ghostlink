@@ -21,7 +21,7 @@ export function ReplayViewer({ channel, onClose }: ReplayViewerProps) {
 
   useEffect(() => {
     if (!playing || visibleCount >= channelMsgs.length) {
-      if (visibleCount >= channelMsgs.length) setPlaying(false);
+      if (visibleCount >= channelMsgs.length) queueMicrotask(() => setPlaying(false));
       return;
     }
     const current = channelMsgs[visibleCount];

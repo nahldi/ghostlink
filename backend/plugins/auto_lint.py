@@ -42,8 +42,14 @@ _TEST_RUNNER_MAP = {
     "jest.config.ts": ["npx", "jest", "--bail"],
 }
 
-# Tools that may write files (expanded from just code_execute)
-_FILE_WRITE_TOOLS = {"code_execute", "delegate"}
+# Tools that may write files — expanded to cover all write paths
+_FILE_WRITE_TOOLS = {
+    "code_execute", "delegate",
+    "chat_send",           # agents may include file content in messages
+    "gemini_image",        # generates image files
+    "image_generate",      # generates image files
+    "text_to_speech",      # generates audio files
+}
 
 
 def _detect_linter(workspace: str) -> tuple[list[str], str] | None:

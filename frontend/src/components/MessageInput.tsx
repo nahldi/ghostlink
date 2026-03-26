@@ -205,9 +205,12 @@ export function MessageInput() {
   // Watch for external input (from SearchModal command palette)
   useEffect(() => {
     if (pendingInput) {
-      setText(pendingInput);
-      setPendingInput('');
-      textareaRef.current?.focus();
+      // Defer setState to avoid synchronous set-state-in-effect
+      queueMicrotask(() => {
+        setText(pendingInput);
+        setPendingInput('');
+        textareaRef.current?.focus();
+      });
     }
   }, [pendingInput, setPendingInput]);
   const replyTo = useChatStore((s) => s.replyTo);

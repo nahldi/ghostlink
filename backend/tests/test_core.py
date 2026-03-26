@@ -15,7 +15,7 @@ import pytest_asyncio
 def test_version():
     """Backend version string is set."""
     import app
-    assert app.__version__ == "4.0.0"
+    assert app.__version__ == "4.2.1"
 
 
 def test_imports_clean():

@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-25
-**Version:** v3.9.7
+**Version:** v4.2.1
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,12 +66,14 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v3.9.4)
+## CURRENT STATE (v4.0.0)
 
-### Recent Changes (v3.9.2 → v3.9.4)
-- **v3.9.4**: Agent identity fix — preset labels/roles/descriptions injected into agent context. Code Reviewer now actually knows it's a Code Reviewer.
-- **v3.9.3**: Settings panel redesign — collapsible Section cards, only primary settings visible, rest collapsed. Bigger text, better hierarchy.
-- **v3.9.2**: Thinking UI redesign (compact dots, no SVG clutter), message shake/glitch fix (triple animation conflict), agent identity (chat_who returns metadata), multi-agent MCP support (grok/aider/goose/copilot), thread safety fixes.
+### Recent Changes (v3.9.8 → v4.0.0)
+- **v4.0.0**: Phase 2 agent intelligence — plan mode UI, memory search, auto-lint/test, delegation. Phase 3 headless & automation — CLI `--full-auto`, diff/chart cards, Python SDK.
+- **v3.10.0**: Phase 1 personalization — first-run wizard, agent nicknames, layout toggles.
+- **v3.9.8**: Phase 0 stability — version sync, system messages, emoji, timezone, ESLint, bundle splitting.
+- **v3.9.7**: Plan mode enforcement, race conditions, TTS, security hardening.
+- **v3.9.5–v3.9.6**: WebSocket keepalive, server stop fixes, shutdown handling, agent identity fixes.
 
 ### Numbers
 - **90+ completed features** (see FEATURES.md for full list)
@@ -84,7 +86,7 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 - **9 themes** (dark, light, cyberpunk, terminal, ocean, sunset, midnight, rosegold, arctic)
 - **28 built-in skills**
 - **23 slash commands**
-- **3 plugins** (example, file_watcher, skill_marketplace)
+- **5 plugins** (auto_commit, auto_lint, example, file_watcher, skill_marketplace)
 - **3 platform installers** (Windows .exe, Linux .AppImage/.deb, macOS .dmg)
 
 ### What's Working
@@ -326,7 +328,7 @@ npm run build:win   # Windows .exe
 See BUGS.md for full list. 72+ bugs fixed as of v3.9.4. All critical/high code bugs resolved. Remaining items:
 - BUG-007: OneDrive paths need /tmp copy (handled but slow — OS limitation)
 - BUG-011: Frontend dist path mismatch in packaged app (fallback exists)
-- BUG-087: ESLint 89 errors (cosmetic — `no-explicit-any`, empty catch blocks, no runtime impact)
+- BUG-089: ESLint 92 errors (cosmetic — `no-explicit-any`, empty catch blocks, no runtime impact)
 - BUG-088: WorktreeManager code exists but not wired into agent spawn/deregister lifecycle
 - BUG-046: OAuth sign-in not implemented (all providers work via API keys)
 - ARCH-003: Desktop app requires WSL on Windows (no native Python support yet)

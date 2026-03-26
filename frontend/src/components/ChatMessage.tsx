@@ -133,27 +133,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isSelected = selectedIds.has(message.id);
   const agent = agents.find((a) => a.name === message.sender);
   const agentNames = new Set(agents.map(a => a.name));
-  // v2.5.1: Build color map via useMemo instead of module-level mutation (React safety)
+  // v4.2.1: Build color map (updates shared ref for MdParagraph mention highlighting)
   useMemo(() => {
     const map: Record<string, string> = {};
     agents.forEach(a => { map[a.name] = a.color; map[a.base] = a.color; });
-    _agentColorMap = map; // Still needed for renderWithMentions helper
+    _agentColorMapRef.current = map;
   }, [agents]);
   const isUser = message.sender === settings.username || message.sender === 'You' || (!agentNames.has(message.sender) && message.type === 'chat');
   const isSystem = message.type === 'system' || message.type === 'join';
 
   if (isSystem) {
-    // Render inline **bold** markdown as <strong> elements, uppercase the rest
-    const systemParts = message.text.split(/(\*\*.+?\*\*)/g).map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="text-on-surface-variant/60 font-semibold">{part.slice(2, -2)}</strong>;
-      }
-      return <span key={i} className="uppercase">{part}</span>;
-    });
     return (
       <div className="flex justify-center py-2">
-        <div className="text-[10px] text-on-surface-variant/30 tracking-widest bg-surface-container/30 px-4 py-1 rounded-full">
-          {systemParts}
+        <div className="text-[10px] text-on-surface-variant/30 tracking-widest bg-surface-container/30 px-4 py-1 rounded-full uppercase [&_strong]:text-on-surface-variant/60 [&_strong]:font-semibold [&_strong]:normal-case [&_em]:normal-case [&_p]:inline">
+          <ReactMarkdown components={{ p: ({ children }) => <>{children}</> }}>{message.text}</ReactMarkdown>
         </div>
       </div>
     );
@@ -462,16 +455,17 @@ function Attachments({ attachments }: { attachments: Attachment[] }) {
   );
 }
 
-// Render text with @mention highlights
-// Agent color map — updated by ChatMessage on render
-let _agentColorMap: Record<string, string> = {};
+// Module-level ref to agent color map (set by ChatMessage via useRef, read by MdParagraph)
+const _agentColorMapRef: { current: Record<string, string> } = { current: {} };
 
+// Render text with @mention highlights
 function renderWithMentions(text: string): React.ReactNode[] {
+  const colorMap = _agentColorMapRef.current;
   const parts = text.split(/(@\w[\w-]*)/g);
   return parts.map((part, i) => {
     if (part.match(/^@\w/)) {
       const name = part.slice(1); // remove @
-      const color = _agentColorMap[name] || '#a78bfa';
+      const color = colorMap[name] || '#a78bfa';
       return (
         <span key={i} style={{
           background: `${color}25`,
@@ -509,7 +503,7 @@ function MdParagraph(props: any) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function MdCode(props: any) {
-  const { className, children, node, ...rest } = props;
+  const { className, children, ...rest } = props;
   const match = /language-(\w+)/.exec(className || '');
   const codeStr = String(children).replace(/\n$/, '');
   // For fenced code blocks: pass highlighted HTML from rehype-highlight

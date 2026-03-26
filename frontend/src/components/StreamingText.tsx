@@ -3,7 +3,7 @@
  * Only animates on initial render of NEW messages — not historical ones.
  * Uses requestAnimationFrame batching to prevent layout thrashing.
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 
 interface StreamingTextProps {
   text: string;
@@ -18,12 +18,11 @@ interface StreamingTextProps {
  */
 export function StreamingText({ text, wordsPerMs = 15, onComplete }: StreamingTextProps) {
   const [visibleCount, setVisibleCount] = useState(0);
-  const tokens = useRef<string[]>([]);
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useEffect(() => { onCompleteRef.current = onComplete; });
 
-  useEffect(() => {
-    // Split into tokens: words and code blocks as units
+  // Tokenize text (derived from props, safe to compute during render)
+  const tokens = useMemo(() => {
     const parts: string[] = [];
     const codeBlockRe = /```[\s\S]*?```/g;
     let lastIndex = 0;
@@ -38,13 +37,18 @@ export function StreamingText({ text, wordsPerMs = 15, onComplete }: StreamingTe
     const remaining = text.slice(lastIndex);
     if (remaining) parts.push(...remaining.split(/(\s+)/));
 
-    tokens.current = parts.filter(p => p.length > 0);
-    const total = tokens.current.length;
+    return parts.filter(p => p.length > 0);
+  }, [text]);
+
+  useEffect(() => {
+    const total = tokens.length;
 
     // For very short messages, show immediately
     if (total <= 3) {
-      setVisibleCount(total);
-      onCompleteRef.current?.();
+      queueMicrotask(() => {
+        setVisibleCount(total);
+        onCompleteRef.current?.();
+      });
       return;
     }
 
@@ -62,8 +66,8 @@ export function StreamingText({ text, wordsPerMs = 15, onComplete }: StreamingTe
     }, wordsPerMs);
 
     return () => clearInterval(interval);
-  }, [text, wordsPerMs]);
+  }, [tokens, wordsPerMs]);
 
-  const visible = tokens.current.slice(0, visibleCount).join('');
+  const visible = tokens.slice(0, visibleCount).join('');
   return <>{visible}</>;
 }

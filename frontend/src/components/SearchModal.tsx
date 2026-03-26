@@ -62,7 +62,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
 
   // Message search
   useEffect(() => {
-    if (mode !== 'search' || !query.trim()) { setResults([]); return; }
+    if (mode !== 'search' || !query.trim()) { queueMicrotask(() => setResults([])); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
@@ -74,12 +74,14 @@ export function SearchModal({ onClose }: SearchModalProps) {
     return () => clearTimeout(timer);
   }, [query, mode]);
 
-  // Reset selection when query changes
-  const prevQueryRef = useRef(query);
-  if (prevQueryRef.current !== query) {
-    prevQueryRef.current = query;
-    if (selectedIdx !== 0) setSelectedIdx(0);
-  }
+  // Reset selection when query changes (deferred to avoid setState in render/effect)
+  const prevQuery = useRef(query);
+  useEffect(() => {
+    if (prevQuery.current !== query) {
+      prevQuery.current = query;
+      queueMicrotask(() => setSelectedIdx(0));
+    }
+  }, [query]);
 
   const handleSelect = (msg: Message) => {
     setActiveChannel(msg.channel);

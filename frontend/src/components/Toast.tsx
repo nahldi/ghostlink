@@ -3,7 +3,7 @@
  * v3.2.0: Stacking offset, swipe-to-dismiss, max 5 visible.
  * Usage: import { toast } from './Toast'; toast('Message saved', 'success');
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -43,7 +43,7 @@ export function ToastContainer() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  _addToast = useCallback((message: string, type: ToastType) => {
+  const addToast = useCallback((message: string, type: ToastType) => {
     const id = crypto.randomUUID();
     setToasts(prev => {
       // Cap at MAX_TOASTS — drop oldest if needed
@@ -52,6 +52,9 @@ export function ToastContainer() {
     });
     setTimeout(() => dismiss(id), 4000);
   }, [dismiss]);
+
+  // Register the add function for the module-level toast() helper
+  useEffect(() => { _addToast = addToast; return () => { _addToast = () => {}; }; }, [addToast]);
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 items-end">

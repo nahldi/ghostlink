@@ -49,8 +49,10 @@ export function ChatWidget({ html, title, height = 300 }: ChatWidgetProps) {
 <body>${html}</body>
 </html>`);
     doc.close();
-    setLoaded(true);
   }, [html]);
+
+  // Use iframe onLoad for loaded state (avoids setState in effect body)
+  const handleLoad = () => setLoaded(true);
 
   const containerHeight = expanded ? Math.max(height, 500) : height;
 
@@ -80,6 +82,7 @@ export function ChatWidget({ html, title, height = 300 }: ChatWidgetProps) {
       <iframe
         ref={iframeRef}
         sandbox="allow-scripts"
+        onLoad={handleLoad}
         style={{
           width: '100%',
           height: containerHeight,

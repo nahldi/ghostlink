@@ -211,7 +211,26 @@ export const useChatStore = create<ChatState>((set) => ({
     debugMode: false,
     showStatsPanel: true,
     statsSections: { session: true, tokens: true, agents: true, activity: true },
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: (() => {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // Africa/Abidjan is UTC+0 fallback when OS timezone isn't detected properly
+      // (common in Electron/WSL). Use UTC offset to guess a better default.
+      if (tz === 'Africa/Abidjan' || !tz) {
+        const offset = -new Date().getTimezoneOffset();
+        const hours = Math.floor(offset / 60);
+        // Map common offsets to well-known timezones
+        const offsetMap: Record<number, string> = {
+          [-5]: 'America/New_York', [-6]: 'America/Chicago',
+          [-7]: 'America/Denver', [-8]: 'America/Los_Angeles',
+          [-4]: 'America/Halifax', [-3]: 'America/Sao_Paulo',
+          [0]: 'Europe/London', [1]: 'Europe/Paris', [2]: 'Europe/Helsinki',
+          [3]: 'Europe/Moscow', [5]: 'Asia/Kolkata', [8]: 'Asia/Shanghai',
+          [9]: 'Asia/Tokyo', [10]: 'Australia/Sydney',
+        };
+        return offsetMap[hours] || 'UTC';
+      }
+      return tz;
+    })(),
     timeFormat: '12h' as const,
     voiceLanguage: 'en-US',
     showAgentBar: true,
