@@ -64,40 +64,56 @@ export function useWebSocket() {
   } = useChatStore();
 
   useEffect(() => {
-    let client: WebSocketClient;
-    try {
+    let client: WebSocketClient | null = null;
+    let unsub: (() => void) | null = null;
+    let unsubState: (() => void) | null = null;
+    let unsubReconnect: (() => void) | null = null;
+    let cancelled = false;
+
+    async function initWs() {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${proto}//${window.location.host}/ws`;
+      let wsUrl = `${proto}//${window.location.host}/ws`;
+
+      // If accessed remotely (not localhost), try to get WS auth token
+      const isRemote = !['localhost', '127.0.0.1', '[::1]'].some(h => window.location.hostname === h);
+      if (isRemote) {
+        try {
+          const resp = await fetch('/api/ws-token');
+          if (resp.ok) {
+            const { token } = await resp.json();
+            wsUrl += `?token=${encodeURIComponent(token)}`;
+          }
+        } catch { /* tunnel mode — server accepts without token */ }
+      }
+
+      if (cancelled) return;
       client = new WebSocketClient(wsUrl);
       wsRef.current = client;
-    } catch {
-      return;
-    }
 
-    // Track connection state
-    const unsubState = client.onStateChange((s) => setWsState(s));
+      // Track connection state
+      unsubState = client.onStateChange((s) => setWsState(s));
 
-    // Fetch missed messages on reconnect
-    const unsubReconnect = client.onReconnect(async () => {
-      try {
-        const state = useChatStore.getState();
-        const lastMsg = state.messages[state.messages.length - 1];
-        const sinceId = lastMsg?.id || 0;
-        if (sinceId > 0) {
-          const resp = await api.getMessages(state.activeChannel, sinceId);
-          const msgs = resp.messages || [];
-          for (const msg of msgs) {
-            state.addMessage(msg);
+      // Fetch missed messages on reconnect
+      unsubReconnect = client.onReconnect(async () => {
+        try {
+          const state = useChatStore.getState();
+          const lastMsg = state.messages[state.messages.length - 1];
+          const sinceId = lastMsg?.id || 0;
+          if (sinceId > 0) {
+            const resp = await api.getMessages(state.activeChannel, sinceId);
+            const msgs = resp.messages || [];
+            for (const msg of msgs) {
+              state.addMessage(msg);
+            }
           }
+        } catch (e) {
+          console.warn('Failed to fetch missed messages on reconnect:', e instanceof Error ? e.message : String(e));
         }
-      } catch (e) {
-        console.warn('Failed to fetch missed messages on reconnect:', e instanceof Error ? e.message : String(e));
-      }
-    });
+      });
 
-    const unsub = client.subscribe((event) => {
-      try {
-        const parsed: WSEvent = JSON.parse(event.data);
+      unsub = client.subscribe((event) => {
+        try {
+          const parsed: WSEvent = JSON.parse(event.data);
         switch (parsed.type) {
           case 'message':
             addMessage(parsed.data);
@@ -187,7 +203,7 @@ export function useWebSocket() {
           case 'system':
             // Handle server shutdown — stop reconnecting and notify user
             if (parsed.data?.event === 'server_shutdown') {
-              client.disconnect();
+              client?.disconnect();
             }
             break;
         }
@@ -196,23 +212,27 @@ export function useWebSocket() {
         const state = useChatStore.getState();
         const totalUnread = state.channels.reduce((sum, ch) => sum + ch.unread, 0);
         updateFaviconBadge(totalUnread);
-      } catch {
-        // ignore parse errors or handler errors — never crash
-      }
-    });
+        } catch {
+          // ignore parse errors or handler errors — never crash
+        }
+      });
 
-    try {
-      client.connect();
-    } catch {
-      // WebSocket connection failed — app still works via REST
+      try {
+        client.connect();
+      } catch {
+        // WebSocket connection failed — app still works via REST
+      }
     }
 
+    initWs();
+
     return () => {
+      cancelled = true;
       try {
-        unsub();
-        unsubState();
-        unsubReconnect();
-        client.disconnect();
+        unsub?.();
+        unsubState?.();
+        unsubReconnect?.();
+        client?.disconnect();
       } catch { /* ignored */ }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

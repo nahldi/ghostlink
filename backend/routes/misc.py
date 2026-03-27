@@ -76,7 +76,8 @@ def _save_settings():
 @router.get("/api/ws-token")
 async def get_ws_token(request: Request):
     client_host = request.client.host if request.client else "127.0.0.1"
-    if client_host not in ("127.0.0.1", "::1"):
+    tunnel_active = deps._tunnel_process is not None and deps._tunnel_process.poll() is None
+    if client_host not in ("127.0.0.1", "::1") and not tunnel_active:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Localhost only")
     return {"token": deps._ws_token}

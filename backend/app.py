@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "4.7.2"
+__version__ = "4.7.3"
 
 import json
 import os
@@ -529,7 +529,8 @@ async def rate_limit_middleware(request: Request, call_next):
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     client_host = ws.client.host if ws.client else "127.0.0.1"
-    if client_host not in ("127.0.0.1", "::1"):
+    tunnel_active = deps._tunnel_process is not None and deps._tunnel_process.poll() is None
+    if client_host not in ("127.0.0.1", "::1") and not tunnel_active:
         token = ws.query_params.get("token")
         if not token or not secrets.compare_digest(token, _ws_token):
             await ws.close(code=4001, reason="Unauthorized")

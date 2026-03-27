@@ -1,5 +1,5 @@
 // GhostLink Service Worker — network-first for HTML, cache-first for assets
-const CACHE_NAME = 'ghostlink-v4.7.2';
+const CACHE_NAME = 'ghostlink-v4.7.3';
 
 // Install: skip waiting immediately to activate new SW
 self.addEventListener('install', () => {
