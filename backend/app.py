@@ -528,6 +528,7 @@ async def lifespan(_app: FastAPI):
                 "browser_snapshot": "Snapshot captured",
             }.get(tool_name, "Browser updated")
             artifact_path = _parse_artifact_path(result) if tool_name == "browser_snapshot" else ""
+            artifact_url = f"/api/agents/{agent}/browser/artifact" if artifact_path else ""
             _dispatch(set_agent_browser_state(
                 agent,
                 mode=tool_name,
@@ -547,7 +548,7 @@ async def lifespan(_app: FastAPI):
                 url=str(args.get("url", "")),
                 query=str(args.get("query", "")),
                 tool=tool_name,
-                metadata={"artifact_path": artifact_path},
+                metadata={"artifact_path": artifact_path, "artifact_url": artifact_url, "status": status},
             ))
             return
         surface, status, detail = _tool_surface(tool_name, args)
