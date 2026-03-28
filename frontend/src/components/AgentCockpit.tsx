@@ -144,8 +144,10 @@ function CockpitFiles({ agent }: { agent: Agent }) {
     setLoading(false);
   }, [agent.name]);
 
-  const openFile = useCallback(async (name: string) => {
-    const path = currentPath === '.' ? name : `${currentPath}/${name}`;
+  const openFile = useCallback(async (target: string) => {
+    const path = target.includes('/') || target.startsWith('./')
+      ? target.replace(/^\.\//, '')
+      : (currentPath === '.' ? target : `${currentPath}/${target}`);
     try {
       const [fileRes, diffData] = await Promise.all([
         fetch(`/api/agents/${encodeURIComponent(agent.name)}/file?path=${encodeURIComponent(path)}`),
@@ -288,7 +290,7 @@ function CockpitFiles({ agent }: { agent: Agent }) {
             const normPath = viewingFile!.replace(/\/\.\//g, '/').replace(/\/+/g, '/').replace(/^\.\//, '');
             const diffPayload = useChatStore.getState().fileDiffs[agent.name]?.[normPath];
             return diffPayload?.diff ? (
-              <DiffViewer diff={diffPayload.diff} path={normPath} before={diffPayload.before} after={diffPayload.after} agentName={agent.name} agentColor={agent.color} onRevert={() => { setShowDiff(false); openFile(viewingFile!.split('/').pop()!); }} />
+              <DiffViewer diff={diffPayload.diff} path={normPath} before={diffPayload.before} after={diffPayload.after} agentName={agent.name} agentColor={agent.color} onRevert={() => { setShowDiff(false); openFile(viewingFile!); }} />
             ) : (
               <div className="flex-1 flex items-center justify-center text-on-surface-variant/30 text-xs">No diff available</div>
             );
