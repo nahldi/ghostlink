@@ -308,8 +308,8 @@ function CockpitFiles({ agent }: { agent: Agent }) {
                   onClick={() => f.type === 'directory' ? fetchFiles(currentPath === '.' ? f.name : `${currentPath}/${f.name}`) : openFile(f.name)}
                   className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-surface-container-high/50 transition-colors"
                 >
-                  <span className="material-symbols-outlined text-sm" style={{ color: f.type === 'directory' ? '#60a5fa' : '#a78bfa' }}>
-                    {f.type === 'directory' ? 'folder' : 'description'}
+                  <span className="material-symbols-outlined text-sm" style={{ color: f.type === 'directory' ? '#60a5fa' : agent.color + '90' }}>
+                    {f.type === 'directory' ? 'folder' : getFileIcon(f.name)}
                   </span>
                   <span className="text-[11px] text-on-surface/70 truncate">{f.name}</span>
                   {f.size !== undefined && f.type === 'file' && (
@@ -401,9 +401,11 @@ const TAB_ICONS: Record<CockpitTab, string> = {
 export function AgentCockpit() {
   const agents = useChatStore((s) => s.agents);
   const cockpitAgent = useChatStore((s) => s.cockpitAgent);
+  const thinkingStreams = useChatStore((s) => s.thinkingStreams);
   const [tab, setTab] = useState<CockpitTab>('terminal');
 
   const agent = agents.find((a) => a.name === cockpitAgent) || null;
+  const thinking = agent ? thinkingStreams[agent.name] : null;
 
   if (!agent) {
     return (
@@ -423,19 +425,33 @@ export function AgentCockpit() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Agent header */}
-      <div className="px-3 py-2.5 border-b border-outline-variant/10 flex items-center gap-2.5 shrink-0">
-        <AgentIcon base={agent.base} color={agent.color} size={20} />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-on-surface/80 truncate">{agent.label || agent.name}</p>
-          <p className="text-[9px] text-on-surface-variant/40">
-            {agent.state === 'active' ? 'Working' : agent.state === 'idle' ? 'Ready' : agent.state === 'thinking' ? 'Thinking...' : agent.state}
-          </p>
+      {/* Agent header with status bar */}
+      <div className="px-3 py-2.5 border-b shrink-0" style={{ borderColor: `${agent.color}15` }}>
+        <div className="flex items-center gap-2.5">
+          <AgentIcon base={agent.base} color={agent.color} size={20} />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-on-surface/80 truncate">{agent.label || agent.name}</p>
+            <p className="text-[9px] text-on-surface-variant/40">
+              {thinking?.active
+                ? 'Thinking...'
+                : agent.state === 'active' ? 'Working' : agent.state === 'idle' ? 'Ready' : agent.state === 'paused' ? 'Paused' : agent.state}
+              {agent.workspace && <span className="ml-1 text-on-surface-variant/25">in {agent.workspace.split('/').pop()}</span>}
+            </p>
+          </div>
+          <div
+            className="w-2.5 h-2.5 rounded-full transition-all"
+            style={{
+              background: thinking?.active ? agent.color : agent.state === 'active' ? '#22c55e' : agent.state === 'idle' ? '#60a5fa' : agent.state === 'paused' ? '#fb923c' : '#6b7280',
+              boxShadow: thinking?.active ? `0 0 8px ${agent.color}80` : agent.state === 'active' ? '0 0 6px rgba(34,197,94,0.5)' : 'none',
+            }}
+          />
         </div>
-        <div
-          className="w-2 h-2 rounded-full"
-          style={{ background: agent.state === 'active' || agent.state === 'thinking' ? '#22c55e' : agent.state === 'idle' ? '#60a5fa' : '#6b7280' }}
-        />
+        {/* Thinking stream preview */}
+        {thinking?.active && thinking.text && (
+          <p className="mt-1.5 text-[9px] text-on-surface-variant/35 truncate font-mono italic pl-7">
+            {thinking.text.slice(-80)}
+          </p>
+        )}
       </div>
 
       {/* Tabs */}
@@ -446,9 +462,10 @@ export function AgentCockpit() {
             onClick={() => setTab(t)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium transition-colors ${
               tab === t
-                ? 'text-primary border-b-2 border-primary'
+                ? 'border-b-2'
                 : 'text-on-surface-variant/40 hover:text-on-surface-variant/60'
             }`}
+            style={tab === t ? { color: agent.color, borderColor: agent.color } : undefined}
           >
             <span className="material-symbols-outlined text-[14px]">{TAB_ICONS[t]}</span>
             {t.charAt(0).toUpperCase() + t.slice(1)}
