@@ -29,8 +29,6 @@ jobs:
           npm ci
           npx tsc
           npx electron-builder --win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v6
@@ -64,8 +62,6 @@ jobs:
           npm ci
           npx tsc
           npx electron-builder --linux AppImage deb
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v6
@@ -99,8 +95,6 @@ jobs:
           npm ci
           npx tsc
           npx electron-builder --mac dmg
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v6

@@ -1,15 +1,15 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "4.8.3",
+  "version": "4.8.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "rm -rf dist && tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "node ./node_modules/vitest/vitest.mjs run --pool=forks --maxWorkers=1",
+    "test:watch": "node ./node_modules/vitest/vitest.mjs --pool=forks --maxWorkers=1"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
