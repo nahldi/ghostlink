@@ -715,7 +715,10 @@ function CockpitReplay({ agent, onFileReverted }: { agent: Agent; onFileReverted
   const [events, setEvents] = useState<import('../types').AgentReplayEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<import('../types').AgentReplayEvent | null>(null);
   const fileDiffs = useChatStore((s) => s.fileDiffs[agent.name] || {});
-  const diffData = selectedEvent?.path ? (fileDiffs[selectedEvent.path] as FileDiffPayload | undefined) : undefined;
+  const normalizedSelectedPath = selectedEvent?.path
+    ? selectedEvent.path.replace(/\/\.\//g, '/').replace(/\/+/g, '/').replace(/^\.\//, '')
+    : '';
+  const diffData = normalizedSelectedPath ? (fileDiffs[normalizedSelectedPath] as FileDiffPayload | undefined) : undefined;
 
   useEffect(() => {
     let cancelled = false;
