@@ -1,5 +1,25 @@
 # GhostLink Changelog
 
+## v4.8.7 — 2026-03-28
+### Maintenance & Polish
+- **Desktop toolchain** — upgraded to Electron 35.7.5, electron-builder 26.8.1
+- **Zero vulnerabilities** — npm audit clean in both frontend and desktop
+- **Bundle optimization** — main chunk 790KB→174KB via manual chunk splitting (markdown, react, motion vendors)
+- **Frontend tests stabilized** — switched to happy-dom, 19/19 passing reliably
+- **CI/CD** — GitHub Actions upgraded to v6, release pipeline rerun-safe with `gh` CLI
+
+## v4.8.2 — 2026-03-28
+### Backend Hardening
+- **SSRF protection** — private URL check rejects non-HTTP(S), handles IPv6, checks all DNS results
+- **Emoji validation** — proper Unicode range checking replaces broken ASCII check
+- **Reply validation** — rejects non-positive and nonexistent reply_to message IDs
+- **Registry** — rename race fixed, UIDs upgraded to full UUID hex
+- **File locking** — portable lockfile-based append for Windows support
+- **Plugin sandbox** — exact import allowlist enforced for community plugins
+- **Provider resolution** — local providers only available when runtime is reachable
+- **Type safety** — 11 new interfaces, 30+ `any` types replaced across api.ts and SettingsPanel
+- **Tests** — WebSocket event tests, SSRF tests, emoji/reply route tests added
+
 ## v4.8.1 — 2026-03-28
 ### Regression Fixes & Auth Hardening
 - **Auth terminal launch** — spawnInTerminal() now uses typed TerminalLaunchSpec with wrapper scripts instead of string interpolation
