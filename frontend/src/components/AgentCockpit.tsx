@@ -274,6 +274,11 @@ function CockpitFiles({ agent }: { agent: Agent }) {
     );
   }
 
+  const [filter, setFilter] = useState('');
+  const filteredFiles = filter
+    ? files.filter(f => f.name.toLowerCase().includes(filter.toLowerCase()))
+    : files;
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 flex items-center gap-2 border-b border-outline-variant/10 shrink-0">
@@ -281,26 +286,48 @@ function CockpitFiles({ agent }: { agent: Agent }) {
           <button onClick={() => {
             const parent = currentPath.split('/').slice(0, -1).join('/') || '.';
             fetchFiles(parent);
+            setFilter('');
           }} className="p-1 rounded hover:bg-surface-container-high">
             <span className="material-symbols-outlined text-sm text-on-surface-variant/50">arrow_back</span>
           </button>
         )}
-        <span className="text-[11px] font-mono text-on-surface-variant/40 truncate">
+        <span className="text-[11px] font-mono text-on-surface-variant/40 truncate flex-1">
           {agent.workspace || '~'}/{currentPath === '.' ? '' : currentPath}
         </span>
+        <span className="text-[9px] text-on-surface-variant/20">{files.length} items</span>
       </div>
+      {/* File filter */}
+      {files.length > 5 && (
+        <div className="px-3 py-1.5 border-b border-outline-variant/5 shrink-0">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-container-high/30">
+            <span className="material-symbols-outlined text-[12px] text-on-surface-variant/30">search</span>
+            <input
+              type="text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter files..."
+              className="flex-1 bg-transparent text-[10px] text-on-surface/70 outline-none placeholder:text-on-surface-variant/20"
+            />
+            {filter && (
+              <button onClick={() => setFilter('')} className="text-on-surface-variant/30 hover:text-on-surface-variant/50">
+                <span className="material-symbols-outlined text-[12px]">close</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span>
           </div>
-        ) : files.length === 0 ? (
+        ) : filteredFiles.length === 0 ? (
           <div className="text-center py-8 text-on-surface-variant/30 text-xs">
-            {agent.state === 'offline' ? 'Agent is offline — start it to browse files' : 'No files found'}
+            {agent.state === 'offline' ? 'Agent is offline — start it to browse files' : filter ? 'No matches' : 'No files found'}
           </div>
         ) : (
           <div className="py-1">
-            {files
+            {filteredFiles
               .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'directory' ? -1 : 1))
               .map((f) => (
                 <button
