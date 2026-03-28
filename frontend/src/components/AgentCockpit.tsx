@@ -22,6 +22,8 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
 
   useEffect(() => {
     let cancelled = false;
+    setOutput('');
+    setActive(false);
     api.getAgentTerminalLive(agent.name)
       .then((data) => {
         if (!cancelled) {
@@ -467,6 +469,8 @@ function CockpitBrowser({ agent }: { agent: Agent }) {
 
   useEffect(() => {
     let cancelled = false;
+    setBrowser(null);
+    setLoading(true);
     api.getAgentBrowserState(agent.name)
       .then((data) => {
         if (!cancelled) {
