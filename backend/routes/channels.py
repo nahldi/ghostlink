@@ -1,11 +1,14 @@
 """Channel management routes."""
 from __future__ import annotations
 
+import re
+
 import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
+_CHANNEL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9_-]{0,19})$")
 
 
 @router.get("/api/channels")
@@ -17,7 +20,7 @@ async def get_channels():
 async def create_channel(request: Request):
     body = await request.json()
     name = body.get("name", "").strip().lower()
-    if not name or len(name) > 20:
+    if not _CHANNEL_NAME_RE.fullmatch(name):
         return JSONResponse({"error": "invalid name"}, 400)
     async with deps._settings_lock:
         channels = list(deps._settings.get("channels", ["general"]))
@@ -51,7 +54,7 @@ async def delete_channel(name: str):
 async def rename_channel(name: str, request: Request):
     body = await request.json()
     new_name = body.get("name", "").strip().lower()
-    if not new_name or len(new_name) > 20:
+    if not _CHANNEL_NAME_RE.fullmatch(new_name):
         return JSONResponse({"error": "invalid name"}, 400)
     async with deps._settings_lock:
         channels = list(deps._settings.get("channels", ["general"]))
@@ -82,7 +85,10 @@ async def channel_summary(name: str):
             "SELECT sender, text, timestamp FROM messages WHERE channel = ? ORDER BY id DESC LIMIT 100",
             (name,),
         )
-        rows = await cursor.fetchall()
+        try:
+            rows = await cursor.fetchall()
+        finally:
+            await cursor.close()
     except Exception as e:
         return JSONResponse({"error": "database unavailable", "detail": str(e)}, 503)
     if not rows:

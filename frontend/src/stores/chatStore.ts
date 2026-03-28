@@ -152,7 +152,7 @@ export const useChatStore = create<ChatState>((set) => ({
   channels: [{ name: 'general', unread: 0 }],
   activeChannel: 'general',
   setChannels: (channels) => set({ channels }),
-  setActiveChannel: (name) => set({ activeChannel: name, selectMode: false, selectedIds: new Set() }),
+  setActiveChannel: (name) => set({ activeChannel: name }),
   incrementUnread: (channel) =>
     set((s) => ({
       channels: s.channels.map((c) =>

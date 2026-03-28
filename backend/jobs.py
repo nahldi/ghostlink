@@ -49,7 +49,11 @@ class JobStore:
             (uid, job_type, title, body, channel, created_by, assignee, now, now),
         )
         await self._db.commit()
-        return await self._get_by_id(cursor.lastrowid)  # type: ignore
+        try:
+            lastrowid = cursor.lastrowid
+        finally:
+            await cursor.close()
+        return await self._get_by_id(lastrowid)  # type: ignore
 
     async def update(self, job_id: int, updates: dict) -> dict | None:
         allowed = {"status", "title", "assignee", "body", "sort_order"}
@@ -66,7 +70,10 @@ class JobStore:
     async def delete(self, job_id: int) -> bool:
         cursor = await self._db.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         await self._db.commit()
-        return cursor.rowcount > 0
+        try:
+            return cursor.rowcount > 0
+        finally:
+            await cursor.close()
 
     async def list_jobs(self, channel: str | None = None, status: str | None = None) -> list[dict]:
         query = "SELECT * FROM jobs"

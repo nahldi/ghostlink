@@ -698,7 +698,10 @@ async def respond_approval(request: Request):
     if message_id and deps.store._db:
         try:
             cursor = await deps.store._db.execute("SELECT metadata FROM messages WHERE id = ?", (message_id,))
-            row = await cursor.fetchone()
+            try:
+                row = await cursor.fetchone()
+            finally:
+                await cursor.close()
             if row:
                 try:
                     meta = json.loads(row["metadata"]) if row["metadata"] else {}
@@ -927,7 +930,10 @@ async def agent_feedback(name: str, request: Request):
     msg_text = ""
     if message_id and deps.store._db:
         cursor = await deps.store._db.execute("SELECT text FROM messages WHERE id = ?", (message_id,))
-        row = await cursor.fetchone()
+        try:
+            row = await cursor.fetchone()
+        finally:
+            await cursor.close()
         if row:
             msg_text = row["text"][:200]
 

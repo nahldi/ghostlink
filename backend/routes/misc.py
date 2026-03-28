@@ -346,7 +346,10 @@ async def export_channel(channel: str = "general", format: str = "markdown"):
         "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC",
         [channel],
     )
-    rows = await cursor.fetchall()
+    try:
+        rows = await cursor.fetchall()
+    finally:
+        await cursor.close()
     msgs = [deps.store._row_to_dict(r) for r in rows]
 
     if format == "json":
@@ -379,7 +382,10 @@ async def share_conversation(channel: str = "general"):
     cursor = await deps.store._db.execute(
         "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC", [channel],
     )
-    rows = await cursor.fetchall()
+    try:
+        rows = await cursor.fetchall()
+    finally:
+        await cursor.close()
     msgs = [deps.store._row_to_dict(r) for r in rows]
     agent_colors = {inst.name: inst.color for inst in deps.registry.get_all()}
 
@@ -440,17 +446,26 @@ async def get_dashboard():
         raise RuntimeError("Database not initialized.")
 
     cursor = await deps.store._db.execute("SELECT COUNT(*) as cnt FROM messages")
-    total_msgs = (await cursor.fetchone())["cnt"]
+    try:
+        total_msgs = (await cursor.fetchone())["cnt"]
+    finally:
+        await cursor.close()
 
     cursor = await deps.store._db.execute(
         "SELECT channel, COUNT(*) as cnt FROM messages GROUP BY channel ORDER BY cnt DESC"
     )
-    msgs_by_channel = {row["channel"]: row["cnt"] for row in await cursor.fetchall()}
+    try:
+        msgs_by_channel = {row["channel"]: row["cnt"] for row in await cursor.fetchall()}
+    finally:
+        await cursor.close()
 
     cursor = await deps.store._db.execute(
         "SELECT sender, COUNT(*) as cnt FROM messages WHERE type = 'chat' GROUP BY sender ORDER BY cnt DESC LIMIT 10"
     )
-    msgs_by_sender = {row["sender"]: row["cnt"] for row in await cursor.fetchall()}
+    try:
+        msgs_by_sender = {row["sender"]: row["cnt"] for row in await cursor.fetchall()}
+    finally:
+        await cursor.close()
 
     day_ago = time.time() - 86400
     cursor = await deps.store._db.execute(
@@ -458,7 +473,10 @@ async def get_dashboard():
         "FROM messages WHERE timestamp > ? GROUP BY hour ORDER BY hour",
         (day_ago, day_ago),
     )
-    hourly = {row["hour"]: row["cnt"] for row in await cursor.fetchall()}
+    try:
+        hourly = {row["hour"]: row["cnt"] for row in await cursor.fetchall()}
+    finally:
+        await cursor.close()
 
     from app_helpers import get_full_agent_list
     agents = get_full_agent_list()
@@ -494,7 +512,10 @@ async def export_snapshot():
     if deps.store._db is None:
         raise RuntimeError("Database not initialized.")
     cursor = await deps.store._db.execute("SELECT * FROM messages ORDER BY id ASC")
-    rows = await cursor.fetchall()
+    try:
+        rows = await cursor.fetchall()
+    finally:
+        await cursor.close()
     msgs = [deps.store._row_to_dict(r) for r in rows]
     jobs = await deps.job_store.list_jobs()
     rules = await deps.rule_store.list_all()
@@ -540,7 +561,10 @@ async def import_snapshot(request: Request):
     if deps.store._db is None:
         raise RuntimeError("Database not initialized.")
     cursor = await deps.store._db.execute("SELECT uid FROM messages")
-    existing_uids = {row["uid"] for row in await cursor.fetchall()}
+    try:
+        existing_uids = {row["uid"] for row in await cursor.fetchall()}
+    finally:
+        await cursor.close()
 
     imported_count = 0
     for msg in imported_msgs:

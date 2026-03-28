@@ -81,4 +81,17 @@ describe('chatStore', () => {
     const ch = useChatStore.getState().channels.find(c => c.name === 'general');
     expect(ch?.unread).toBe(1);
   });
+
+  it('preserves bulk selection when switching channels', () => {
+    useChatStore.setState({
+      selectMode: true,
+      selectedIds: new Set([1, 2]),
+      channels: [{ name: 'general', unread: 0 }, { name: 'dev', unread: 0 }],
+      activeChannel: 'general',
+    });
+    useChatStore.getState().setActiveChannel('dev');
+    expect(useChatStore.getState().activeChannel).toBe('dev');
+    expect(useChatStore.getState().selectMode).toBe(true);
+    expect(Array.from(useChatStore.getState().selectedIds)).toEqual([1, 2]);
+  });
 });

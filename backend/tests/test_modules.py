@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from pathlib import Path
 
@@ -100,6 +101,21 @@ async def test_store_generated_uid_is_full_uuid_hex(db):
     msg = await db.add("alice", "hello world", channel="general")
     assert len(msg["uid"]) == 32
     int(msg["uid"], 16)
+
+
+@pytest.mark.asyncio
+async def test_store_react_is_serialized(db):
+    """Concurrent reactions preserve both writers instead of losing one update."""
+    msg = await db.add("alice", "hello world", channel="general")
+    first, second = await asyncio.gather(
+        db.react(msg["id"], "😀", "bob"),
+        db.react(msg["id"], "😀", "carol"),
+    )
+    assert first is not None
+    assert second is not None
+    stored = await db.get_by_id(msg["id"])
+    assert stored is not None
+    assert sorted(json.loads(stored["reactions"])["😀"]) == ["bob", "carol"]
 
 
 # ── AgentRegistry ─────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ async def search_messages(q: str = "", channel: str = "", sender: str = "", limi
         return {"results": []}
     if deps.store._db is None:
         raise RuntimeError("Database not initialized. Call init() first.")
+    limit = max(1, min(limit, 200))
 
     # Try FTS5 first (much faster)
     try:
@@ -31,7 +32,10 @@ async def search_messages(q: str = "", channel: str = "", sender: str = "", limi
         fts_query += " ORDER BY m.id DESC LIMIT ?"
         fts_params.append(limit)
         cursor = await deps.store._db.execute(fts_query, fts_params)
-        rows = await cursor.fetchall()
+        try:
+            rows = await cursor.fetchall()
+        finally:
+            await cursor.close()
     except Exception as fts_err:
         # FTS5 not available or query syntax error — fall back to LIKE
         log.warning("FTS5 search failed, falling back to LIKE: %s", fts_err)
@@ -46,7 +50,10 @@ async def search_messages(q: str = "", channel: str = "", sender: str = "", limi
         query += " ORDER BY id DESC LIMIT ?"
         params.append(limit)
         cursor = await deps.store._db.execute(query, params)
-        rows = await cursor.fetchall()
+        try:
+            rows = await cursor.fetchall()
+        finally:
+            await cursor.close()
     return {"results": [deps.store._row_to_dict(r) for r in rows], "query": q}
 
 

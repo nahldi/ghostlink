@@ -46,7 +46,11 @@ class ScheduleStore:
             (uid, cron_expr, agent, command, channel, 1 if enabled else 0, now, now),
         )
         await self._db.commit()
-        return await self._get_by_id(cursor.lastrowid)  # type: ignore
+        try:
+            lastrowid = cursor.lastrowid
+        finally:
+            await cursor.close()
+        return await self._get_by_id(lastrowid)  # type: ignore
 
     async def update(self, sched_id: int, updates: dict) -> dict | None:
         allowed = {"cron_expr", "agent", "command", "channel", "enabled", "last_run"}

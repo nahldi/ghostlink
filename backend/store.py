@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 import aiosqlite
 from pathlib import Path
@@ -64,6 +65,7 @@ class MessageStore:
         self.db_path = str(db_path)
         self._db: aiosqlite.Connection | None = None
         self._on_message: list[MsgCallback] = []
+        self._reaction_lock = asyncio.Lock()
 
     async def init(self):
         # v3.3.3: Recover from empty/corrupt DB files before connecting
@@ -111,9 +113,15 @@ class MessageStore:
             await self._db.commit()
             # Rebuild FTS index from existing messages (first time only)
             cursor = await self._db.execute("SELECT COUNT(*) FROM messages_fts")
-            fts_count = (await cursor.fetchone())[0]
+            try:
+                fts_count = (await cursor.fetchone())[0]
+            finally:
+                await cursor.close()
             cursor = await self._db.execute("SELECT COUNT(*) FROM messages")
-            msg_count = (await cursor.fetchone())[0]
+            try:
+                msg_count = (await cursor.fetchone())[0]
+            finally:
+                await cursor.close()
             if fts_count == 0 and msg_count > 0:
                 await self._db.execute("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')")
                 await self._db.commit()
@@ -169,8 +177,12 @@ class MessageStore:
             (uid, sender, text, msg_type, now, time_str, channel, reply_to, attachments, metadata),
         )
         await self._db.commit()
+        try:
+            lastrowid = cursor.lastrowid
+        finally:
+            await cursor.close()
         msg = {
-            "id": cursor.lastrowid,
+            "id": lastrowid,
             "uid": uid,
             "sender": sender,
             "text": text,
@@ -249,37 +261,38 @@ class MessageStore:
         import json
         if self._db is None:
             raise RuntimeError("MessageStore not initialized — call await store.init() first")
-        cursor = await self._db.execute("SELECT reactions FROM messages WHERE id = ?", (msg_id,))
-        try:
-            row = await cursor.fetchone()
-        finally:
-            await cursor.close()
-        if not row:
-            return None
-        try:
-            reactions = json.loads(row["reactions"]) if row["reactions"] else {}
-        except (json.JSONDecodeError, TypeError):
-            reactions = {}
-        users = reactions.get(emoji, [])
-        if sender in users:
-            users.remove(sender)
-        else:
-            # Cap unique emoji at 50 and users per emoji at 100
-            if emoji not in reactions and len(reactions) >= 50:
-                return reactions
-            if len(users) >= 100:
-                return reactions
-            users.append(sender)
-        if users:
-            reactions[emoji] = users
-        else:
-            reactions.pop(emoji, None)
-        await self._db.execute(
-            "UPDATE messages SET reactions = ? WHERE id = ?",
-            (json.dumps(reactions), msg_id),
-        )
-        await self._db.commit()
-        return reactions
+        async with self._reaction_lock:
+            cursor = await self._db.execute("SELECT reactions FROM messages WHERE id = ?", (msg_id,))
+            try:
+                row = await cursor.fetchone()
+            finally:
+                await cursor.close()
+            if not row:
+                return None
+            try:
+                reactions = json.loads(row["reactions"]) if row["reactions"] else {}
+            except (json.JSONDecodeError, TypeError):
+                reactions = {}
+            users = list(reactions.get(emoji, []))
+            if sender in users:
+                users.remove(sender)
+            else:
+                # Cap unique emoji at 50 and users per emoji at 100
+                if emoji not in reactions and len(reactions) >= 50:
+                    return reactions
+                if len(users) >= 100:
+                    return reactions
+                users.append(sender)
+            if users:
+                reactions[emoji] = users
+            else:
+                reactions.pop(emoji, None)
+            await self._db.execute(
+                "UPDATE messages SET reactions = ? WHERE id = ?",
+                (json.dumps(reactions), msg_id),
+            )
+            await self._db.commit()
+            return reactions
 
     async def edit(self, msg_id: int, new_text: str) -> dict | None:
         """Edit a message's text. Returns updated message or None."""

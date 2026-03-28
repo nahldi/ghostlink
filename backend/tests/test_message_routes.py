@@ -119,3 +119,17 @@ def test_react_message_accepts_real_emoji(tmp_path: Path):
         assert response["reactions"] == {"😀": ["bob"]}
     finally:
         asyncio.run(store.close())
+
+
+def test_create_channel_rejects_special_chars():
+    from routes import channels
+
+    async def _run():
+        deps._settings = {"channels": ["general"]}
+        deps._settings_lock = asyncio.Lock()
+        deps.broadcast = lambda *_args, **_kwargs: asyncio.sleep(0)
+        response = await channels.create_channel(_DummyRequest({"name": "../oops"}))
+        assert response.status_code == 400
+        assert json.loads(response.body) == {"error": "invalid name"}
+
+    asyncio.run(_run())
