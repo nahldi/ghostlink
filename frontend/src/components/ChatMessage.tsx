@@ -13,6 +13,7 @@ import { ApprovalCard } from './ApprovalCard';
 import { UrlPreviews } from './UrlPreview';
 import { GenerativeCard } from './GenerativeCard';
 import { AgentIcon } from './AgentIcon';
+import { toast } from './Toast';
 import { StreamingText } from './StreamingText';
 import { useLongPress } from '../hooks/useLongPress';
 import { useChatStore } from '../stores/chatStore';
@@ -266,7 +267,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
           {!selectMode && <>
             <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
-            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard?.writeText(message.text).catch(() => { /* clipboard unavailable */ })} />
+            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard?.writeText(message.text).then(() => toast('Copied to clipboard', 'success')).catch(() => { /* clipboard unavailable */ })} />
             <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
             <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
             <MsgAction icon="delete" title="Select to delete" danger onClick={() => { setSelectMode(true); toggleSelected(message.id); }} />
@@ -276,7 +277,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <div className="max-w-[70%] lg:max-w-[55%]">
           {(settings.showTimestamps !== false || settings.showSenderLabels !== false) && (
             <div className="flex items-center justify-end gap-2 mb-0.5">
-              {settings.showTimestamps !== false && <span className="text-[10px] text-on-surface-variant/30" title={message.time}>{timeAgo(message.timestamp)}</span>}
+              {settings.showTimestamps !== false && <span className="text-[10px] text-on-surface-variant/30" title={message.time}>{timeAgo(message.timestamp)}{message.edited && ' (edited)'}</span>}
               {settings.showSenderLabels !== false && <span className="text-[11px] font-semibold text-[#38bdf8]">{settings.username}</span>}
             </div>
           )}
@@ -385,7 +386,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               {agent?.label || message.sender}
             </span>
           )}
-          {settings.showTimestamps !== false && <span className="text-[10px] text-on-surface-variant/30" title={message.time}>{timeAgo(message.timestamp)}</span>}
+          {settings.showTimestamps !== false && <span className="text-[10px] text-on-surface-variant/30" title={message.time}>{timeAgo(message.timestamp)}{message.edited && ' (edited)'}</span>}
           {message.pinned && <span className="material-symbols-outlined text-[10px] text-tertiary">push_pin</span>}
         </div>
 
@@ -430,7 +431,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
           {proposal && <JobProposal title={proposal.title} assignee={proposal.assignee} description={proposal.description} accepted={proposal.accepted} onAccept={() => {}} onDismiss={() => {}} />}
           {handoff && <HandoffCard from={handoff.from} to={handoff.to} reason={handoff.reason} context={handoff.context} fromColor={agents.find(a => a.name === handoff.from)?.color} toColor={agents.find(a => a.name === handoff.to)?.color} />}
           {approval && <ApprovalCard messageId={message.id} agent={approval.agent || message.sender} agentColor={agentColor} agentBase={agent?.base} prompt={approval.prompt || message.text} responded={approval.responded} />}
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- card shape validated by 'type' in check */}
           {card && 'type' in card && <GenerativeCard card={card as any} agentColor={agentColor} />}
         </div>
@@ -446,7 +446,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 mt-1">
             <MsgAction icon="add_reaction" title="React" onClick={() => setShowPicker(!showPicker)} />
             <MsgAction icon="reply" title="Reply" onClick={() => setReplyTo(message)} />
-            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard?.writeText(message.text).catch(() => { /* clipboard unavailable */ })} />
+            <MsgAction icon="content_copy" title="Copy" onClick={() => navigator.clipboard?.writeText(message.text).then(() => toast('Copied to clipboard', 'success')).catch(() => { /* clipboard unavailable */ })} />
             <MsgAction icon={ttsPlaying ? 'stop_circle' : 'volume_up'} title={ttsPlaying ? 'Playing...' : 'Read aloud'} active={ttsPlaying} onClick={handleTTS} />
             <MsgAction icon="push_pin" title={message.pinned ? 'Unpin' : 'Pin'} active={message.pinned} onClick={handlePin} />
             <MsgAction icon="bookmark" title={message.bookmarked ? 'Remove bookmark' : 'Bookmark'} active={message.bookmarked} onClick={handleBookmark} />
@@ -469,7 +469,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               {[
                 { icon: 'add_reaction', fn: () => setShowPicker(true) },
                 { icon: 'reply', fn: () => setReplyTo(message) },
-                { icon: 'content_copy', fn: () => navigator.clipboard?.writeText(message.text).catch(() => {}) },
+                { icon: 'content_copy', fn: () => navigator.clipboard?.writeText(message.text).then(() => toast('Copied', 'success')).catch(() => {}) },
                 { icon: 'push_pin', fn: handlePin },
                 { icon: 'bookmark', fn: handleBookmark },
                 { icon: 'delete', fn: () => { setSelectMode(true); toggleSelected(message.id); } },

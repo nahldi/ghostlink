@@ -16,7 +16,7 @@ import { ConnectionBanner } from './components/ConnectionBanner';
 import { BulkDeleteBar } from './components/BulkDeleteBar';
 import { SoundManager } from './lib/sounds';
 import { SessionBar } from './components/SessionBar';
-// ThinkingParticles still used by AgentBar — keep export but not imported here
+
 
 // Lazy-loaded components (reduce initial bundle from ~900KB)
 const JobsPanel = lazy(() => import('./components/JobsPanel').then(m => ({ default: m.JobsPanel })));
@@ -263,7 +263,7 @@ function RightPanel() {
             >
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
-            <Suspense fallback={null}>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}>
               {panel === 'jobs' && <JobsPanel />}
               {panel === 'rules' && <RulesPanel />}
               {panel === 'settings' && <SettingsPanel />}
@@ -467,10 +467,14 @@ function AppInner() {
   }, [setAgents, setJobs, setRules, setChannels, updateSettings]);
 
   useEffect(() => {
+    let stale = false;
     api.getMessages(activeChannel).then((r) => {
-      setMessages(r.messages);
-      clearUnread(activeChannel);
+      if (!stale) {
+        setMessages(r.messages);
+        clearUnread(activeChannel);
+      }
     }).catch((e) => console.warn('Messages fetch:', e.message || e));
+    return () => { stale = true; };
   }, [activeChannel, setMessages, clearUnread]);
 
   return (
@@ -499,7 +503,7 @@ function AppInner() {
                 <AgentBar />
               </div>
               <div className="ml-3 shrink-0">
-                <Suspense fallback={null}><RemoteSession /></Suspense>
+                <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><RemoteSession /></Suspense>
               </div>
             </div>
           )}
@@ -512,7 +516,7 @@ function AppInner() {
         </header>
         {/* Remote session — mobile */}
         <div className="lg:hidden flex items-center justify-end px-4 py-1 border-b border-outline-variant/6">
-          <Suspense fallback={null}><RemoteSession /></Suspense>
+          <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><RemoteSession /></Suspense>
         </div>
         {/* Mobile spacer for fixed header */}
         <div className="lg:hidden h-14" />
@@ -539,31 +543,31 @@ function AppInner() {
       <AnimatePresence>
         {showSearch && (
           <motion.div key="search-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
-            <Suspense fallback={null}><SearchModal onClose={() => setShowSearch(false)} /></Suspense>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><SearchModal onClose={() => setShowSearch(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showShortcuts && (
           <motion.div key="shortcuts-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
-            <Suspense fallback={null}><KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} /></Suspense>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>
       <ConnectionBanner />
-      <Suspense fallback={null}><FirstRunWizard /></Suspense>
-      <Suspense fallback={null}><OnboardingTour /></Suspense>
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><FirstRunWizard /></Suspense>
+      <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><OnboardingTour /></Suspense>
       <AnimatePresence>
         {showHelp && (
           <motion.div key="help-panel" initial={{ opacity: 0, x: 320 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 320 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
-            <Suspense fallback={null}><HelpPanel onClose={() => setShowHelp(false)} /></Suspense>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><HelpPanel onClose={() => setShowHelp(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showSessionLauncher && (
           <motion.div key="session-launcher" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
-            <Suspense fallback={null}><SessionLauncher onClose={() => setShowSessionLauncher(false)} /></Suspense>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><SessionLauncher onClose={() => setShowSessionLauncher(false)} /></Suspense>
           </motion.div>
         )}
       </AnimatePresence>
