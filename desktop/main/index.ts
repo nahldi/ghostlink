@@ -637,6 +637,10 @@ function setupIPC(): void {
     return app.getVersion();
   });
 
+  ipcMain.handle('app:get-settings', () => {
+    return loadSettings() ?? {};
+  });
+
   ipcMain.handle('app:pick-folder', async () => {
     const launcher = getLauncherWindow();
     if (!launcher || launcher.isDestroyed()) return null;

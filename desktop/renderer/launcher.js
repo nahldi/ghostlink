@@ -40,27 +40,41 @@ function renderConnectionsLoadingState() {
   while ($providers.firstChild) $providers.removeChild($providers.firstChild);
 
   const loadingDiv = document.createElement('div');
-  loadingDiv.className = 'providers-empty-state';
-  loadingDiv.innerHTML = `
-    <span class="material-symbols-outlined providers-empty-icon spinner-icon">progress_activity</span>
-    <div class="providers-empty-copy">
-      <div class="providers-empty-title">Checking connections…</div>
-      <div class="providers-empty-subtitle">GhostLink is detecting installed and authenticated agent CLIs.</div>
-    </div>
-  `;
+  loadingDiv.style.cssText = 'padding:16px;text-align:center;line-height:1.5';
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-weight:600;margin-bottom:4px;color:rgba(255,255,255,0.5);font-size:11px';
+  title.textContent = 'Checking connections\u2026';
+
+  const desc = document.createElement('div');
+  desc.style.cssText = 'color:rgba(255,255,255,0.3);font-size:10px';
+  desc.textContent = 'Detecting installed agent CLIs and auth status.';
+
+  loadingDiv.appendChild(title);
+  loadingDiv.appendChild(desc);
   $providers.appendChild(loadingDiv);
 }
 
 function renderConnectionsEmptyState() {
   const emptyState = document.createElement('div');
   emptyState.className = 'providers-empty-state';
-  emptyState.innerHTML = `
-    <span class="material-symbols-outlined providers-empty-icon">hub</span>
-    <div class="providers-empty-copy">
-      <div class="providers-empty-title">No active connections yet</div>
-      <div class="providers-empty-subtitle">Install or connect an agent below, then it will appear here.</div>
-    </div>
-  `;
+  emptyState.style.cssText = 'padding:16px;text-align:center;line-height:1.5';
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-weight:600;margin-bottom:4px;color:rgba(255,255,255,0.5);font-size:11px';
+  title.textContent = 'No agents detected';
+
+  const desc = document.createElement('div');
+  desc.style.cssText = 'color:rgba(255,255,255,0.35);font-size:11px';
+  desc.textContent = 'Expand "Supported Agents" below to install CLIs.';
+
+  const hint = document.createElement('div');
+  hint.style.cssText = 'margin-top:4px;font-size:9px;color:rgba(255,255,255,0.2)';
+  hint.textContent = 'Connected agents will appear here automatically.';
+
+  emptyState.appendChild(title);
+  emptyState.appendChild(desc);
+  emptyState.appendChild(hint);
   $providers.appendChild(emptyState);
 }
 
@@ -471,6 +485,30 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function applySavedSettings(settings) {
+  if (!settings || typeof settings !== 'object') return;
+
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (!el || value == null) return;
+    el.value = String(value);
+  };
+
+  const setChecked = (id, value) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.checked = Boolean(value);
+  };
+
+  setValue('setting-port', settings.port);
+  setValue('setting-workspace', settings.workspace);
+  setValue('setting-python', settings.pythonPath);
+  setValue('setting-platform', settings.platform);
+  setValue('setting-theme', settings.theme);
+  setValue('setting-update-channel', settings.updateChannel);
+  setChecked('setting-autostart', settings.autoStart);
+}
+
 // ── Settings toggle ──────────────────────────────────────────────────────────
 
 const $settingsToggle = document.getElementById('settings-toggle');
@@ -530,6 +568,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       $portDisplay.textContent = 'Port: ' + status.port;
     }
   }).catch((e) => console.warn('Server status fetch failed:', e));
+
+  // Load saved launcher settings without waiting on auth/update checks
+  api.invoke('app:get-settings').then((settings) => {
+    applySavedSettings(settings);
+  }).catch((e) => console.warn('Settings fetch failed:', e));
 
   // Auth checks — can be slow, don't block other UI
   api.invoke('auth:check-all').then((statuses) => {

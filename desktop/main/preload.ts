@@ -21,6 +21,7 @@ const INVOKE_CHANNELS = [
   'update:install',
   'app:open-chat',
   'app:get-version',
+  'app:get-settings',
   'app:pick-folder',
   'app:save-settings',
   'window:minimize',
