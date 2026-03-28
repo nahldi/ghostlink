@@ -245,6 +245,37 @@ function ScrollArrow() {
 function RightPanel() {
   const panel = useChatStore((s) => s.sidebarPanel);
   const setSidebarPanel = useChatStore((s) => s.setSidebarPanel);
+  const [panelWidth, setPanelWidth] = useState(panel === 'cockpit' ? 400 : 320);
+  const isDragging = useRef(false);
+
+  // Update default width when panel type changes
+  useEffect(() => {
+    setPanelWidth(panel === 'cockpit' ? 400 : 320);
+  }, [panel]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+    const handleMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = startX - e.clientX;
+      setPanelWidth(Math.max(280, Math.min(startWidth + delta, 600)));
+    };
+    const handleUp = () => {
+      isDragging.current = false;
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth]);
+
   return (
     <AnimatePresence>
       {panel && (
@@ -252,12 +283,19 @@ function RightPanel() {
           <div className="fixed inset-0 z-[29] max-lg:hidden" onClick={() => setSidebarPanel(null)} />
           <motion.aside
             key="right-panel"
-            initial={{ x: 320, opacity: 0 }}
+            initial={{ x: panelWidth, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 320, opacity: 0 }}
+            exit={{ x: panelWidth, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="w-80 h-screen glass-strong fixed right-0 top-0 z-30 max-lg:hidden flex flex-col"
+            className="h-screen glass-strong fixed right-0 top-0 z-30 max-lg:hidden flex flex-col"
+            style={{ width: panelWidth }}
           >
+            {/* Resize handle */}
+            <div
+              onMouseDown={handleResizeStart}
+              className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+              title="Drag to resize"
+            />
             <button
               onClick={() => setSidebarPanel(null)}
               className="absolute top-3 right-3 z-10 p-1.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant/40 hover:text-on-surface-variant/70 transition-colors"
