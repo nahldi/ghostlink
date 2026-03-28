@@ -573,11 +573,23 @@ export function AgentCockpit() {
   const cockpitAgent = useChatStore((s) => s.cockpitAgent);
   const thinkingStreams = useChatStore((s) => s.thinkingStreams);
   const agentPresence = useChatStore((s) => s.agentPresence);
+  const setAgentPresence = useChatStore((s) => s.setAgentPresence);
   const [tab, setTab] = useState<CockpitTab>('terminal');
 
   const agent = agents.find((a) => a.name === cockpitAgent) || null;
   const thinking = agent ? thinkingStreams[agent.name] : null;
   const presence = agent ? agentPresence[agent.name] : null;
+
+  useEffect(() => {
+    if (!agent || presence?.updated_at) return;
+    let cancelled = false;
+    api.getAgentPresence(agent.name)
+      .then((data) => {
+        if (!cancelled) setAgentPresence(data);
+      })
+      .catch(() => { /* ignored */ });
+    return () => { cancelled = true; };
+  }, [agent, presence?.updated_at, setAgentPresence]);
 
   if (!agent) {
     return (
