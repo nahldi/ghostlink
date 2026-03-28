@@ -247,6 +247,36 @@ def test_provider_registry_uses_encrypted_secrets_and_migrates_plaintext(tmp_pat
         deps.secrets_manager = previous_manager
 
 
+def test_provider_registry_does_not_resolve_unreachable_local_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Unreachable local providers must not satisfy capability resolution."""
+    from providers import ProviderRegistry
+
+    registry = ProviderRegistry(tmp_path)
+    monkeypatch.setattr(registry, "get_api_key", lambda _provider_id: None)
+    monkeypatch.setattr(registry, "_is_local_provider_available", lambda _provider_id, _pdef: False)
+
+    assert registry.resolve_capability("chat") is None
+    assert registry.resolve_capability("code") is None
+
+
+def test_provider_registry_skips_unreachable_preferred_local_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A preferred local provider should be ignored when its service is down."""
+    from providers import ProviderRegistry
+
+    registry = ProviderRegistry(tmp_path)
+    registry.save_config({"preferred_chat": "ollama"})
+    monkeypatch.setattr(registry, "get_api_key", lambda _provider_id: None)
+    monkeypatch.setattr(registry, "_is_local_provider_available", lambda _provider_id, _pdef: False)
+
+    assert registry.resolve_capability("chat") is None
+
+
 def test_require_startup_attr_success(monkeypatch: pytest.MonkeyPatch):
     import importlib
     import app

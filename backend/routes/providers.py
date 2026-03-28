@@ -90,11 +90,10 @@ async def get_provider_models(provider_id: str):
     pdef = PROVIDERS.get(provider_id)
     if not pdef:
         return JSONResponse({"error": "unknown provider"}, 404)
-    has_key = deps.provider_registry.get_api_key(provider_id) is not None
     return {
         "provider": provider_id,
         "name": pdef["name"],
-        "available": has_key or pdef.get("local", False),
+        "available": deps.provider_registry.is_provider_available(provider_id),
         "models": pdef["models"],
         "capabilities": pdef["capabilities"],
     }

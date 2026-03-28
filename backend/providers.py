@@ -274,6 +274,31 @@ class ProviderRegistry:
 
         self._save_user_config()
 
+    def _is_local_provider_available(self, provider_id: str, pdef: dict) -> bool:
+        """Return whether a local-only provider is actually reachable."""
+        if not pdef.get("local", False):
+            return False
+
+        if provider_id == "ollama":
+            try:
+                import urllib.request
+                urllib.request.urlopen("http://localhost:11434/api/version", timeout=2)
+                return True
+            except Exception:
+                return False
+
+        return True
+
+    def is_provider_available(self, provider_id: str) -> bool:
+        """Return whether a provider is currently usable."""
+        pdef = PROVIDERS.get(provider_id)
+        if not pdef:
+            return False
+
+        has_key = any(os.environ.get(k) for k in pdef["env_keys"])
+        user_key = self.get_api_key(provider_id)
+        return has_key or bool(user_key) or self._is_local_provider_available(provider_id, pdef)
+
     def detect_available(self) -> list[dict]:
         """Detect which providers are available based on env vars and config."""
         available = []
@@ -281,16 +306,7 @@ class ProviderRegistry:
             has_key = any(os.environ.get(k) for k in pdef["env_keys"])
             user_key = self.get_api_key(pid)
             is_local = pdef.get("local", False)
-            # For local providers, verify the service is actually running
-            if is_local and pid == "ollama":
-                try:
-                    import urllib.request
-                    urllib.request.urlopen("http://localhost:11434/api/version", timeout=2)
-                    is_local_running = True
-                except Exception:
-                    is_local_running = False
-            else:
-                is_local_running = is_local
+            is_local_running = self._is_local_provider_available(pid, pdef)
             is_available = has_key or bool(user_key) or is_local_running
 
             available.append({
@@ -337,7 +353,7 @@ class ProviderRegistry:
         # Check user preference first
         preferred = self._user_config.get(f"preferred_{capability}")
         if preferred and preferred in PROVIDERS:
-            if self.get_api_key(preferred) or PROVIDERS[preferred].get("local"):
+            if self.is_provider_available(preferred):
                 pdef = PROVIDERS[preferred]
                 models = {k: v for k, v in pdef["models"].items()
                          if capability in v.get("tier", "") or v["tier"] in ("standard", "premium", "fast")}
@@ -350,7 +366,7 @@ class ProviderRegistry:
             pdef = PROVIDERS[pid]
             if capability not in pdef["capabilities"]:
                 continue
-            if self.get_api_key(pid) or pdef.get("local"):
+            if self.is_provider_available(pid):
                 return {"provider": pid, "name": pdef["name"], "models": pdef["models"]}
 
         return None
@@ -389,6 +405,6 @@ class ProviderRegistry:
             pdef = PROVIDERS[pid]
             if capability not in pdef["capabilities"]:
                 continue
-            if self.get_api_key(pid) or pdef.get("local"):
+            if self.is_provider_available(pid):
                 return {"provider": pid, "name": pdef["name"], "models": pdef["models"]}
         return None
