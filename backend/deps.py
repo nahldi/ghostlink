@@ -131,6 +131,8 @@ _agent_presence: dict[str, dict] = {}
 _agent_browser_state: dict[str, dict] = {}
 _terminal_streams: dict[str, dict] = {}
 _workspace_changes: collections.deque[dict] = collections.deque(maxlen=500)
+_agent_replay_log: collections.deque[dict] = collections.deque(maxlen=2000)
+_file_diff_cache: dict[str, dict[str, dict]] = {}
 _agent_state_lock = threading.Lock()
 
 # ── Agent name validation ────────────────────────────────────────────

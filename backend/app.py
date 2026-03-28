@@ -381,7 +381,10 @@ async def lifespan(_app: FastAPI):
 
     from routes.agents import (
         _get_agent_workspace_path,
+        _read_text_file_for_diff,
         add_workspace_change,
+        add_replay_event,
+        cache_file_diff,
         set_agent_browser_state,
         set_agent_presence,
         set_terminal_stream,
@@ -470,6 +473,16 @@ async def lifespan(_app: FastAPI):
             return
         surface, status, detail = _tool_surface(tool_name, args)
         if tool_name in {"web_fetch", "web_search", "browser_snapshot"}:
+            _dispatch(add_replay_event(
+                agent,
+                "tool_start",
+                title=status,
+                detail=detail,
+                surface="browser",
+                url=str(args.get("url", "")),
+                query=str(args.get("query", "")),
+                tool=tool_name,
+            ))
             _dispatch(set_agent_browser_state(
                 agent,
                 mode=tool_name,
@@ -479,6 +492,17 @@ async def lifespan(_app: FastAPI):
                 title=detail,
             ))
             return
+        _dispatch(add_replay_event(
+            agent,
+            "tool_start",
+            title=status,
+            detail=detail,
+            surface=surface,
+            url=str(args.get("url", "")),
+            query=str(args.get("query", "")),
+            command=str(args.get("language", "")) if tool_name == "code_execute" else "",
+            tool=tool_name,
+        ))
         _dispatch(set_agent_presence(
             agent,
             surface=surface,
@@ -514,9 +538,31 @@ async def lifespan(_app: FastAPI):
                 preview=result,
                 artifact_path=artifact_path,
             ))
+            _dispatch(add_replay_event(
+                agent,
+                "tool_result",
+                title=status,
+                detail=result,
+                surface="browser",
+                url=str(args.get("url", "")),
+                query=str(args.get("query", "")),
+                tool=tool_name,
+                metadata={"artifact_path": artifact_path},
+            ))
             return
         surface, status, detail = _tool_surface(tool_name, args)
         done_status = "Completed" if tool_name.startswith("memory_") else status
+        _dispatch(add_replay_event(
+            agent,
+            "tool_result",
+            title=done_status,
+            detail=result or detail,
+            surface=surface,
+            url=str(args.get("url", "")),
+            query=str(args.get("query", "")),
+            command=str(args.get("language", "")) if tool_name == "code_execute" else "",
+            tool=tool_name,
+        ))
         _dispatch(set_agent_presence(
             agent,
             surface=surface,
@@ -664,6 +710,7 @@ async def lifespan(_app: FastAPI):
 
     def _workspace_monitor():
         workspace_state: dict[str, dict[str, float]] = {}
+        workspace_content: dict[str, dict[str, str]] = {}
         while not _workspace_stop.is_set():
             try:
                 for inst in registry.get_all():
@@ -674,7 +721,10 @@ async def lifespan(_app: FastAPI):
                     new_state = _scan_workspace_state(workspace)
                     old_state = workspace_state.get(inst.name)
                     workspace_state[inst.name] = new_state
+                    content_state = workspace_content.setdefault(inst.name, {})
                     if old_state is None:
+                        for rel_path in list(new_state)[:500]:
+                            content_state[rel_path] = _read_text_file_for_diff(workspace / rel_path)
                         continue
 
                     changes: list[tuple[str, str]] = []
@@ -689,6 +739,16 @@ async def lifespan(_app: FastAPI):
 
                     for action, rel_path in changes[:20]:
                         _dispatch(add_workspace_change(inst.name, action, rel_path))
+                        full_path = workspace / rel_path
+                        if action == "deleted":
+                            before = content_state.pop(rel_path, "")
+                            _dispatch(cache_file_diff(inst.name, rel_path, before, "", action))
+                            continue
+                        before = content_state.get(rel_path, "")
+                        after = _read_text_file_for_diff(full_path)
+                        content_state[rel_path] = after
+                        if before != after:
+                            _dispatch(cache_file_diff(inst.name, rel_path, before, after, action))
             except Exception as e:
                 log.debug("Workspace monitor error: %s", e)
             _workspace_stop.wait(2.0)

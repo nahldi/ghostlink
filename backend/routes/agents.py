@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import logging
 import os
@@ -75,6 +76,41 @@ async def _record_activity(event_type: str, text: str, *, agent: str = "", chann
     }
     deps._activity_log.append(event)
     await deps.broadcast("activity", event)
+
+
+async def add_replay_event(
+    agent_name: str,
+    event_type: str,
+    *,
+    title: str,
+    detail: str = "",
+    surface: str = "",
+    path: str = "",
+    url: str = "",
+    query: str = "",
+    command: str = "",
+    tool: str = "",
+    metadata: dict | None = None,
+) -> dict:
+    event = {
+        "id": f"{int(time.time() * 1000)}-{agent_name}-{event_type}",
+        "agent": agent_name,
+        "type": event_type,
+        "title": title,
+        "detail": detail,
+        "surface": surface,
+        "path": path,
+        "url": url,
+        "query": query,
+        "command": command,
+        "tool": tool,
+        "metadata": metadata or {},
+        "timestamp": time.time(),
+    }
+    with deps._agent_state_lock:
+        deps._agent_replay_log.append(event)
+    await deps.broadcast("agent_replay", event)
+    return event
 
 
 def _get_agent_label(name: str) -> str:
@@ -186,12 +222,75 @@ async def add_workspace_change(agent_name: str, action: str, path: str) -> dict:
     await deps.broadcast("workspace_change", payload)
     verb = {"created": "Created", "modified": "Updated", "deleted": "Deleted"}.get(action, "Changed")
     await _record_activity("message", f"{verb} {path}", agent=agent_name)
+    await add_replay_event(
+        agent_name,
+        "workspace_change",
+        title=f"{verb} file",
+        detail=path,
+        surface="files",
+        path=path,
+        metadata={"action": action},
+    )
     await set_agent_presence(
         agent_name,
         surface="files",
         status=f"{verb} file",
         detail=path,
         path=path,
+    )
+    return payload
+
+
+def _read_text_file_for_diff(file_path: Path, *, max_bytes: int = 200_000) -> str:
+    try:
+        if not file_path.is_file():
+            return ""
+        if file_path.stat().st_size > max_bytes:
+            return ""
+        return file_path.read_text("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+async def cache_file_diff(agent_name: str, path: str, before: str, after: str, action: str) -> dict:
+    before_lines = before.splitlines()
+    after_lines = after.splitlines()
+    diff_text = "\n".join(
+        difflib.unified_diff(
+            before_lines,
+            after_lines,
+            fromfile=f"a/{path}",
+            tofile=f"b/{path}",
+            lineterm="",
+        )
+    )
+    payload = {
+        "agent": agent_name,
+        "path": path,
+        "action": action,
+        "before": before,
+        "after": after,
+        "diff": diff_text,
+        "timestamp": time.time(),
+    }
+    with deps._agent_state_lock:
+        agent_cache = deps._file_diff_cache.setdefault(agent_name, {})
+        agent_cache[path] = payload
+    await deps.broadcast("file_diff", {
+        "agent": agent_name,
+        "path": path,
+        "action": action,
+        "diff": diff_text,
+        "timestamp": payload["timestamp"],
+    })
+    await add_replay_event(
+        agent_name,
+        "file_diff",
+        title="Updated file diff",
+        detail=path,
+        surface="files",
+        path=path,
+        metadata={"action": action, "has_diff": bool(diff_text)},
     )
     return payload
 
@@ -305,6 +404,7 @@ async def register_agent(request: Request):
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("agent_join", f"{inst.label or inst.name} connected", agent=inst.name)
+    await add_replay_event(inst.name, "agent_join", title="Agent connected", detail="Session started", surface="session")
     await set_agent_presence(inst.name, surface="session", status="Connected", detail="Agent online", state=inst.state)
     return inst.to_dict()
 
@@ -324,6 +424,7 @@ async def deregister_agent(name: str):
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
         await _record_activity("agent_leave", f"{name} disconnected", agent=name)
+        await add_replay_event(name, "agent_leave", title="Agent disconnected", detail="Session ended", surface="session")
         await set_agent_presence(name, surface="session", status="Disconnected", detail="Agent offline", state="offline")
     return {"ok": ok}
 
@@ -658,6 +759,7 @@ async def kill_agent(name: str):
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
         await _record_activity("agent_leave", f"{name} stopped", agent=name)
+        await add_replay_event(name, "agent_leave", title="Agent stopped", detail="Process terminated", surface="session")
         await set_agent_presence(name, surface="session", status="Stopped", detail="Agent stopped", state="offline")
     return {"ok": ok or proc is not None}
 
@@ -804,6 +906,14 @@ async def update_thinking(agent_name: str, request: Request):
         "active": active,
     })
     summary = (text or "").strip().splitlines()[0][:180] if text else ""
+    if summary:
+        await add_replay_event(
+            agent_name,
+            "thinking",
+            title="Thinking update",
+            detail=summary,
+            surface="thinking",
+        )
     await set_agent_presence(
         agent_name,
         surface="thinking" if active else "session",
@@ -888,6 +998,7 @@ async def pause_agent(name: str):
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("message", f"{inst.label or name} paused", agent=name)
+    await add_replay_event(name, "pause", title="Agent paused", detail="Awaiting resume", surface="session")
     await set_agent_presence(name, surface="session", status="Paused", detail="Awaiting resume", state="paused")
     return {"ok": True, "state": "paused"}
 
@@ -901,6 +1012,7 @@ async def resume_agent(name: str):
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("message", f"{inst.label or name} resumed", agent=name)
+    await add_replay_event(name, "resume", title="Agent resumed", detail="Work resumed", surface="session")
     await set_agent_presence(name, surface="session", status="Active", detail="Ready", state="active")
     return {"ok": True, "state": "active"}
 
@@ -1259,6 +1371,35 @@ async def get_agent_browser_artifact(name: str):
     return FileResponse(path)
 
 
+@router.get("/api/agents/{name}/replay")
+async def get_agent_replay(name: str, since: float = 0, limit: int = 100):
+    """Return structured replay events for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    limit = max(1, min(limit, 300))
+    with deps._agent_state_lock:
+        events = [
+            dict(event)
+            for event in deps._agent_replay_log
+            if event.get("agent") == name and event.get("timestamp", 0) > since
+        ]
+    return {"events": events[-limit:]}
+
+
+@router.get("/api/agents/{name}/diff")
+async def get_agent_file_diff(name: str, path: str = ""):
+    """Return the most recent cached diff for an agent/file path."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    if not path:
+        return JSONResponse({"error": "path required"}, 400)
+    with deps._agent_state_lock:
+        payload = dict(deps._file_diff_cache.get(name, {}).get(path, {}))
+    if not payload:
+        return JSONResponse({"error": "diff not found"}, 404)
+    return payload
+
+
 # ── Workspace viewer (v3.8.0) ──────────────────────────────────────
 
 _WORKSPACE_SKIP_NAMES = {"node_modules", "__pycache__", ".venv", "venv", ".git", "dist"}
@@ -1385,6 +1526,7 @@ async def get_agent_workspace_file(name: str, path: str = ""):
     try:
         content = file_path.read_text("utf-8", errors="replace")
         await _record_activity("message", f"Viewed {name} workspace file {path}", agent=name)
+        await add_replay_event(name, "file_open", title="Opened file", detail=path, surface="files", path=path)
         return {"path": path, "content": content, "size": len(content)}
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
@@ -1460,9 +1602,13 @@ async def write_agent_file(name: str, request: Request):
         return JSONResponse({"error": str(exc)}, 403)
 
     try:
+        before = _read_text_file_for_diff(file_path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding="utf-8")
         await _record_activity("message", f"Saved {name} workspace file {path}", agent=name)
+        await add_replay_event(name, "file_save", title="Saved file", detail=path, surface="files", path=path)
+        if before != content:
+            await cache_file_diff(name, path, before, content, "modified" if before else "created")
         return {
             "ok": True,
             "path": str(file_path.relative_to(ws)),
