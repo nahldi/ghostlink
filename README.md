@@ -12,7 +12,7 @@
 
 **[Download the latest installer from Releases](../../releases/latest)**
 
-- **Windows:** `GhostLink-Setup-4.7.3.exe` — one-click install, auto-updates
+- **Windows:** `GhostLink-Setup-4.8.2.exe` — one-click install, auto-updates
 - **Linux:** `.AppImage` / `.deb`
 - **macOS:** `.dmg`
 
@@ -133,6 +133,10 @@ Configure providers in Settings > AI. Paste an API key or use a free provider �
 - Skills marketplace — browse, create, export/import custom skills
 - Safety scanning — blocks dangerous patterns in community skills
 - Plugin system with auto-discovery and manifest tracking
+
+### SDK
+- Python SDK for local automation via [`sdk/python/ghostlink_sdk.py`](sdk/python/ghostlink_sdk.py)
+- Covers status, channels, messages, agents, jobs, settings, providers, and session control
 
 ### Desktop App
 - One-click installer with setup wizard

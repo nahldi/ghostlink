@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
-**Last updated:** 2026-03-25
-**Version:** v4.7.3
+**Last updated:** 2026-03-28
+**Version:** v4.8.2
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,9 +66,10 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v4.7.3)
+## CURRENT STATE (v4.8.2)
 
-### Recent Changes (v3.9.8 → v4.7.3)
+### Recent Changes (v3.9.8 → v4.8.2)
+- **v4.8.0–v4.8.2**: Security hardening, auth regression fixes, SSRF protection, provider reachability checks, CI/runtime upgrades, emoji/reply validation, type-safety cleanup, expanded frontend/backend tests.
 - **v4.7.1–v4.7.3**: Tunnel remote access fixes, service worker cache-first fix, CSS specificity fix.
 - **v4.7.0**: UI polish — sidebar animation, settings consolidation, spacing fixes.
 - **v4.6.0**: Voice notes + voice call mode.
@@ -83,7 +84,7 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ### Numbers
 - **90+ completed features** (see FEATURES.md for full list)
-- **51 React components** (StreamingText, ThinkingParticles, Toast, Section, etc.)
+- **53 React components** (StreamingText, ThinkingParticles, Toast, UrlPreview, WorkspaceViewer, etc.)
 - **132+ API endpoints** (split into 13 route modules)
 - **17 MCP tools** (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_load, memory_list, memory_search, web_search, web_fetch, image_generate)
 - **13 known AI agents** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)

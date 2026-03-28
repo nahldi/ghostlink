@@ -13,7 +13,7 @@
 - [x] **Notification sounds** — per-agent sound assignment, SoundManager with play/mute/volume
 - [x] **Emoji reactions** — 6-emoji picker, toggle per user, stored in DB, broadcast via WebSocket
 - [x] **@all agents** — mention @all to wake every connected agent
-- [x] **21 slash commands** — /status, /clear, /export, /help, /focus, /theme, /mute, /unmute, /agents, /ping, /stats, /role, /spawn, /kill, /pinned, /bookmarks, /jobs, /rules, /settings, /debug, /notify
+- [x] **23 slash commands** — /status, /clear, /export, /help, /focus, /theme, /mute, /unmute, /agents, /ping, /stats, /role, /consensus, /debate, /spawn, /kill, /pinned, /bookmarks, /jobs, /rules, /settings, /debug, /notify
 - [x] **Message editing** — double-click to edit, PATCH endpoint, broadcast updates
 - [x] **Message bookmarking** — star icon, /bookmarks command
 - [x] **Collapsible long messages** — auto-collapse at 600 chars with expand toggle
@@ -164,5 +164,5 @@
 ### MCP Tools (17 shipped)
 chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_load, memory_list, memory_search, web_search, web_fetch, image_generate
 
-### Components (46)
+### Components (53)
 ActivityTimeline, AddAgentModal, AgentBar, AgentIcon, AgentInfoPanel, AgentMiniCard, AgentStatusPill, ApprovalCard, BulkDeleteBar, ChannelSummary, ChannelTabs, ChatMessage, CodeBlock, CommandBar, ConnectionBanner, ConsensusCard, DecisionCard, EmptyState, GenerativeCard, HandoffCard, HelpPanel, JobProposal, JobsPanel, KeyboardShortcutsModal, MessageInput, MobileHeader, MobileSidebar, MobilePanel, OnboardingTour, ProgressCard, RemoteSession, ReplayViewer, RulesPanel, ScrollArrow, SearchModal, SessionBar, SessionLauncher, SettingsPanel, Sidebar, Skeleton, SplitView, StatsPanel, StreamingText, TerminalPeek, ThinkingParticles, Toast, TypingIndicator, UrlPreview
