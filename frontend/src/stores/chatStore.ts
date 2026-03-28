@@ -396,7 +396,9 @@ export const useChatStore = create<ChatState>((set) => ({
   fileDiffs: {},
   setFileDiff: (diff) =>
     set((s) => {
-      const agentDiffs = { ...(s.fileDiffs[diff.agent] || {}), [diff.path]: diff };
+      // Normalize path to prevent key collisions (./file vs file, double slashes)
+      const normPath = diff.path.replace(/\/\.\//g, '/').replace(/\/+/g, '/').replace(/^\.\//, '');
+      const agentDiffs = { ...(s.fileDiffs[diff.agent] || {}), [normPath]: { ...diff, path: normPath } };
       // Cap at 50 diffs per agent to prevent unbounded growth
       const keys = Object.keys(agentDiffs);
       if (keys.length > 50) {
