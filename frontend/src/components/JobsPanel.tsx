@@ -19,7 +19,7 @@ function JobCard({ job, onDragStart }: { job: Job; onDragStart: (e: React.DragEv
     <div
       draggable
       onDragStart={(e) => onDragStart(e, job)}
-      className={`glass-card rounded-xl p-4 border-l-2 ${priorityColor} cursor-grab hover:brightness-110 transition-all active:cursor-grabbing`}
+      className={`glass-card rounded-xl p-4 border-l-2 ${priorityColor} cursor-grab hover:brightness-110 hover:scale-[1.01] transition-all active:cursor-grabbing active:scale-[0.98] active:brightness-95`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="text-sm font-bold text-on-surface leading-tight">

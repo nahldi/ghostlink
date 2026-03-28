@@ -153,7 +153,7 @@ export function RulesPanel() {
                       key={rule.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, rule)}
-                      className="glass-card rounded-xl p-4 border-l-2 cursor-grab hover:brightness-110 transition-all active:cursor-grabbing"
+                      className="glass-card rounded-xl p-4 border-l-2 cursor-grab hover:brightness-110 hover:scale-[1.01] transition-all active:cursor-grabbing active:scale-[0.98] active:brightness-95"
                       style={{ borderLeftColor: section.color }}
                     >
                       <div className="text-sm text-on-surface mb-2 leading-relaxed">
