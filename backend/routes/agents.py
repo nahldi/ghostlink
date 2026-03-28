@@ -64,6 +64,19 @@ def _warn_missing_worktree_manager(action: str, agent_name: str) -> None:
     log.warning("Worktree cleanup skipped during %s for %s: manager unavailable", action, agent_name)
 
 
+async def _record_activity(event_type: str, text: str, *, agent: str = "", channel: str = "") -> None:
+    event = {
+        "id": f"{int(time.time() * 1000)}-{agent or 'system'}-{event_type}",
+        "type": event_type,
+        "text": text,
+        "agent": agent or None,
+        "channel": channel or None,
+        "timestamp": time.time(),
+    }
+    deps._activity_log.append(event)
+    await deps.broadcast("activity", event)
+
+
 def _validate_spawn_args(base: str, extra_args: object, cfg_args: object) -> list[str]:
     if extra_args is None:
         raw_args: list[object] = []
@@ -172,6 +185,7 @@ async def register_agent(request: Request):
                     deps._agent_processes[inst.name] = proc
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
+    await _record_activity("agent_join", f"{inst.label or inst.name} connected", agent=inst.name)
     return inst.to_dict()
 
 
@@ -189,6 +203,7 @@ async def deregister_agent(name: str):
         deps._thinking_buffers.pop(name, None)
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
+        await _record_activity("agent_leave", f"{name} disconnected", agent=name)
     return {"ok": ok}
 
 
@@ -521,6 +536,7 @@ async def kill_agent(name: str):
     if ok:
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
+        await _record_activity("agent_leave", f"{name} stopped", agent=name)
     return {"ok": ok or proc is not None}
 
 
@@ -733,6 +749,7 @@ async def pause_agent(name: str):
     inst.state = "paused"
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
+    await _record_activity("message", f"{inst.label or name} paused", agent=name)
     return {"ok": True, "state": "paused"}
 
 
@@ -744,6 +761,7 @@ async def resume_agent(name: str):
     inst.state = "active"
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
+    await _record_activity("message", f"{inst.label or name} resumed", agent=name)
     return {"ok": True, "state": "active"}
 
 
@@ -1033,73 +1051,105 @@ async def peek_terminal(name: str, lines: int = 30):
 
 # ── Workspace viewer (v3.8.0) ──────────────────────────────────────
 
-@router.get("/api/agents/{name}/workspace")
-async def get_agent_workspace(name: str):
-    """List files in an agent's workspace directory."""
-    if not _VALID_AGENT_NAME.match(name):
-        return JSONResponse({"error": "invalid agent name"}, 400)
+_WORKSPACE_SKIP_NAMES = {"node_modules", "__pycache__", ".venv", "venv", ".git", "dist"}
+_WORKSPACE_VISIBLE_DOTFILES = {".gitignore"}
+_WORKSPACE_MAX_FILE_SIZE = 500_000
 
-    # Find agent's workspace
+
+def _get_agent_workspace_path(name: str) -> Path:
     inst = deps.registry.get(name) if deps.registry else None
-    workspace = getattr(inst, 'workspace', None) if inst else None
+    workspace = getattr(inst, "workspace", None) if inst else None
     if not workspace:
-        # Check persistent agents
         for pa in deps._settings.get("persistentAgents", []):
-            if pa.get("base") == name or name.startswith(pa.get("base", "")):
+            base = pa.get("base", "")
+            if pa.get("name") == name or pa.get("label") == name or pa.get("base") == name or (base and name.startswith(base)):
                 workspace = pa.get("cwd", ".")
                 break
-    if not workspace:
-        workspace = "."
+    return Path(workspace or ".").resolve()
 
-    from pathlib import Path
-    ws = Path(workspace).resolve()
-    if not ws.is_dir():
-        return {"files": [], "workspace": str(ws), "git_status": ""}
 
-    files = []
+def _resolve_workspace_target(workspace: Path, raw_path: str, *, expect_dir: bool | None = None) -> Path:
+    requested = (raw_path or ".").strip()
+    target = (workspace / requested).resolve()
     try:
-        for entry in sorted(ws.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower())):
-            if entry.name.startswith('.') and entry.name not in ('.gitignore',):
+        target.relative_to(workspace)
+    except ValueError as exc:
+        raise PermissionError("path traversal blocked") from exc
+
+    if expect_dir is True and not target.is_dir():
+        raise FileNotFoundError("directory not found")
+    if expect_dir is False and not target.is_file():
+        raise FileNotFoundError("file not found")
+    return target
+
+
+def _list_workspace_entries(workspace: Path, current: Path) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    try:
+        for entry in sorted(current.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower())):
+            if entry.name in _WORKSPACE_SKIP_NAMES:
                 continue
-            if entry.name in ('node_modules', '__pycache__', '.venv', 'venv', '.git', 'dist'):
+            if entry.name.startswith(".") and entry.name not in _WORKSPACE_VISIBLE_DOTFILES:
                 continue
-            files.append({
+            rel_path = entry.relative_to(workspace)
+            entries.append({
                 "name": entry.name,
-                "path": str(entry.relative_to(ws)),
+                "path": str(rel_path),
                 "type": "directory" if entry.is_dir() else "file",
                 "size": entry.stat().st_size if entry.is_file() else None,
             })
     except PermissionError:
         pass
+    return entries
 
-    # Git status — per-file and latest commit
+
+def _get_workspace_git_status(workspace: Path) -> tuple[str, dict[str, str]]:
     git_status = ""
-    git_file_status: dict[str, str] = {}  # filename → M/A/D/?
+    git_file_status: dict[str, str] = {}
     try:
         result = subprocess.run(
             ["git", "log", "--oneline", "-1"],
-            cwd=str(ws), capture_output=True, text=True, timeout=5,
+            cwd=str(workspace),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             git_status = result.stdout.strip()
-        # Per-file status
+
         porcelain = subprocess.run(
             ["git", "status", "--porcelain"],
-            cwd=str(ws), capture_output=True, text=True, timeout=5,
+            cwd=str(workspace),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if porcelain.returncode == 0:
-            for line in porcelain.stdout.strip().split('\n'):
-                if len(line) >= 4:
-                    status_code = line[:2].strip()
-                    fname = line[3:].strip().split('/')[0]  # top-level name
-                    git_file_status[fname] = status_code
+            for line in porcelain.stdout.strip().splitlines():
+                if len(line) < 4:
+                    continue
+                status_code = line[:2].strip()
+                fname = line[3:].strip().split("/")[0]
+                git_file_status[fname] = status_code
     except Exception:
         pass
+    return git_status, git_file_status
 
-    # Annotate files with git status
-    for f in files:
-        f["git_status"] = git_file_status.get(f["name"], "")
 
+@router.get("/api/agents/{name}/workspace")
+async def get_agent_workspace(name: str):
+    """List top-level files in an agent's workspace directory."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+
+    ws = _get_agent_workspace_path(name)
+    if not ws.is_dir():
+        return {"files": [], "workspace": str(ws), "git_status": ""}
+
+    files = _list_workspace_entries(ws, ws)
+    git_status, git_file_status = _get_workspace_git_status(ws)
+    for entry in files:
+        entry["git_status"] = git_file_status.get(str(entry["name"]), "")
     return {"files": files, "workspace": str(ws), "git_status": git_status}
 
 
@@ -1111,24 +1161,87 @@ async def get_agent_workspace_file(name: str, path: str = ""):
     if not path:
         return JSONResponse({"error": "path required"}, 400)
 
-    # Resolve workspace
-    inst = deps.registry.get(name) if deps.registry else None
-    workspace = getattr(inst, 'workspace', None) if inst else "."
+    ws = _get_agent_workspace_path(name)
+    try:
+        file_path = _resolve_workspace_target(ws, path, expect_dir=False)
+    except PermissionError as exc:
+        return JSONResponse({"error": str(exc)}, 403)
+    except FileNotFoundError as exc:
+        return JSONResponse({"error": str(exc)}, 404)
 
-    from pathlib import Path
-    ws = Path(workspace).resolve()
-    file_path = (ws / path).resolve()
-
-    # Path traversal guard
-    if not file_path.is_relative_to(ws):
-        return JSONResponse({"error": "path traversal blocked"}, 403)
-    if not file_path.is_file():
-        return JSONResponse({"error": "file not found"}, 404)
-    if file_path.stat().st_size > 500_000:
+    if file_path.stat().st_size > _WORKSPACE_MAX_FILE_SIZE:
         return JSONResponse({"error": "file too large (>500KB)"}, 413)
 
     try:
         content = file_path.read_text("utf-8", errors="replace")
+        await _record_activity("message", f"Viewed {name} workspace file {path}", agent=name)
         return {"path": path, "content": content, "size": len(content)}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
+
+
+@router.get("/api/agents/{name}/files")
+async def list_agent_files(name: str, path: str = "."):
+    """List files for a subdirectory inside an agent workspace."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+
+    ws = _get_agent_workspace_path(name)
+    if not ws.is_dir():
+        return JSONResponse({"error": "workspace not found"}, 404)
+
+    try:
+        current = _resolve_workspace_target(ws, path, expect_dir=True)
+    except PermissionError as exc:
+        return JSONResponse({"error": str(exc)}, 403)
+    except FileNotFoundError as exc:
+        return JSONResponse({"error": str(exc)}, 404)
+
+    entries = _list_workspace_entries(ws, current)
+    return {
+        "entries": entries,
+        "path": "." if current == ws else str(current.relative_to(ws)),
+        "workspace": str(ws),
+    }
+
+
+@router.get("/api/agents/{name}/file")
+async def read_agent_file(name: str, path: str = ""):
+    """Read a file from anywhere inside an agent workspace."""
+    return await get_agent_workspace_file(name, path)
+
+
+@router.put("/api/agents/{name}/file")
+async def write_agent_file(name: str, request: Request):
+    """Write a text file inside an agent workspace for in-app editing."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+
+    body = await request.json()
+    path = str(body.get("path", "")).strip()
+    content = body.get("content", "")
+    if not path:
+        return JSONResponse({"error": "path required"}, 400)
+    if not isinstance(content, str):
+        return JSONResponse({"error": "content must be a string"}, 400)
+
+    ws = _get_agent_workspace_path(name)
+    if not ws.is_dir():
+        return JSONResponse({"error": "workspace not found"}, 404)
+
+    try:
+        file_path = _resolve_workspace_target(ws, path, expect_dir=None)
+    except PermissionError as exc:
+        return JSONResponse({"error": str(exc)}, 403)
+
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(content, encoding="utf-8")
+        await _record_activity("message", f"Saved {name} workspace file {path}", agent=name)
+        return {
+            "ok": True,
+            "path": str(file_path.relative_to(ws)),
+            "size": len(content),
+        }
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
