@@ -126,7 +126,7 @@ export function JobsPanel() {
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             placeholder="Job title..."
-            className="flex-1 bg-surface-container rounded-lg px-3 py-1.5 text-xs text-on-surface outline-none border border-outline-variant/10 focus:border-primary/50"
+            className="flex-1 bg-surface-container rounded-lg px-3 py-1.5 text-xs text-on-surface outline-none border border-outline-variant/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
             autoFocus
           />
           <button
@@ -169,10 +169,13 @@ export function JobsPanel() {
               </div>
               <div className="space-y-2 min-h-[40px]">
                 {items.length === 0 ? (
-                  <div className={`text-xs text-center py-4 rounded-lg border border-dashed transition-colors ${
-                    isOver ? 'border-primary/30 text-primary/50' : 'border-outline-variant/10 text-outline-variant'
+                  <div className={`text-xs text-center py-6 rounded-xl border border-dashed transition-colors ${
+                    isOver ? 'border-primary/30 text-primary/50 bg-primary/5' : 'border-outline-variant/10 text-outline-variant'
                   }`}>
-                    {isOver ? 'Drop here' : 'No jobs'}
+                    <span className="material-symbols-outlined text-lg text-on-surface-variant/15 block mb-1">
+                      {isOver ? 'add_circle' : 'task'}
+                    </span>
+                    {isOver ? 'Drop here' : 'No jobs yet'}
                   </div>
                 ) : (
                   items.map((job) => <JobCard key={job.id} job={job} onDragStart={handleDragStart} />)
