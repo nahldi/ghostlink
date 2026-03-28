@@ -94,6 +94,33 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       });
     }
 
+    // Cockpit quick actions for active agents
+    const onlineAgents = agents.filter(a => a.state === 'active' || a.state === 'idle' || a.state === 'thinking');
+    if (onlineAgents.length > 0) {
+      for (const a of onlineAgents) {
+        results.push(
+          {
+            id: `cockpit-terminal-${a.name}`,
+            label: `${a.label}: Terminal`,
+            description: 'View live terminal output',
+            icon: 'terminal',
+            category: 'action',
+            color: a.color,
+            action: () => { setCockpitAgent(a.name); onClose(); },
+          },
+          {
+            id: `cockpit-files-${a.name}`,
+            label: `${a.label}: Files`,
+            description: 'Browse workspace files',
+            icon: 'folder_open',
+            category: 'action',
+            color: a.color,
+            action: () => { setCockpitAgent(a.name); onClose(); },
+          },
+        );
+      }
+    }
+
     // Quick actions
     results.push(
       {
