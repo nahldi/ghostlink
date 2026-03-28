@@ -211,6 +211,8 @@ export interface Bridge {
   configured?: boolean;
   connected?: boolean;
   enabled?: boolean;
+  channel_map?: Record<string, string>;
+  [key: string]: unknown;
 }
 
 // Policies and Security

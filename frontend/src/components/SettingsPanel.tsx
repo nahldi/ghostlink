@@ -3,6 +3,7 @@ import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
 import { AgentIcon } from './AgentIcon';
 import { SoundManager, SOUND_OPTIONS } from '../lib/sounds';
+import type { Plugin, SkillPack, Hook, Bridge, RetentionPolicy, AuditLogEntry } from '../types';
 import type { Settings, PersistentAgent, StatsSections } from '../types';
 
 const AGENT_PRESETS: { base: string; label: string; command: string; color: string; defaultArgs: string[] }[] = [
@@ -434,7 +435,7 @@ function AgentsTab({
 /* ── MarketplaceSection ────────────────────────────────────────────── */
 
 function MarketplaceSection() {
-  const [plugins, setPlugins] = useState<any[]>([]);
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [search, setSearch] = useState('');
   const [installing, setInstalling] = useState('');
   const [uninstalling, setUninstalling] = useState('');
@@ -498,7 +499,7 @@ function MarketplaceSection() {
 /* ── SkillPacksSection ─────────────────────────────────────────────── */
 
 function SkillPacksSection() {
-  const [packs, setPacks] = useState<any[]>([]);
+  const [packs, setPacks] = useState<SkillPack[]>([]);
   const [applying, setApplying] = useState('');
   const agents = useChatStore((s) => s.agents);
 
@@ -539,7 +540,7 @@ function SkillPacksSection() {
 /* ── HooksSection ──────────────────────────────────────────────────── */
 
 function HooksSection() {
-  const [hooks, setHooks] = useState<any[]>([]);
+  const [hooks, setHooks] = useState<Hook[]>([]);
   const [events, setEvents] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -627,7 +628,7 @@ const BRIDGE_INFO: Record<string, { name: string; icon: string; color: string; d
 };
 
 function IntegrationsTab() {
-  const [bridges, setBridges] = useState<any[]>([]);
+  const [bridges, setBridges] = useState<Bridge[]>([]);
   const [configuring, setConfiguring] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [channelMap, setChannelMap] = useState<Record<string, string>>({});
@@ -911,7 +912,7 @@ function SecretsSection() {
 }
 
 function RetentionSection() {
-  const [policy, setPolicy] = useState<any>(null);
+  const [policy, setPolicy] = useState<RetentionPolicy | null>(null);
 
   useEffect(() => { api.getRetention().then(r => setPolicy(r.policy)).catch((e) => console.warn('Retention fetch:', e instanceof Error ? e.message : String(e))); }, []);
 
@@ -1020,7 +1021,7 @@ function DataManagementSection() {
 }
 
 function AuditLogSection() {
-  const [entries, setEntries] = useState<any[]>([]);
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -1087,6 +1088,7 @@ function AdvancedTab({
 /* ── ServerConfigSection ───────────────────────────────────────────── */
 
 function ServerConfigSection() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- server config shape varies
   const [config, setConfig] = useState<any>(null);
 
   useEffect(() => {
@@ -1203,6 +1205,7 @@ function ServerLogsSection() {
 /* ── Tab: Providers ──────────────────────────────────────────────── */
 
 function ProvidersTab() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- provider status shape varies
   const [status, setStatus] = useState<any>(null);
   const [configuring, setConfiguring] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
