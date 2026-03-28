@@ -414,14 +414,123 @@ function CockpitActivity({ agent }: { agent: Agent }) {
   );
 }
 
+// ── Browser Tab ───────────────────────────────────────────────────────
+
+interface BrowserState {
+  url?: string;
+  query?: string;
+  preview?: string;
+  tool?: string;
+  timestamp?: number;
+}
+
+function CockpitBrowser({ agent }: { agent: Agent }) {
+  const [browser, setBrowser] = useState<BrowserState | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchBrowser = async () => {
+      try {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent.name)}/browser`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setBrowser(data.state || null);
+        }
+      } catch { /* ignored */ }
+      if (!cancelled) setLoading(false);
+    };
+    fetchBrowser();
+    const interval = setInterval(fetchBrowser, 3000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [agent.name]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span>
+      </div>
+    );
+  }
+
+  if (!browser || (!browser.url && !browser.query && !browser.preview)) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4">
+        <span className="material-symbols-outlined text-3xl text-on-surface-variant/20">language</span>
+        <p className="text-xs text-on-surface-variant/40 text-center">
+          No browser activity yet. When {agent.label || agent.name} browses the web, you'll see it here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* URL bar */}
+      {browser.url && (
+        <div className="px-3 py-2 flex items-center gap-2 border-b border-outline-variant/10 shrink-0">
+          <span className="material-symbols-outlined text-sm text-on-surface-variant/40">language</span>
+          <a
+            href={browser.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] font-mono text-primary/70 hover:text-primary truncate flex-1"
+          >
+            {browser.url}
+          </a>
+          <button
+            onClick={() => navigator.clipboard?.writeText(browser.url!).then(() => toast('URL copied', 'success'))}
+            className="p-1 rounded hover:bg-surface-container-high shrink-0"
+          >
+            <span className="material-symbols-outlined text-[12px] text-on-surface-variant/30">content_copy</span>
+          </button>
+        </div>
+      )}
+      {/* Search query */}
+      {browser.query && (
+        <div className="px-3 py-1.5 flex items-center gap-2 border-b border-outline-variant/5 shrink-0">
+          <span className="material-symbols-outlined text-sm text-on-surface-variant/30">search</span>
+          <span className="text-[10px] text-on-surface-variant/50">"{browser.query}"</span>
+          {browser.tool && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant/30 ml-auto">
+              {browser.tool}
+            </span>
+          )}
+        </div>
+      )}
+      {/* Preview content */}
+      <div className="flex-1 overflow-auto p-3">
+        {browser.preview ? (
+          <div className="text-[11px] text-on-surface/60 leading-relaxed whitespace-pre-wrap font-mono">
+            {browser.preview}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-on-surface-variant/25 text-xs">
+            Page content loading...
+          </div>
+        )}
+      </div>
+      {/* Timestamp */}
+      {browser.timestamp && (
+        <div className="px-3 py-1.5 border-t border-outline-variant/5 shrink-0">
+          <span className="text-[9px] text-on-surface-variant/20">
+            Last updated {new Date(browser.timestamp * 1000).toLocaleTimeString()}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Cockpit Panel ────────────────────────────────────────────────
 
-const TABS = ['terminal', 'files', 'activity'] as const;
+const TABS = ['terminal', 'files', 'browser', 'activity'] as const;
 type CockpitTab = typeof TABS[number];
 
 const TAB_ICONS: Record<CockpitTab, string> = {
   terminal: 'terminal',
   files: 'folder_open',
+  browser: 'language',
   activity: 'timeline',
 };
 
@@ -504,6 +613,7 @@ export function AgentCockpit() {
       <div className="flex-1 min-h-0 overflow-hidden">
         {tab === 'terminal' && <CockpitTerminal agent={agent} />}
         {tab === 'files' && <CockpitFiles agent={agent} />}
+        {tab === 'browser' && <CockpitBrowser agent={agent} />}
         {tab === 'activity' && <CockpitActivity agent={agent} />}
       </div>
     </div>
