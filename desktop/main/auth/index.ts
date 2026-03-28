@@ -3,17 +3,16 @@
  * Exports shared WSL / platform helpers used by every provider module.
  */
 
-import { exec, spawn } from 'child_process';
+import { exec, execFile, execFileSync, spawn } from 'child_process';
 
 
 import fs from 'fs';
-import path from 'path';
-import os from 'os';
 
 import { checkAnthropic, loginAnthropic, installAnthropic } from './anthropic';
 import { checkOpenAI, loginOpenAI, installOpenAI } from './openai';
 import { checkGoogle, loginGoogle, installGoogle } from './google';
 import { checkGitHub, loginGitHub, installGitHub } from './github';
+import { getSettingsPath, loadSettingsFile } from '../settings';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,13 +47,66 @@ export function execAsync(command: string, options: any = {}): Promise<string> {
   });
 }
 
+function execFileAsync(command: string, args: string[], options: any = {}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, options, (error: any, stdout: any, stderr: any) => {
+      if (error) {
+        const err: any = new Error(error.message);
+        err.stdout = stdout;
+        err.stderr = stderr;
+        err.code = error.code;
+        reject(err);
+      } else {
+        resolve(String(stdout).trim());
+      }
+    });
+  });
+}
+
+function assertSafeCommandName(name: string): void {
+  if (!/^[A-Za-z0-9._+-]+$/.test(name)) {
+    throw new Error(`Unsafe command name: ${name}`);
+  }
+}
+
+async function execWslBash(args: string[], options: any = {}): Promise<string> {
+  return execFileAsync('wsl', ['bash', ...args], {
+    windowsHide: true,
+    ...options,
+  });
+}
+
+async function commandExists(commandName: string): Promise<boolean> {
+  assertSafeCommandName(commandName);
+  try {
+    if (isWsl()) {
+      await execWslBash([
+        '-lc',
+        'export PATH="$PATH:$HOME/.npm-global/bin:$HOME/.local/bin:/usr/local/bin"; command -v "$1" >/dev/null 2>&1',
+        'bash',
+        commandName,
+      ], { stdio: 'pipe', timeout: 5_000 });
+    } else {
+      const checker = process.platform === 'win32' ? 'where' : 'which';
+      await execFileAsync(checker, [commandName], {
+        windowsHide: true,
+        stdio: 'pipe',
+        timeout: 5_000,
+      });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Shared platform helpers ─────────────────────────────────────────────────
 
 export function getSettings(): Record<string, any> | null {
   try {
-    const settingsPath = path.join(os.homedir(), '.ghostlink', 'settings.json');
+    const settingsPath = getSettingsPath();
     if (!fs.existsSync(settingsPath)) return null;
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    return loadSettingsFile(settingsPath) as Record<string, any> | null;
   } catch {
     return null;
   }
@@ -99,25 +151,22 @@ export async function execCmd(command: string, timeoutMs: number = 10_000): Prom
  */
 export async function hasCommand(name: string): Promise<boolean> {
   // Method 1: Direct binary via which/where
-  try {
-    if (isWsl()) {
-      await execAsync(`wsl bash -lc "which ${name} 2>/dev/null || command -v ${name} 2>/dev/null"`, { stdio: 'pipe', timeout: 5_000 });
-      return true;
-    } else {
-      const check = process.platform === 'win32' ? `where ${name}` : `which ${name}`;
-      await execAsync(check, { stdio: 'pipe', timeout: 5_000 });
-      return true;
-    }
-  } catch {
-    // Not found via which/where — try other methods
+  if (await commandExists(name)) {
+    return true;
   }
 
   // Method 2: Check common npm global bin paths (npm-global, nvm, etc.)
   if (isWsl()) {
+    assertSafeCommandName(name);
     try {
       // Check ~/.npm-global/bin, ~/.local/bin, nvm paths, /usr/local/bin
-      const result = await execAsync(
-        `wsl bash -c "test -f ~/.npm-global/bin/${name} || test -f ~/.local/bin/${name} || test -f /usr/local/bin/${name} && echo found"`,
+      const result = await execWslBash(
+        [
+          '-lc',
+          'for candidate in "$HOME/.npm-global/bin/$1" "$HOME/.local/bin/$1" "/usr/local/bin/$1"; do test -f "$candidate" && echo found && exit 0; done; exit 1',
+          'bash',
+          name,
+        ],
         { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5_000 }
       );
       if (String(result).includes('found')) return true;
@@ -125,8 +174,13 @@ export async function hasCommand(name: string): Promise<boolean> {
 
     // Also try running it with full PATH expansion
     try {
-      const result = await execAsync(
-        `wsl bash -ic "${name} --version 2>/dev/null || PATH=$PATH:$HOME/.npm-global/bin:$HOME/.local/bin ${name} --version 2>/dev/null"`,
+      const result = await execWslBash(
+        [
+          '-ic',
+          'export PATH="$PATH:$HOME/.npm-global/bin:$HOME/.local/bin:/usr/local/bin"; "$1" --version 2>/dev/null',
+          'bash',
+          name,
+        ],
         { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 }
       );
       if (String(result).length > 0) return true;
@@ -136,9 +190,13 @@ export async function hasCommand(name: string): Promise<boolean> {
   // Method 3: Try npx (for tools installed via npm)
   try {
     if (isWsl()) {
-      await execAsync(`wsl bash -lc "npx ${name} --version 2>/dev/null"`, { stdio: 'pipe', timeout: 15_000 });
+      assertSafeCommandName(name);
+      await execWslBash(
+        ['-lc', 'export PATH="$PATH:$HOME/.npm-global/bin:$HOME/.local/bin:/usr/local/bin"; npx "$1" --version 2>/dev/null', 'bash', name],
+        { stdio: 'pipe', timeout: 15_000 }
+      );
     } else {
-      await execAsync(`npx ${name} --version`, { stdio: 'pipe', timeout: 15_000 });
+      await execFileAsync('npx', [name, '--version'], { windowsHide: true, stdio: 'pipe', timeout: 15_000 });
     }
     return true;
   } catch {
@@ -210,7 +268,7 @@ export function spawnInTerminal(command: string): void {
     const terminals = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xterm'];
     for (const term of terminals) {
       try {
-        require('child_process').execSync(`which ${term}`, { stdio: 'ignore' });
+        execFileSync('which', [term], { stdio: 'ignore' });
         spawn(term, ['-e', command], { detached: true, stdio: 'ignore' }).unref();
         return;
       } catch { /* next */ }
@@ -243,13 +301,7 @@ const _extraAgents: { command: string; name: string; color: string; installCmd: 
 ];
 
 async function checkExtraAgent(agent: typeof _extraAgents[0]): Promise<AuthStatus> {
-  let installed = false;
-  try {
-    const useWsl = isWsl();
-    const checkCmd = useWsl ? `wsl bash -lc "which ${agent.command}"` : `which ${agent.command}`;
-    await execAsync(checkCmd, { timeout: 5000 });
-    installed = true;
-  } catch {}
+  const installed = await commandExists(agent.command);
   return {
     provider: agent.command,
     name: agent.name,

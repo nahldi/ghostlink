@@ -32,6 +32,11 @@ async def send_message(request: Request):
     text = (body.get("text", "") or "")
     channel = (body.get("channel", "general") or "").strip()
     reply_to = body.get("reply_to")
+    if reply_to is not None:
+        try:
+            reply_to = int(reply_to)
+        except (ValueError, TypeError):
+            return JSONResponse({"error": "reply_to must be an integer"}, 400)
     attachments = body.get("attachments", [])
     msg_type = (body.get("type", "chat") or "chat").strip()
     raw_metadata = body.get("metadata", "{}")

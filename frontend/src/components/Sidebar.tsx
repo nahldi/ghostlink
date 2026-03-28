@@ -98,7 +98,7 @@ export function Sidebar() {
     <>
       {/* Context menu */}
       {contextMenu && (
-        <div className="fixed inset-0 z-[60]" onClick={() => setContextMenu(null)}>
+        <div className="fixed inset-0 z-[60]" onClick={() => setContextMenu(null)} onKeyDown={(e) => { if (e.key === 'Escape') setContextMenu(null); }} role="presentation">
           <div className="absolute rounded-xl p-1 min-w-[140px]" style={{
             left: contextMenu.x, top: contextMenu.y,
             background: 'rgba(14, 14, 22, 0.98)', border: '1px solid rgba(255,255,255,0.08)',

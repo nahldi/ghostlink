@@ -76,12 +76,15 @@ async def channel_summary(name: str):
     if name not in channels:
         return JSONResponse({"error": "channel not found"}, 404)
     if deps.store._db is None:
-        raise RuntimeError("database not initialized")
-    cursor = await deps.store._db.execute(
-        "SELECT sender, text, timestamp FROM messages WHERE channel = ? ORDER BY id DESC LIMIT 100",
-        (name,),
-    )
-    rows = await cursor.fetchall()
+        return JSONResponse({"error": "database unavailable"}, 503)
+    try:
+        cursor = await deps.store._db.execute(
+            "SELECT sender, text, timestamp FROM messages WHERE channel = ? ORDER BY id DESC LIMIT 100",
+            (name,),
+        )
+        rows = await cursor.fetchall()
+    except Exception as e:
+        return JSONResponse({"error": "database unavailable", "detail": str(e)}, 503)
     if not rows:
         return {"channel": name, "summary": "No messages yet.", "message_count": 0, "participants": [], "topics": []}
     rows.reverse()

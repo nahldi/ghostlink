@@ -228,18 +228,58 @@ class ProviderRegistry:
             except (json.JSONDecodeError, OSError):
                 pass
 
-    def save_config(self, config: dict):
-        self._user_config.update(config)
+    def _save_user_config(self):
         if self._config_path:
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
             self._config_path.write_text(json.dumps(self._user_config, indent=2))
+
+    def _migrate_plaintext_key(self, secret_key: str) -> str | None:
+        plaintext = self._user_config.get(secret_key)
+        if not plaintext:
+            return None
+        try:
+            import deps
+            secrets_manager = getattr(deps, "secrets_manager", None)
+            if secrets_manager:
+                secrets_manager.set(secret_key, plaintext)
+                del self._user_config[secret_key]
+                self._save_user_config()
+                log.info("Migrated plaintext provider secret '%s' to encrypted storage", secret_key)
+        except Exception as exc:
+            log.warning("Failed to migrate provider secret '%s': %s", secret_key, exc)
+        return plaintext
+
+    def save_config(self, config: dict):
+        try:
+            import deps
+            secrets_manager = getattr(deps, "secrets_manager", None)
+        except Exception:
+            secrets_manager = None
+
+        for key, value in config.items():
+            if key.endswith("_api_key"):
+                secret_value = str(value or "").strip()
+                if secrets_manager:
+                    if secret_value:
+                        secrets_manager.set(key, secret_value)
+                    else:
+                        secrets_manager.delete(key)
+                elif secret_value:
+                    self._user_config[key] = secret_value
+                else:
+                    self._user_config.pop(key, None)
+                continue
+
+            self._user_config[key] = value
+
+        self._save_user_config()
 
     def detect_available(self) -> list[dict]:
         """Detect which providers are available based on env vars and config."""
         available = []
         for pid, pdef in PROVIDERS.items():
             has_key = any(os.environ.get(k) for k in pdef["env_keys"])
-            user_key = self._user_config.get(f"{pid}_api_key", "")
+            user_key = self.get_api_key(pid)
             is_local = pdef.get("local", False)
             # For local providers, verify the service is actually running
             if is_local and pid == "ollama":
@@ -269,7 +309,19 @@ class ProviderRegistry:
 
     def get_api_key(self, provider_id: str) -> str | None:
         """Get API key for a provider (user config > env var)."""
-        user_key = self._user_config.get(f"{provider_id}_api_key")
+        secret_key = f"{provider_id}_api_key"
+        try:
+            import deps
+            secrets_manager = getattr(deps, "secrets_manager", None)
+        except Exception:
+            secrets_manager = None
+
+        if secrets_manager:
+            user_key = secrets_manager.get(secret_key)
+            if user_key:
+                return user_key
+
+        user_key = self._migrate_plaintext_key(secret_key)
         if user_key:
             return user_key
         pdef = PROVIDERS.get(provider_id)

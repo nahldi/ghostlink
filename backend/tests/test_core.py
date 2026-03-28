@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
+import types
 from pathlib import Path
 
 import pytest
@@ -175,6 +177,69 @@ def test_security_different_dirs_different_keys(tmp_path: Path):
     # sm_b has a different data_dir, so it doesn't have "secret"
     result = sm_b.get("secret")
     assert result is None  # different dir, key doesn't exist there
+
+
+def test_provider_registry_uses_encrypted_secrets_and_migrates_plaintext(tmp_path: Path):
+    """Provider keys are stored in secrets.enc and legacy plaintext keys are migrated out."""
+    import deps
+    from providers import ProviderRegistry
+    from security import SecretsManager
+
+    previous_manager = deps.secrets_manager
+    deps.secrets_manager = SecretsManager(tmp_path)
+    try:
+        registry = ProviderRegistry(tmp_path)
+        registry.save_config({"openai_api_key": "sk-test-123", "preferred_chat": "openai"})
+
+        config_data = json.loads((tmp_path / "providers.json").read_text())
+        assert config_data == {"preferred_chat": "openai"}
+        assert deps.secrets_manager.get("openai_api_key") == "sk-test-123"
+
+        (tmp_path / "providers.json").write_text(json.dumps({"anthropic_api_key": "sk-legacy"}))
+        migrated = ProviderRegistry(tmp_path)
+        assert migrated.get_api_key("anthropic") == "sk-legacy"
+        migrated_config = json.loads((tmp_path / "providers.json").read_text())
+        assert "anthropic_api_key" not in migrated_config
+        assert deps.secrets_manager.get("anthropic_api_key") == "sk-legacy"
+    finally:
+        deps.secrets_manager = previous_manager
+
+
+def test_require_startup_attr_success(monkeypatch: pytest.MonkeyPatch):
+    import importlib
+    import app
+
+    module_name = "ghostlink_test_startup_success"
+    module = types.ModuleType(module_name)
+    token = object()
+    module.Token = token
+    original_import_module = importlib.import_module
+
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda name: module if name == module_name else original_import_module(name),
+    )
+
+    assert app._require_startup_attr(module_name, "Token") is token
+
+
+def test_require_startup_attr_missing_attr_raises(monkeypatch: pytest.MonkeyPatch):
+    import importlib
+    import app
+
+    module_name = "ghostlink_test_startup_missing_attr"
+    module = types.ModuleType(module_name)
+    original_import_module = importlib.import_module
+
+    monkeypatch.setattr(
+        importlib,
+        "import_module",
+        lambda name: module if name == module_name else original_import_module(name),
+    )
+
+    with pytest.raises(RuntimeError, match=f"Startup import missing {module_name}\\.Missing"):
+        app._require_startup_attr(module_name, "Missing")
 
 
 # ── shlex fix (Tier 5.1) ──────────────────────────────────────────────

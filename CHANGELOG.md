@@ -1,5 +1,18 @@
 # GhostLink Changelog
 
+## v4.8.0 — 2026-03-28
+### Security Hardening & Full Audit
+- **Electron security** — removed shell-string path handling, all exec calls use argument arrays, symlink rejection in WSL copy, path traversal prevention
+- **Window isolation** — wizard/launcher now use `nodeIntegration: false`, `contextIsolation: true` with preload bridge
+- **Provider key encryption** — API keys routed through SecretsManager, legacy plaintext auto-migrated from providers.json
+- **Settings validation** — allowlist-based sanitizer for settings.json, persistent agents command-whitelisted
+- **Runtime resilience** — DB failures return 503 instead of crashing, WebSocket broadcast thread-safe, plugin loading guarded, hop counter auto-resets
+- **Frontend fixes** — stale closures fixed in scroll/URL preview/search, AbortController for search races, bounded streamed IDs set, ErrorBoundary logging, sessionStart resets
+- **Accessibility** — aria-live on connection banner, Escape key on context menus
+- **Validation** — export format, reply_to type, HMAC secret non-empty check
+- **Docs sync** — all version references updated, FEATURES.md planned→completed, STATUS.md changelog backfilled, DESKTOP_APP_PLAN.md OAuth→CLI auth
+- **Version consistency** — pyproject.toml, GDPR export, desktop lockfile all synced
+
 ## v4.7.0 — 2026-03-26
 ### UI Polish & Visual Refinement
 - **Sidebar animation** — channel panel slides in/out with spring physics (Framer Motion)

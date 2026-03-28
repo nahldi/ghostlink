@@ -23,6 +23,13 @@ BOOTSTRAP.md
 MEMORY.md
 memory/
 
+# Secrets & environment
+.env
+.env.*
+*.key
+*.pem
+*.p12
+
 # OS/editor
 .DS_Store
 *.log

@@ -213,9 +213,11 @@ class SessionManager:
 
         phase = phases[current]
         roles = [r for r in session["cast"].keys() if session["cast"][r]]
+        if not roles:
+            return None
         # Alternate turns between assigned roles
-        role_idx = session["current_turn"] % len(roles) if len(roles) > 0 else 0
-        current_role = roles[role_idx] if len(roles) > 0 else None
+        role_idx = session["current_turn"] % len(roles)
+        current_role = roles[role_idx]
         current_agent = session["cast"].get(current_role, "") if current_role else None
 
         return {

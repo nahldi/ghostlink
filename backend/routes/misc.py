@@ -333,6 +333,8 @@ async def get_usage():
 
 @router.get("/api/export")
 async def export_channel(channel: str = "general", format: str = "markdown"):
+    if format not in ("markdown", "json", "csv"):
+        return JSONResponse({"error": f"unsupported format: {format}"}, 400)
     if deps.store._db is None:
         raise RuntimeError("Database not initialized. Call init() first.")
     cursor = await deps.store._db.execute(

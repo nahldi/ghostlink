@@ -103,7 +103,7 @@ export const useChatStore = create<ChatState>((set) => ({
       // Cap messages to prevent memory leak in long sessions
       return { messages: updated.length > MAX_MESSAGES ? updated.slice(-TRIM_TO) : updated };
     }),
-  setMessages: (messages) => set({ messages }),
+  setMessages: (messages) => set({ messages, sessionStart: Date.now() }),
   pinMessage: (id, pinned) =>
     set((s) => ({
       messages: s.messages.map((m) =>

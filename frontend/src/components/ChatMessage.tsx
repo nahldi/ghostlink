@@ -104,7 +104,16 @@ interface ChatMessageProps { message: Message; }
 const COLLAPSE_THRESHOLD = 600; // characters
 
 // v3.2.0: Track which messages have completed streaming to avoid re-streaming
+// Bounded to prevent memory leak in long sessions
 const _streamedIds = new Set<number>();
+const MAX_STREAMED = 2000;
+function _markStreamed(id: number) {
+  _streamedIds.add(id);
+  if (_streamedIds.size > MAX_STREAMED) {
+    const first = _streamedIds.values().next().value;
+    if (first !== undefined) _streamedIds.delete(first);
+  }
+}
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const [showPicker, setShowPicker] = useState(false);
@@ -372,7 +381,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 <StreamingText
                   text={displayText}
                   wordsPerMs={15}
-                  onComplete={() => { _streamedIds.add(message.id); setStreaming(false); }}
+                  onComplete={() => { _markStreamed(message.id); setStreaming(false); }}
                 />
               </p>
             ) : (

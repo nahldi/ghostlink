@@ -113,20 +113,16 @@
 - [x] **Webhook integration** — CRUD for webhook endpoints
 - [x] **Mobile responsive** — dvh units, ErrorBoundary, inline loading
 
----
-
-## PLANNED FEATURES
-
-### Agent Intelligence (remaining)
+### Agent Intelligence
 - [x] **Consensus mode** — /consensus asks all agents the same question via @all
 - [x] **Agent debates** — /debate agent1 agent2 topic, structured FOR/AGAINST prompts
 - [x] **Smart auto-routing** — keyword-based message classification routes to best-fit agent (none/all/smart modes)
 
-### Observability (remaining)
+### Observability
 - [x] **Terminal peek** — live view of agent tmux pane output with auto-scroll
 - [x] **File change feed** — real-time file change monitoring via plugin, tracks creates/modifies/deletes
 
-### Power User (remaining)
+### Power User
 - [x] **Split view** — two channels side by side with divider
 - [x] **Session replay** — playback stored messages with original timing, speed controls
 - [x] **Plugin system** — drop-in Python modules in plugins/ directory, auto-discovered and loaded on startup

@@ -19,6 +19,115 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 _VALID_AGENT_NAME = deps._VALID_AGENT_NAME
+_SAFE_AGENT_ARG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/=+\-@]*$")
+_KNOWN_AGENT_ARG_PRESETS: dict[str, set[tuple[str, ...]]] = {
+    "claude": {
+        (),
+        ("--dangerously-skip-permissions",),
+        ("--permission-mode", "acceptEdits"),
+        ("--permission-mode", "plan"),
+    },
+    "codex": {
+        (),
+        ("--sandbox", "danger-full-access", "-a", "never"),
+        ("--full-auto",),
+    },
+    "gemini": {
+        (),
+        ("-y",),
+        ("--approval-mode", "auto_edit"),
+        ("--approval-mode", "plan"),
+    },
+    "grok": {()},
+    "aider": {
+        (),
+        ("--yes",),
+    },
+    "goose": {()},
+    "opencode": {()},
+    "copilot": {()},
+    "ollama": {
+        (),
+        ("run", "qwen2.5-coder"),
+    },
+}
+_KNOWN_MODEL_FLAGS: dict[str, str] = {
+    "claude": "--model",
+    "codex": "-m",
+    "gemini": "-m",
+    "grok": "--model",
+    "aider": "--model",
+}
+
+
+def _warn_missing_worktree_manager(action: str, agent_name: str) -> None:
+    log.warning("Worktree cleanup skipped during %s for %s: manager unavailable", action, agent_name)
+
+
+def _validate_spawn_args(base: str, extra_args: object, cfg_args: object) -> list[str]:
+    if extra_args is None:
+        raw_args: list[object] = []
+    elif isinstance(extra_args, list):
+        raw_args = list(extra_args)
+    else:
+        raise ValueError("args must be an array of strings")
+
+    if len(raw_args) > 8:
+        raise ValueError("too many args")
+
+    normalized: list[str] = []
+    for raw in raw_args:
+        if not isinstance(raw, str):
+            raise ValueError("args must be strings")
+        arg = raw.strip()
+        if not arg or len(arg) > 128 or not _SAFE_AGENT_ARG_RE.match(arg):
+            raise ValueError(f"invalid arg: {raw!r}")
+        normalized.append(arg)
+
+    allowed = set(_KNOWN_AGENT_ARG_PRESETS.get(base, {()}))
+    if isinstance(cfg_args, list):
+        cfg_tuple = tuple(str(arg).strip() for arg in cfg_args if isinstance(arg, str) and str(arg).strip())
+        allowed.add(cfg_tuple)
+
+    if tuple(normalized) in allowed:
+        return normalized
+
+    model_flag = _KNOWN_MODEL_FLAGS.get(base)
+    if model_flag and len(normalized) >= 2 and len(normalized) <= 6:
+        for preset in allowed:
+            prefix = list(preset)
+            if normalized[:len(prefix)] != prefix:
+                continue
+            remainder = normalized[len(prefix):]
+            if len(remainder) == 2 and remainder[0] == model_flag and _SAFE_AGENT_ARG_RE.match(remainder[1]):
+                return normalized
+
+    raise ValueError(f"unsupported args for {base}")
+
+
+async def _wait_for_spawn_health(proc: subprocess.Popen, base: str, stderr_buf: list[str]) -> None:
+    delay = 0.25
+    max_delay = 2.0
+    deadline = time.time() + 6.0
+
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            await asyncio.sleep(0.2)
+            stderr_output = "\n".join(stderr_buf[-30:]).strip()
+            error_msg = stderr_output or f"Agent '{base}' exited immediately. Is the '{base}' CLI installed and authenticated?"
+            raise RuntimeError(error_msg)
+
+        async with deps._agent_lock:
+            if proc.pid not in deps._pending_spawns:
+                return
+
+        await asyncio.sleep(delay)
+        delay = min(max_delay, delay * 2)
+
+    if proc.poll() is not None:
+        stderr_output = "\n".join(stderr_buf[-30:]).strip()
+        error_msg = stderr_output or f"Agent '{base}' exited before registration completed."
+        raise RuntimeError(error_msg)
 
 
 def _drain_pipe(pipe, agent_base: str, buf: list | None = None) -> None:
@@ -49,6 +158,8 @@ async def register_agent(request: Request):
         inst.role = role
     if hasattr(deps, "worktree_manager") and deps.worktree_manager:
         deps.worktree_manager.create_worktree(inst.name)
+    else:
+        _warn_missing_worktree_manager("register", inst.name)
     if wrapper_pid is not None:
         try:
             pid_int = int(wrapper_pid)
@@ -70,6 +181,8 @@ async def deregister_agent(name: str):
     if hasattr(deps, "worktree_manager") and deps.worktree_manager:
         deps.worktree_manager.merge_changes(name)
         deps.worktree_manager.remove_worktree(name)
+    else:
+        _warn_missing_worktree_manager("deregister", name)
     ok = deps.registry.deregister(name)
     if ok:
         mcp_bridge.cleanup_agent(name)
@@ -231,6 +344,12 @@ async def spawn_agent(request: Request):
         "opencode": "opencode", "ollama": "ollama",
     }
     command = cfg.get("command") or _KNOWN_COMMANDS.get(base, base)
+    try:
+        extra_args = _validate_spawn_args(base, extra_args, cfg.get("args", []))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, 400)
+    if len(role_description) > 500:
+        return JSONResponse({"error": "roleDescription too long"}, 400)
 
     import shutil as _shutil
 
@@ -333,12 +452,12 @@ async def spawn_agent(request: Request):
         async with deps._agent_lock:
             deps._pending_spawns[proc.pid] = proc
 
-        await asyncio.sleep(3)
-
-        if proc.poll() is not None:
-            await asyncio.sleep(0.2)
-            stderr_output = "\n".join(_stderr_buf[-30:]).strip()
-            error_msg = stderr_output or f"Agent '{base}' exited immediately. Is the '{command}' CLI installed and authenticated?"
+        try:
+            await _wait_for_spawn_health(proc, base, _stderr_buf)
+        except RuntimeError as spawn_err:
+            error_msg = str(spawn_err)
+            if not _stderr_buf and command and error_msg.endswith("installed and authenticated?"):
+                error_msg = f"Agent '{base}' exited immediately. Is the '{command}' CLI installed and authenticated?"
             log.warning("Agent spawn failed for %s: %s", base, error_msg)
             async with deps._agent_lock:
                 deps._pending_spawns.pop(proc.pid, None)
@@ -361,6 +480,8 @@ async def kill_agent(name: str):
     if hasattr(deps, "worktree_manager") and deps.worktree_manager:
         deps.worktree_manager.merge_changes(name)
         deps.worktree_manager.remove_worktree(name)
+    else:
+        _warn_missing_worktree_manager("kill", name)
     ok = deps.registry.deregister(name)
     if ok:
         mcp_bridge.cleanup_agent(name)

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-__version__ = "4.7.3"
+__version__ = "4.8.0"
 
 import json
+import importlib
 import os
 import sys
 import time
 import collections
+import functools
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -205,6 +207,39 @@ def _save_settings():
         json.dump(deps._settings, f, indent=2)
 
 
+@functools.lru_cache(maxsize=256)
+def _schedule_cooldown_seconds(cron_expr: str) -> float:
+    import datetime
+
+    now = datetime.datetime.now(datetime.timezone.utc).replace(second=0, microsecond=0)
+    first_match: datetime.datetime | None = None
+
+    for minute_offset in range(0, 60 * 24 * 366):
+        candidate = now + datetime.timedelta(minutes=minute_offset)
+        if not cron_matches(cron_expr, candidate.timestamp()):
+            continue
+        if first_match is None:
+            first_match = candidate
+            continue
+        return max(60.0, (candidate - first_match).total_seconds())
+
+    return 60.0
+
+
+def _require_startup_attr(module_name: str, attr_name: str):
+    try:
+        module = importlib.import_module(module_name)
+    except Exception as exc:
+        log.exception("Startup import failed for %s", module_name)
+        raise RuntimeError(f"Startup import failed for {module_name}") from exc
+
+    try:
+        return getattr(module, attr_name)
+    except AttributeError as exc:
+        log.exception("Startup import missing %s.%s", module_name, attr_name)
+        raise RuntimeError(f"Startup import missing {module_name}.{attr_name}") from exc
+
+
 # ── Server logs ──────────────────────────────────────────────────────
 
 _MAX_LOG_ENTRIES = 500
@@ -241,6 +276,8 @@ async def lifespan(_app: FastAPI):
 
     _load_settings()
     deps._settings["_server_start"] = time.time()
+    if not HAS_AIOHTTP:
+        log.warning("aiohttp is not installed; pooled outbound HTTP features are disabled")
 
     # v2.5.2: Use ghostlink_v2.db to avoid stale journal corruption
     db_path = DATA_DIR / "ghostlink_v2.db"
@@ -257,18 +294,18 @@ async def lifespan(_app: FastAPI):
     await schedule_store.init()
     skills_registry = SkillsRegistry(DATA_DIR)
     session_manager = SessionManager(DATA_DIR)
+    secrets_manager = SecretsManager(DATA_DIR)
     provider_registry = ProviderRegistry(DATA_DIR)
     bridge_manager = BridgeManager(DATA_DIR, store=store, registry=registry, server_port=PORT)
     marketplace = Marketplace(DATA_DIR)
     hook_manager = HookManager(DATA_DIR, server_port=PORT)
     hook_manager.register_all()
-    secrets_manager = SecretsManager(DATA_DIR)
     exec_policy = ExecPolicy(DATA_DIR)
     audit_log = AuditLog(DATA_DIR)
     data_manager = DataManager(DATA_DIR, store=store)
     # v3.6.0: Worktree manager for agent isolation + automation manager
-    from worktree import WorktreeManager
-    from automations import AutomationManager
+    WorktreeManager = _require_startup_attr("worktree", "WorktreeManager")
+    AutomationManager = _require_startup_attr("automations", "AutomationManager")
     worktree_manager = WorktreeManager(str(BASE_DIR))
     automation_manager = AutomationManager(DATA_DIR)
     audit_log.log("server_start", {"version": __version__, "port": PORT})
@@ -292,20 +329,21 @@ async def lifespan(_app: FastAPI):
     deps.automation_manager = automation_manager
 
     # v4.4.0: Remote runner + A2A bridge + user auth
-    from remote_runner import RemoteRunner
+    RemoteRunner = _require_startup_attr("remote_runner", "RemoteRunner")
     deps.remote_runner = RemoteRunner(server_port=PORT)
-    from auth import UserManager
+    UserManager = _require_startup_attr("auth", "UserManager")
     deps.user_manager = UserManager(DATA_DIR)
-    from a2a_bridge import A2ABridge, setup_routes as setup_a2a
+    A2ABridge = _require_startup_attr("a2a_bridge", "A2ABridge")
+    setup_a2a = _require_startup_attr("a2a_bridge", "setup_routes")
     deps.a2a_bridge = A2ABridge(server_version=__version__)
     setup_a2a(app, deps.a2a_bridge)
-    from autonomous import AutonomousManager
+    AutonomousManager = _require_startup_attr("autonomous", "AutonomousManager")
     deps.autonomous_manager = AutonomousManager()
-    from memory_graph import MemoryGraph
+    MemoryGraph = _require_startup_attr("memory_graph", "MemoryGraph")
     deps.memory_graph = MemoryGraph(DATA_DIR)
-    from specialization import SpecializationEngine
+    SpecializationEngine = _require_startup_attr("specialization", "SpecializationEngine")
     deps.specialization = SpecializationEngine(DATA_DIR)
-    from rag import RAGPipeline
+    RAGPipeline = _require_startup_attr("rag", "RAGPipeline")
     deps.rag_pipeline = RAGPipeline(DATA_DIR)
 
     # Broadcast new messages via WebSocket
@@ -353,7 +391,8 @@ async def lifespan(_app: FastAPI):
                 now = time.time()
                 for sched in schedules:
                     if cron_matches(sched["cron_expr"], now):
-                        if now - sched.get("last_run", 0) < 55:
+                        cooldown = _schedule_cooldown_seconds(sched["cron_expr"])
+                        if now - sched.get("last_run", 0) < cooldown:
                             continue
                         agent = sched.get("agent", "")
                         command = sched.get("command", "")
@@ -418,11 +457,17 @@ async def lifespan(_app: FastAPI):
     print("  Health monitor started (checks every 30s)")
 
     # Load plugins
-    plugin_loader.load_plugins(_app, store=store, registry=registry, mcp_bridge_module=mcp_bridge)
+    try:
+        plugin_loader.load_plugins(_app, store=store, registry=registry, mcp_bridge_module=mcp_bridge)
+    except Exception as e:
+        log.exception("Plugin loading failed during startup: %s", e)
 
     # Start enabled channel bridges
-    bridge_manager.start_all_enabled()
-    print("  Channel bridges initialized")
+    try:
+        bridge_manager.start_all_enabled()
+        print("  Channel bridges initialized")
+    except Exception as e:
+        log.exception("Failed to start enabled channel bridges: %s", e)
 
     # Plugin management endpoints (registered here because they need plugin_loader)
     @_app.get("/api/plugins")
@@ -536,7 +581,8 @@ async def ws_endpoint(ws: WebSocket):
             await ws.close(code=4001, reason="Unauthorized")
             return
     await ws.accept()
-    deps._ws_clients.add(ws)
+    async with deps._ws_clients_lock:
+        deps._ws_clients.add(ws)
     try:
         while True:
             data = await ws.receive_text()
@@ -555,7 +601,8 @@ async def ws_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        deps._ws_clients.discard(ws)
+        async with deps._ws_clients_lock:
+            deps._ws_clients.discard(ws)
 
 
 # ── Include route modules ───────────────────────────────────────────

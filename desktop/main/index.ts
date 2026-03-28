@@ -11,15 +11,14 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
 import log from 'electron-log';
 import path from 'path';
 import fs from 'fs';
-import { execSync, exec } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
 
 import util from 'util';
-const execAsync = util.promisify(exec);
-
-import os from 'os';
+const execFileAsync = util.promisify(execFile);
 
 import { serverManager } from './server';
 import { createLauncherWindow, getLauncherWindow } from './launcher';
+import { getSettingsPath, loadSettingsFile, saveSettingsFile, sanitizeSettings } from './settings';
 import { setupTray, updateTrayMenu } from './tray';
 import { setupUpdater, checkForUpdates, downloadUpdate, installUpdate } from './updater';
 import { authManager, winToWsl } from './auth/index';
@@ -31,26 +30,54 @@ log.transports.file.level = 'info';
 log.transports.console.level = 'debug';
 log.info('GhostLink starting — version', app.getVersion());
 
-// ---------------------------------------------------------------------------
-// Settings file path
-// ---------------------------------------------------------------------------
-function getSettingsPath(): string {
-  const homeDir = os.homedir();
-  const ghostlinkDir = path.join(homeDir, '.ghostlink');
-  return path.join(ghostlinkDir, 'settings.json');
+async function runCommand(command: string, args: string[], timeout = 10_000): Promise<{ stdout: string; stderr: string }> {
+  const result = await execFileAsync(command, args, {
+    timeout,
+    encoding: 'utf-8',
+    windowsHide: true,
+  });
+  return {
+    stdout: String(result.stdout ?? ''),
+    stderr: String(result.stderr ?? ''),
+  };
 }
 
-function settingsExist(): boolean {
+function getCommandOutput(result: { stdout: string; stderr: string }): string {
+  return (result.stdout || result.stderr).trim();
+}
+
+async function findPythonVersion(command: string, useWsl: boolean): Promise<string | null> {
   try {
-    const settingsPath = getSettingsPath();
-    if (!fs.existsSync(settingsPath)) return false;
-    const data = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-    // Only show wizard on true fresh install — never on updates
-    if (data.setupComplete !== true) return false;
-    // Update stored version silently on update
-    if (data.appVersion !== app.getVersion()) {
-      data.appVersion = app.getVersion();
-      fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2), 'utf-8');
+    const result = useWsl
+      ? await runCommand('wsl', [command, '--version'])
+      : await runCommand(command, ['--version']);
+    const match = getCommandOutput(result).match(/Python\s+([\d.]+)/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+async function findSupportedPython(useWsl: boolean): Promise<{ command: string; version: string } | null> {
+  for (const candidate of ['python3', 'python']) {
+    const version = await findPythonVersion(candidate, useWsl);
+    if (!version) continue;
+
+    const parts = version.split('.').map(Number);
+    if (parts[0] >= 3 && parts[1] >= 10) {
+      return { command: candidate, version };
+    }
+  }
+
+  return null;
+}
+
+async function isPythonModuleAvailable(command: string, moduleName: string, useWsl: boolean): Promise<boolean> {
+  try {
+    if (useWsl) {
+      await runCommand('wsl', [command, '-c', `import ${moduleName}`]);
+    } else {
+      await runCommand(command, ['-c', `import ${moduleName}`]);
     }
     return true;
   } catch {
@@ -58,24 +85,41 @@ function settingsExist(): boolean {
   }
 }
 
+async function findExecutable(command: string, useWsl: boolean): Promise<boolean> {
+  try {
+    if (useWsl) {
+      await runCommand('wsl', ['which', command], 5_000);
+    } else if (process.platform === 'win32') {
+      await runCommand('where', [command], 5_000);
+    } else {
+      await runCommand('which', [command], 5_000);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function settingsExist(): boolean {
+  const settingsPath = getSettingsPath();
+  const data = loadSettingsFile(settingsPath);
+  if (!data || data.setupComplete !== true) return false;
+
+  if (data.appVersion !== app.getVersion()) {
+    saveSettings({ ...data, appVersion: app.getVersion() });
+  }
+
+  return true;
+}
+
 function saveSettings(settings: Record<string, any>): void {
   const settingsPath = getSettingsPath();
-  const dir = path.dirname(settingsPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+  saveSettingsFile(settings, settingsPath);
   log.info('Settings saved to', settingsPath);
 }
 
 function loadSettings(): Record<string, any> | null {
-  try {
-    const settingsPath = getSettingsPath();
-    if (!fs.existsSync(settingsPath)) return null;
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-  } catch {
-    return null;
-  }
+  return loadSettingsFile(getSettingsPath()) as Record<string, any> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,10 +160,9 @@ function createWizardWindow(): BrowserWindow {
     frame: false,
 
     webPreferences: {
-      // nodeIntegration required: renderer uses require('electron').ipcRenderer directly
-      // Security note: this window only loads local files (loadFile), never remote URLs
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
     },
@@ -222,7 +265,7 @@ function setupWizardIPC(): void {
 
       // Check if WSL is available
       try {
-        execSync('wsl --status', { timeout: 5000, stdio: 'pipe' });
+        execFileSync('wsl', ['--status'], { timeout: 5000, stdio: 'pipe', windowsHide: true });
         wslAvailable = true;
         detectedPlatform = 'wsl';
         platformLabel = 'Windows (WSL)';
@@ -250,75 +293,26 @@ function setupWizardIPC(): void {
     const useWsl = wizardPlatform === 'wsl' || settings?.platform === 'wsl';
 
     if (useWsl) {
-      // Check python3 inside WSL
-      const candidates = ['python3', 'python'];
-      for (const cmd of candidates) {
-        try {
-          const { stdout: output } = await execAsync(`wsl bash -lc "${cmd} --version"`, {
-            timeout: 10000,
-            encoding: 'utf-8',
-          });
-          const match = String(output).trim().match(/Python\s+([\d.]+)/);
-          if (match) {
-            const ver = match[1];
-            const parts = ver.split('.').map(Number);
-            if (parts[0] >= 3 && parts[1] >= 10) {
-              pythonPath = cmd;
-              version = ver;
-              found = true;
-              break;
-            }
-          }
-        } catch {
-          // Not found, try next
-        }
+      const supportedPython = await findSupportedPython(true);
+      if (supportedPython) {
+        pythonPath = supportedPython.command;
+        version = supportedPython.version;
+        found = true;
       }
 
       if (found && pythonPath) {
-        // Check if fastapi is installed in WSL
-        try {
-          await execAsync(`wsl bash -lc "${pythonPath} -c 'import fastapi'"`, {
-            timeout: 10000,
-          });
-          depsInstalled = true;
-        } catch {
-          depsInstalled = false;
-        }
+        depsInstalled = await isPythonModuleAvailable(pythonPath, 'fastapi', true);
       }
     } else {
-      // Native: try python3 first, then python
-      const candidates = ['python3', 'python'];
-      for (const cmd of candidates) {
-        try {
-          const { stdout: output } = await execAsync(`${cmd} --version`, {
-            timeout: 10000,
-            encoding: 'utf-8',
-          });
-          const match = String(output).trim().match(/Python\s+([\d.]+)/);
-          if (match) {
-            const ver = match[1];
-            const parts = ver.split('.').map(Number);
-            if (parts[0] >= 3 && parts[1] >= 10) {
-              pythonPath = cmd;
-              version = ver;
-              found = true;
-              break;
-            }
-          }
-        } catch {
-          // Not found, try next
-        }
+      const supportedPython = await findSupportedPython(false);
+      if (supportedPython) {
+        pythonPath = supportedPython.command;
+        version = supportedPython.version;
+        found = true;
       }
 
       if (found && pythonPath) {
-        try {
-          await execAsync(`${pythonPath} -c "import fastapi"`, {
-            timeout: 10000,
-          });
-          depsInstalled = true;
-        } catch {
-          depsInstalled = false;
-        }
+        depsInstalled = await isPythonModuleAvailable(pythonPath, 'fastapi', false);
       }
     }
 
@@ -330,6 +324,10 @@ function setupWizardIPC(): void {
     try {
       const settings = loadSettings();
       const useWsl = wizardPlatform === 'wsl' || settings?.platform === 'wsl';
+      const supportedPython = await findSupportedPython(useWsl);
+      if (!supportedPython) {
+        return { success: false, error: 'Python 3.10+ not found' };
+      }
 
       // Find requirements.txt relative to the app
       const appDir = app.isPackaged
@@ -348,26 +346,18 @@ function setupWizardIPC(): void {
         // Use the backend one
         if (useWsl) {
           const wslReqPath = winToWsl(backendReq);
-          await execAsync(`wsl bash -lc "pip install -r '${wslReqPath}'"`, {
-            timeout: 120000,
-          });
+          await runCommand('wsl', [supportedPython.command, '-m', 'pip', 'install', '-r', wslReqPath], 120_000);
         } else {
-          await execAsync(`pip install -r "${backendReq}"`, {
-            timeout: 120000,
-          });
+          await runCommand(supportedPython.command, ['-m', 'pip', 'install', '-r', backendReq], 120_000);
         }
         return { success: true };
       }
 
       if (useWsl) {
         const wslReqPath = winToWsl(reqPath);
-        await execAsync(`wsl bash -lc "pip install -r '${wslReqPath}'"`, {
-          timeout: 120000,
-        });
+        await runCommand('wsl', [supportedPython.command, '-m', 'pip', 'install', '-r', wslReqPath], 120_000);
       } else {
-        await execAsync(`pip install -r "${reqPath}"`, {
-          timeout: 120000,
-        });
+        await runCommand(supportedPython.command, ['-m', 'pip', 'install', '-r', reqPath], 120_000);
       }
 
       return { success: true };
@@ -398,71 +388,82 @@ function setupWizardIPC(): void {
   // ── Complete wizard ───────────────────────────────────────────────────
   ipcMain.handle('wizard:complete', async (_event, settings: Record<string, any>) => {
     log.info('Wizard complete — saving settings');
+    try {
+      const sanitizedSettings = sanitizeSettings(settings) as Record<string, any>;
 
-    // Ensure setupComplete is set with current app version
-    settings.setupComplete = true;
-    settings.appVersion = app.getVersion();
+      // Ensure setupComplete is set with current app version
+      sanitizedSettings.setupComplete = true;
+      sanitizedSettings.appVersion = app.getVersion();
 
-    // Pre-populate default persistent agents so the agent bar isn't empty
-    if (!settings.persistentAgents || settings.persistentAgents.length === 0) {
-      const defaultAgents = [];
-      const workspace = settings.workspace || '.';
+      // Pre-populate default persistent agents so the agent bar isn't empty
+      if (!sanitizedSettings.persistentAgents || sanitizedSettings.persistentAgents.length === 0) {
+        const defaultAgents = [];
+        const workspace = sanitizedSettings.workspace || '.';
 
-      // Check which CLIs are available and add them as defaults
-      const agentDefs = [
-        { base: 'claude', label: 'Claude', command: 'claude', color: '#e8734a', args: ['--dangerously-skip-permissions'] },
-        { base: 'codex', label: 'Codex', command: 'codex', color: '#10a37f', args: ['--sandbox', 'danger-full-access', '-a', 'never'] },
-        { base: 'gemini', label: 'Gemini', command: 'gemini', color: '#4285f4', args: ['-y'] },
-      ];
+        // Check which CLIs are available and add them as defaults
+        const agentDefs = [
+          { base: 'claude', label: 'Claude', command: 'claude', color: '#e8734a', args: ['--dangerously-skip-permissions'] },
+          { base: 'codex', label: 'Codex', command: 'codex', color: '#10a37f', args: ['--sandbox', 'danger-full-access', '-a', 'never'] },
+          { base: 'gemini', label: 'Gemini', command: 'gemini', color: '#4285f4', args: ['-y'] },
+        ];
 
-      const useWsl = settings.platform === 'wsl';
-      for (const def of agentDefs) {
-        try {
-          const checkCmd = useWsl
-            ? `wsl bash -lc "which ${def.command}"`
-            : process.platform === 'win32'
-              ? `where ${def.command}`
-              : `which ${def.command}`;
-          await execAsync(checkCmd, { timeout: 5000 });
-          defaultAgents.push({
-            base: def.base,
-            label: def.label,
-            command: def.command,
-            args: def.args,
-            cwd: workspace,
-            color: def.color,
-          });
-        } catch {
-          // CLI not found — skip
+        const useWsl = sanitizedSettings.platform === 'wsl';
+        for (const def of agentDefs) {
+          if (await findExecutable(def.command, useWsl)) {
+            defaultAgents.push({
+              base: def.base,
+              label: def.label,
+              command: def.command,
+              args: def.args,
+              cwd: workspace,
+              color: def.color,
+            });
+          }
+        }
+
+        if (defaultAgents.length > 0) {
+          sanitizedSettings.persistentAgents = defaultAgents;
+          log.info(`Pre-populated ${defaultAgents.length} default agent(s):`, defaultAgents.map(a => a.base).join(', '));
         }
       }
 
-      if (defaultAgents.length > 0) {
-        settings.persistentAgents = defaultAgents;
-        log.info(`Pre-populated ${defaultAgents.length} default agent(s):`, defaultAgents.map(a => a.base).join(', '));
+      // Save settings to ~/.ghostlink/settings.json
+      saveSettings(sanitizedSettings);
+
+      // Close wizard window — set transitioning flag so app doesn't quit
+      isTransitioning = true;
+      if (wizardWindow && !wizardWindow.isDestroyed()) {
+        wizardWindow.destroy();
+        wizardWindow = null;
       }
+
+      // Now open the launcher
+      const launcher = createLauncherWindow();
+      isTransitioning = false;
+      setupTray(launcher);
+      setupUpdater(launcher);
+      checkForUpdates().catch((err) => {
+        log.warn('Initial update check failed:', err.message ?? err);
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      isTransitioning = false;
+      const detail = err?.message ?? String(err);
+      log.error('wizard:complete failed:', err);
+      const dialogOptions = {
+        type: 'error',
+        title: 'Setup Failed',
+        message: 'GhostLink could not finish setup.',
+        detail,
+      } as const;
+      if (wizardWindow && !wizardWindow.isDestroyed()) {
+        await dialog.showMessageBox(wizardWindow, dialogOptions);
+      } else {
+        await dialog.showMessageBox(dialogOptions);
+      }
+      return { success: false, error: detail };
     }
-
-    // Save settings to ~/.ghostlink/settings.json
-    saveSettings(settings);
-
-    // Close wizard window — set transitioning flag so app doesn't quit
-    isTransitioning = true;
-    if (wizardWindow && !wizardWindow.isDestroyed()) {
-      wizardWindow.destroy();
-      wizardWindow = null;
-    }
-
-    // Now open the launcher
-    const launcher = createLauncherWindow();
-    isTransitioning = false;
-    setupTray(launcher);
-    setupUpdater(launcher);
-    checkForUpdates().catch((err) => {
-      log.warn('Initial update check failed:', err.message ?? err);
-    });
-
-    return { success: true };
   });
 }
 
@@ -633,9 +634,10 @@ function setupIPC(): void {
   });
 
   ipcMain.handle('app:save-settings', (_event, settings: Record<string, any>) => {
-    log.info('Settings saved:', settings);
-    saveSettings(settings);
-    return { success: true };
+    const sanitizedSettings = sanitizeSettings(settings) as Record<string, any>;
+    log.info('Settings saved:', sanitizedSettings);
+    saveSettings(sanitizedSettings);
+    return { success: true, settings: sanitizedSettings };
   });
 
   // ── Window controls (titlebar) ────────────────────────────────────────

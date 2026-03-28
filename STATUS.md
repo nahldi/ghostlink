@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-25
-**Version:** v4.7.0
+**Version:** v4.7.3
 **Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,14 +66,20 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v4.0.0)
+## CURRENT STATE (v4.7.3)
 
-### Recent Changes (v3.9.8 → v4.0.0)
-- **v4.0.0**: Phase 2 agent intelligence — plan mode UI, memory search, auto-lint/test, delegation. Phase 3 headless & automation — CLI `--full-auto`, diff/chart cards, Python SDK.
+### Recent Changes (v3.9.8 → v4.7.3)
+- **v4.7.1–v4.7.3**: Tunnel remote access fixes, service worker cache-first fix, CSS specificity fix.
+- **v4.7.0**: UI polish — sidebar animation, settings consolidation, spacing fixes.
+- **v4.6.0**: Voice notes + voice call mode.
+- **v4.5.0–v4.5.2**: Phase 7 completeness — snapshot import/export, GDPR tools, data retention, audit log viewer.
+- **v4.4.0**: Phase 6 remote & auth — tunnel support, remote access, CLI auth detection.
+- **v4.3.0**: Phase 5 advanced — autonomous mode, memory graph, RAG pipeline, agent specialization.
+- **v4.2.0–v4.2.3**: Phase 4 security — encrypted secrets, exec policies, sandbox, approval interception.
+- **v4.1.0**: Phase 3 headless & automation — CLI `--full-auto`, diff/chart cards, Python SDK.
+- **v4.0.0**: Phase 2 agent intelligence — plan mode UI, memory search, auto-lint/test, delegation.
 - **v3.10.0**: Phase 1 personalization — first-run wizard, agent nicknames, layout toggles.
 - **v3.9.8**: Phase 0 stability — version sync, system messages, emoji, timezone, ESLint, bundle splitting.
-- **v3.9.7**: Plan mode enforcement, race conditions, TTS, security hardening.
-- **v3.9.5–v3.9.6**: WebSocket keepalive, server stop fixes, shutdown handling, agent identity fixes.
 
 ### Numbers
 - **90+ completed features** (see FEATURES.md for full list)

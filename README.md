@@ -12,7 +12,7 @@
 
 **[Download the latest installer from Releases](../../releases/latest)**
 
-- **Windows:** `GhostLink-Setup-2.5.1.exe` — one-click install, auto-updates
+- **Windows:** `GhostLink-Setup-4.7.3.exe` — one-click install, auto-updates
 - **Linux:** `.AppImage` / `.deb`
 - **macOS:** `.dmg`
 
@@ -238,7 +238,7 @@ Agent CLIs (tmux sessions via wrapper.py)
 | | Count |
 |---|---|
 | React components | 44 |
-| API endpoints | 90+ |
+| API endpoints | 190+ |
 | MCP tools | 17 |
 | Built-in skills | 28 |
 | AI providers | 13 |

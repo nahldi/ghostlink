@@ -67,6 +67,7 @@ _AGENT_DETECTION_CACHE_TTL = 60.0
 # ── WebSocket clients ────────────────────────────────────────────────
 
 _ws_clients: set = set()
+_ws_clients_lock = asyncio.Lock()
 
 # ── Webhooks ─────────────────────────────────────────────────────────
 
@@ -136,15 +137,20 @@ _VALID_AGENT_NAME = _re.compile(r'^[a-zA-Z0-9_-]{1,50}$')
 async def broadcast(event_type: str, data: dict):
     """Broadcast a JSON event to all connected WebSocket clients and webhooks."""
     payload = json.dumps({"type": event_type, "data": data})
+    async with _ws_clients_lock:
+        clients = list(_ws_clients)
+
     dead = []
-    for ws in list(_ws_clients):
+    for ws in clients:
         try:
             await ws.send_text(payload)
         except Exception as e:
             log.debug("WebSocket send failed, removing client: %s", e)
             dead.append(ws)
-    for ws in dead:
-        _ws_clients.discard(ws)
+    if dead:
+        async with _ws_clients_lock:
+            for ws in dead:
+                _ws_clients.discard(ws)
     # Deliver to active webhooks (non-blocking)
     import threading as _th
     _th.Thread(target=_deliver_webhooks, args=(event_type, data), daemon=True).start()

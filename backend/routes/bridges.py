@@ -61,7 +61,10 @@ async def bridge_inbound(request: Request):
 
     # Verify webhook secret if configured
     cfg = deps.bridge_manager.get_config("webhook")
-    secret = cfg.get("secret", "")
+    raw_secret = cfg.get("secret", "")
+    secret = raw_secret.strip() if isinstance(raw_secret, str) else ""
+    if raw_secret is not None and raw_secret != "" and not secret:
+        return JSONResponse({"error": "webhook secret misconfigured"}, 503)
     if secret:
         import hashlib, hmac
         sig = request.headers.get("X-GhostLink-Signature", "")

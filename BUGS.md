@@ -1,7 +1,7 @@
 # GhostLink — Known Bugs & Issues
 
 **Last updated:** 2026-03-26
-**Version:** v4.5.2
+**Version:** v4.7.3
 **Source:** Full codebase audit + live API testing + deep code path audit + user-reported bugs + automated audit + 8 fix rounds
 
 ---
@@ -1237,7 +1237,7 @@ All previously fixed bugs remain fixed. No new runtime errors, no server warning
 
 ## Automated Audit — 2026-03-25 13:09 UTC (Heartbeat)
 
-**Version:** v4.5.2
+**Version:** v4.7.3
 **Auditor:** Scheduled Cowork healthaudit task
 **Method:** Python compile-check, TypeScript build, ESLint, backend server start, API endpoint testing, browser UI verification via Cloudflare tunnel
 
@@ -1365,7 +1365,7 @@ All previously fixed bugs remain fixed. No new runtime errors, no server warning
 ### BUG-097: BUGS.md and STATUS.md version headers still say v3.9.8
 **Severity:** Low — documentation out of sync with actual codebase version
 **Found:** 2026-03-25T19:XX UTC
-**Where:** `BUGS.md` line 4 (`**Version:** v4.5.2`), `STATUS.md` line 4 (`**Version:** v4.5.2`)
+**Where:** `BUGS.md` line 4 (`**Version:** v4.7.3`), `STATUS.md` line 4 (`**Version:** v4.7.3`)
 **Root cause:** The v4.0.0 release commit updated code versions but did not update the version headers in BUGS.md and STATUS.md documentation files.
 **Fix needed:** Update both files to `**Version:** v4.0.0`.
 **Status:** OPEN

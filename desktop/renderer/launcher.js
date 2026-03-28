@@ -9,12 +9,10 @@
  *   - Window controls (minimize / close)
  */
 
-// IPC bridge — nodeIntegration is enabled for wizard/launcher windows
-const { ipcRenderer } = require('electron');
-const api = {
-  invoke: (ch, ...args) => ipcRenderer.invoke(ch, ...args),
-  on: (ch, cb) => { ipcRenderer.on(ch, (_e, ...args) => cb(...args)); return () => ipcRenderer.removeAllListeners(ch); },
-};
+const api = window.api;
+if (!api) {
+  throw new Error('GhostLink preload bridge is unavailable in launcher window');
+}
 // IPC ready
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────

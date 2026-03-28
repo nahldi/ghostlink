@@ -41,27 +41,25 @@ On app start, show a launcher window (not the chat):
 6. **Settings** — Port, theme, default workspace
 7. **Version** — App version, update check
 
-## OAuth Integration
+## Auth Detection (Current Implementation)
+
+Authentication is handled via CLI auth status detection — not full OAuth flows.
 
 ### Anthropic (Claude)
-- Run `claude auth login` in subprocess
 - Detect auth status via `claude auth status`
-- Store token in OS keychain (keytar)
+- Launch `claude auth login` in user's terminal if needed
 
-### OpenAI (ChatGPT/Codex)
-- Run `codex auth login` for ChatGPT subscription auth (same flow as Claude)
+### OpenAI (Codex)
 - Detect auth status via `codex auth status`
-- API key entry as fallback
-- Store token in OS keychain (keytar)
+- API key entry as fallback via Settings panel
 
 ### Google (Gemini)
-- Google OAuth2 flow via browser
-- Catch callback on localhost:PORT/auth/google/callback
-- Store refresh token in OS keychain
+- API key entry via Settings panel (encrypted via SecretsManager)
 
 ### GitHub (Copilot)
-- Run `gh auth login` device flow
 - Detect status via `gh auth status`
+
+> **Note:** Full OAuth browser flows (keytar, refresh tokens) are not yet implemented. Current approach uses CLI-based auth detection + API key entry through the encrypted secrets path.
 
 ## Packaging
 

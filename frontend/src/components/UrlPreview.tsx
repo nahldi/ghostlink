@@ -23,6 +23,7 @@ export function UrlPreviews({ text }: { text: string }) {
 
   const urls = Array.from(new Set(text.match(URL_REGEX) || [])).slice(0, 3); // max 3
 
+  const urlsKey = urls.join('\n');
   useEffect(() => {
     if (urls.length === 0) return;
     let cancelled = false;
@@ -46,7 +47,7 @@ export function UrlPreviews({ text }: { text: string }) {
       }
     });
     return () => { cancelled = true; };
-  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [urlsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const entries = Object.entries(previews);
   if (entries.length === 0) return null;

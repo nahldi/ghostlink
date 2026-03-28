@@ -38,10 +38,9 @@ export function createLauncherWindow(): BrowserWindow {
       : { frame: false }),
 
     webPreferences: {
-      // nodeIntegration required: renderer uses require('electron').ipcRenderer directly
-      // Security note: this window only loads local files (loadFile), never remote URLs
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
     },

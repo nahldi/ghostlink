@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { useChatStore } from './stores/chatStore';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -129,13 +129,13 @@ function ChatFeed() {
   const VIRTUALIZE_THRESHOLD = 200; // Only virtualize when many messages
   const useVirtual = channelMessages.length > VIRTUALIZE_THRESHOLD;
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (feedRef.current) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
       setNewMsgCount(0);
       setChatAtBottom(true);
     }
-  };
+  }, [setNewMsgCount, setChatAtBottom]);
 
   const handleScroll = () => {
     if (!feedRef.current) return;
@@ -166,12 +166,12 @@ function ChatFeed() {
       }
     }
     prevMsgCount.current = channelMessages.length;
-  }, [channelMessages.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [channelMessages.length, atBottom, scrollToBottom, setNewMsgCount]);
 
   useEffect(() => {
     requestAnimationFrame(() => scrollToBottom());
     prevMsgCount.current = channelMessages.length;
-  }, [activeChannel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeChannel, scrollToBottom, channelMessages.length]);
 
   return (
     <div ref={feedRef} onScroll={handleScroll} onWheel={handleScroll} data-chat-feed className="flex-1 overflow-y-auto overflow-x-hidden py-3 relative min-h-0">
@@ -308,6 +308,9 @@ import { Component, type ReactNode } from 'react';
 class ErrorBoundary extends Component<{children: ReactNode}, {error: Error | null}> {
   state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+    console.error('[GhostLink ErrorBoundary]', error, info.componentStack);
+  }
   render() {
     if (this.state.error) {
       return (

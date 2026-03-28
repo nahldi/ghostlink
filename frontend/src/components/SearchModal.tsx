@@ -60,18 +60,19 @@ export function SearchModal({ onClose }: SearchModalProps) {
     return channels.filter(c => c.name.toLowerCase().includes(q));
   }, [query, channels]);
 
-  // Message search
+  // Message search (with AbortController to prevent stale results)
   useEffect(() => {
     if (mode !== 'search' || !query.trim()) { queueMicrotask(() => setResults([])); return; }
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
         const r = await api.searchMessages(query);
-        setResults(r.results);
+        if (!controller.signal.aborted) setResults(r.results);
       } catch { /* ignored */ }
-      setSearching(false);
+      if (!controller.signal.aborted) setSearching(false);
     }, 300);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [query, mode]);
 
   // Reset selection when query changes (deferred to avoid setState in render/effect)

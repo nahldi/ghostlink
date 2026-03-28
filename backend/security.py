@@ -22,6 +22,15 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+
+def _get_version() -> str:
+    """Get app version without circular import."""
+    try:
+        from app import __version__
+        return __version__
+    except ImportError:
+        return "unknown"
+
 try:
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -427,7 +436,7 @@ class DataManager:
                     pass
 
             zf.writestr("manifest.json", json.dumps({
-                "exported_at": time.time(), "version": "2.5.2", "format": "ghostlink-export-v1",
+                "exported_at": time.time(), "version": _get_version(), "format": "ghostlink-export-v1",
             }, indent=2))
 
         return buf.getvalue()
