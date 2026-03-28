@@ -22,6 +22,7 @@ const SHORTCUTS = [
   { keys: ['Ctrl', 'Shift', 'B'], description: 'Cockpit: Browser tab' },
   { keys: ['Ctrl', 'Shift', 'R'], description: 'Cockpit: Replay tab' },
   { keys: ['Ctrl', 'Shift', 'A'], description: 'Cockpit: Activity tab' },
+  { keys: ['Ctrl', 'Shift', 'C'], description: 'Cockpit: Checkpoints tab' },
 ];
 
 export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps) {
