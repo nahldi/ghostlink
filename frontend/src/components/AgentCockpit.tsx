@@ -90,12 +90,33 @@ interface FileEntry {
   size?: number;
 }
 
+const FILE_ICONS: Record<string, string> = {
+  ts: 'code', tsx: 'code', js: 'javascript', jsx: 'javascript',
+  py: 'code', rs: 'code', go: 'code', java: 'code', cpp: 'code', c: 'code',
+  html: 'html', css: 'css', scss: 'css',
+  json: 'data_object', toml: 'settings', yaml: 'settings', yml: 'settings',
+  md: 'article', txt: 'description', log: 'receipt_long',
+  png: 'image', jpg: 'image', svg: 'image', gif: 'image',
+  sh: 'terminal', bash: 'terminal', zsh: 'terminal',
+};
+
+function getFileIcon(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+  return FILE_ICONS[ext] || 'description';
+}
+
 function CockpitFiles({ agent }: { agent: Agent }) {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentPath, setCurrentPath] = useState('.');
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const hasChanges = editing && editContent !== null && editContent !== fileContent;
 
   const fetchFiles = useCallback(async (path: string) => {
     setLoading(true);
@@ -106,7 +127,9 @@ function CockpitFiles({ agent }: { agent: Agent }) {
         setFiles(data.entries || []);
         setCurrentPath(path);
         setFileContent(null);
+        setEditContent(null);
         setViewingFile(null);
+        setEditing(false);
       } else {
         toast('Failed to list files', 'error');
       }
@@ -122,35 +145,131 @@ function CockpitFiles({ agent }: { agent: Agent }) {
       const res = await fetch(`/api/agents/${encodeURIComponent(agent.name)}/file?path=${encodeURIComponent(path)}`);
       if (res.ok) {
         const data = await res.json();
-        setFileContent(data.content || '');
+        const content = data.content || '';
+        setFileContent(content);
+        setEditContent(content);
         setViewingFile(path);
+        setEditing(false);
       }
     } catch {
       toast('Failed to read file', 'error');
     }
   }, [agent.name, currentPath]);
 
+  const saveFile = useCallback(async () => {
+    if (!viewingFile || editContent === null) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/agents/${encodeURIComponent(agent.name)}/file`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: viewingFile, content: editContent }),
+      });
+      if (res.ok) {
+        setFileContent(editContent);
+        setEditing(false);
+        toast('File saved', 'success');
+      } else {
+        toast('Failed to save', 'error');
+      }
+    } catch {
+      toast('Save failed', 'error');
+    }
+    setSaving(false);
+  }, [agent.name, viewingFile, editContent]);
+
   useEffect(() => { fetchFiles('.'); }, [fetchFiles]);
 
+  // File viewer/editor
   if (viewingFile && fileContent !== null) {
+    const lines = (editing ? editContent || '' : fileContent).split('\n');
+    const lineNumWidth = String(lines.length).length;
+
     return (
       <div className="flex flex-col h-full">
+        {/* File header with actions */}
         <div className="px-3 py-2 flex items-center gap-2 border-b border-outline-variant/10 shrink-0">
-          <button onClick={() => { setFileContent(null); setViewingFile(null); }} className="p-1 rounded hover:bg-surface-container-high">
+          <button onClick={() => { setFileContent(null); setViewingFile(null); setEditing(false); }} className="p-1 rounded hover:bg-surface-container-high">
             <span className="material-symbols-outlined text-sm text-on-surface-variant/50">arrow_back</span>
           </button>
-          <span className="text-[11px] font-mono text-on-surface-variant/60 truncate">{viewingFile}</span>
-          <button
-            onClick={() => navigator.clipboard?.writeText(fileContent).then(() => toast('Copied', 'success'))}
-            className="ml-auto p-1 rounded hover:bg-surface-container-high"
-            title="Copy contents"
-          >
-            <span className="material-symbols-outlined text-sm text-on-surface-variant/40">content_copy</span>
-          </button>
+          <span className="material-symbols-outlined text-sm" style={{ color: agent.color }}>{getFileIcon(viewingFile)}</span>
+          <span className="text-[11px] font-mono text-on-surface-variant/60 truncate flex-1">{viewingFile}</span>
+          <div className="flex items-center gap-1">
+            {hasChanges && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 font-medium">Modified</span>
+            )}
+            {editing ? (
+              <>
+                <button
+                  onClick={saveFile}
+                  disabled={saving || !hasChanges}
+                  className="px-2 py-1 rounded-md text-[10px] font-medium bg-primary/20 text-primary hover:bg-primary/30 transition-colors disabled:opacity-30"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => { setEditing(false); setEditContent(fileContent); }}
+                  className="p-1 rounded hover:bg-surface-container-high"
+                  title="Cancel editing"
+                >
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant/40">close</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setEditing(true); if (textareaRef.current) textareaRef.current.focus(); }}
+                  className="p-1 rounded hover:bg-surface-container-high"
+                  title="Edit file"
+                >
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant/40">edit</span>
+                </button>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(fileContent).then(() => toast('Copied', 'success'))}
+                  className="p-1 rounded hover:bg-surface-container-high"
+                  title="Copy contents"
+                >
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant/40">content_copy</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <pre className="flex-1 overflow-auto p-3 font-mono text-[11px] leading-relaxed text-on-surface/80 whitespace-pre-wrap" style={{ background: '#06060c' }}>
-          {fileContent}
-        </pre>
+
+        {/* File content with line numbers */}
+        {editing ? (
+          <div className="flex-1 overflow-auto flex" style={{ background: '#06060c' }}>
+            <div className="py-2 px-2 text-right select-none shrink-0 border-r border-outline-variant/5" style={{ minWidth: `${lineNumWidth + 2}ch` }}>
+              {lines.map((_, i) => (
+                <div key={i} className="font-mono text-[10px] leading-[1.6] text-on-surface-variant/20">{i + 1}</div>
+              ))}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={editContent || ''}
+              onChange={(e) => setEditContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  saveFile();
+                }
+              }}
+              className="flex-1 p-2 font-mono text-[11px] leading-[1.6] text-on-surface/80 bg-transparent resize-none outline-none"
+              spellCheck={false}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto flex" style={{ background: '#06060c' }}>
+            <div className="py-2 px-2 text-right select-none shrink-0 border-r border-outline-variant/5" style={{ minWidth: `${lineNumWidth + 2}ch` }}>
+              {lines.map((_, i) => (
+                <div key={i} className="font-mono text-[10px] leading-[1.6] text-on-surface-variant/20">{i + 1}</div>
+              ))}
+            </div>
+            <pre className="flex-1 p-2 font-mono text-[11px] leading-[1.6] text-on-surface/80 whitespace-pre overflow-x-auto">
+              {fileContent}
+            </pre>
+          </div>
+        )}
       </div>
     );
   }
