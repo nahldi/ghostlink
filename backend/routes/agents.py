@@ -13,7 +13,7 @@ from pathlib import Path
 
 import deps
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -75,6 +75,125 @@ async def _record_activity(event_type: str, text: str, *, agent: str = "", chann
     }
     deps._activity_log.append(event)
     await deps.broadcast("activity", event)
+
+
+def _get_agent_label(name: str) -> str:
+    inst = deps.registry.get(name) if deps.registry else None
+    return (inst.label if inst and inst.label else name) if name else "system"
+
+
+async def set_agent_presence(
+    agent_name: str,
+    *,
+    surface: str,
+    status: str,
+    detail: str = "",
+    path: str = "",
+    url: str = "",
+    query: str = "",
+    command: str = "",
+    tool: str = "",
+    artifact_url: str = "",
+    state: str = "",
+) -> dict:
+    payload = {
+        "agent": agent_name,
+        "label": _get_agent_label(agent_name),
+        "surface": surface,
+        "status": status,
+        "detail": detail,
+        "path": path,
+        "url": url,
+        "query": query,
+        "command": command,
+        "tool": tool,
+        "artifact_url": artifact_url,
+        "state": state or (deps.registry.get(agent_name).state if deps.registry and deps.registry.get(agent_name) else ""),
+        "updated_at": time.time(),
+    }
+    with deps._agent_state_lock:
+        current = dict(deps._agent_presence.get(agent_name, {}))
+        current.update(payload)
+        current["agent"] = agent_name
+        current["label"] = _get_agent_label(agent_name)
+        current["updated_at"] = payload["updated_at"]
+        deps._agent_presence[agent_name] = current
+        payload = dict(current)
+    await deps.broadcast("agent_presence", payload)
+    return payload
+
+
+async def set_agent_browser_state(
+    agent_name: str,
+    *,
+    mode: str,
+    status: str,
+    url: str = "",
+    query: str = "",
+    title: str = "",
+    preview: str = "",
+    artifact_path: str = "",
+) -> dict:
+    state = {
+        "agent": agent_name,
+        "mode": mode,
+        "status": status,
+        "url": url,
+        "query": query,
+        "title": title,
+        "preview": preview[:4000],
+        "artifact_path": artifact_path,
+        "artifact_url": f"/api/agents/{agent_name}/browser/artifact" if artifact_path else "",
+        "updated_at": time.time(),
+    }
+    with deps._agent_state_lock:
+        deps._agent_browser_state[agent_name] = state
+    await set_agent_presence(
+        agent_name,
+        surface="browser",
+        status=status,
+        detail=title or url or query,
+        url=url,
+        query=query,
+        artifact_url=state["artifact_url"],
+    )
+    await deps.broadcast("browser_state", state)
+    return state
+
+
+async def set_terminal_stream(agent_name: str, output: str, active: bool) -> dict:
+    payload = {
+        "agent": agent_name,
+        "output": output[-12000:],
+        "active": active,
+        "updated_at": time.time(),
+    }
+    with deps._agent_state_lock:
+        deps._terminal_streams[agent_name] = payload
+    await deps.broadcast("terminal_stream", payload)
+    return payload
+
+
+async def add_workspace_change(agent_name: str, action: str, path: str) -> dict:
+    payload = {
+        "agent": agent_name,
+        "action": action,
+        "path": path,
+        "timestamp": time.time(),
+    }
+    with deps._agent_state_lock:
+        deps._workspace_changes.append(payload)
+    await deps.broadcast("workspace_change", payload)
+    verb = {"created": "Created", "modified": "Updated", "deleted": "Deleted"}.get(action, "Changed")
+    await _record_activity("message", f"{verb} {path}", agent=agent_name)
+    await set_agent_presence(
+        agent_name,
+        surface="files",
+        status=f"{verb} file",
+        detail=path,
+        path=path,
+    )
+    return payload
 
 
 def _validate_spawn_args(base: str, extra_args: object, cfg_args: object) -> list[str]:
@@ -186,6 +305,7 @@ async def register_agent(request: Request):
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("agent_join", f"{inst.label or inst.name} connected", agent=inst.name)
+    await set_agent_presence(inst.name, surface="session", status="Connected", detail="Agent online", state=inst.state)
     return inst.to_dict()
 
 
@@ -204,6 +324,7 @@ async def deregister_agent(name: str):
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
         await _record_activity("agent_leave", f"{name} disconnected", agent=name)
+        await set_agent_presence(name, surface="session", status="Disconnected", detail="Agent offline", state="offline")
     return {"ok": ok}
 
 
@@ -537,6 +658,7 @@ async def kill_agent(name: str):
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
         await _record_activity("agent_leave", f"{name} stopped", agent=name)
+        await set_agent_presence(name, surface="session", status="Stopped", detail="Agent stopped", state="offline")
     return {"ok": ok or proc is not None}
 
 
@@ -648,6 +770,14 @@ async def heartbeat(agent_name: str, request: Request):
         if inst.state != old_state:
             from app_helpers import get_full_agent_list
             await deps.broadcast("status", {"agents": get_full_agent_list()})
+            state_detail = "Processing requests" if inst.state == "thinking" else "Connected"
+            await set_agent_presence(
+                agent_name,
+                surface="thinking" if inst.state == "thinking" else "session",
+                status=inst.state.capitalize(),
+                detail=state_detail,
+                state=inst.state,
+            )
         result: dict = {"ok": True, "name": inst.name}
         if inst.is_token_expired():
             result["token"] = inst.rotate_token()
@@ -673,6 +803,14 @@ async def update_thinking(agent_name: str, request: Request):
         "text": text[-2000:] if text else "",
         "active": active,
     })
+    summary = (text or "").strip().splitlines()[0][:180] if text else ""
+    await set_agent_presence(
+        agent_name,
+        surface="thinking" if active else "session",
+        status="Thinking" if active else "Active",
+        detail=summary or ("Working" if active else "Idle"),
+        state="thinking" if active else "active",
+    )
 
     return {"ok": True}
 
@@ -750,6 +888,7 @@ async def pause_agent(name: str):
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("message", f"{inst.label or name} paused", agent=name)
+    await set_agent_presence(name, surface="session", status="Paused", detail="Awaiting resume", state="paused")
     return {"ok": True, "state": "paused"}
 
 
@@ -762,6 +901,7 @@ async def resume_agent(name: str):
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("message", f"{inst.label or name} resumed", agent=name)
+    await set_agent_presence(name, surface="session", status="Active", detail="Ready", state="active")
     return {"ok": True, "state": "active"}
 
 
@@ -1049,6 +1189,76 @@ async def peek_terminal(name: str, lines: int = 30):
         return {"name": name, "output": "", "active": False}
 
 
+@router.get("/api/agents/{name}/terminal/live")
+async def get_terminal_live(name: str):
+    """Return the last streamed terminal snapshot for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    with deps._agent_state_lock:
+        payload = dict(deps._terminal_streams.get(name, {}))
+    if not payload:
+        return {"agent": name, "output": "", "active": False, "updated_at": 0}
+    return payload
+
+
+@router.get("/api/agents/{name}/presence")
+async def get_agent_presence(name: str):
+    """Return the current in-app visibility state for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    with deps._agent_state_lock:
+        payload = dict(deps._agent_presence.get(name, {}))
+    if not payload:
+        inst = deps.registry.get(name) if deps.registry else None
+        return {
+            "agent": name,
+            "label": _get_agent_label(name),
+            "surface": "idle",
+            "status": inst.state if inst else "offline",
+            "detail": "",
+            "updated_at": 0,
+        }
+    return payload
+
+
+@router.get("/api/agents/{name}/browser")
+async def get_agent_browser_state(name: str):
+    """Return the latest browser/session visibility state for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    with deps._agent_state_lock:
+        payload = dict(deps._agent_browser_state.get(name, {}))
+    if not payload:
+        return {
+            "agent": name,
+            "mode": "",
+            "status": "",
+            "url": "",
+            "query": "",
+            "title": "",
+            "preview": "",
+            "artifact_url": "",
+            "updated_at": 0,
+        }
+    payload.pop("artifact_path", None)
+    return payload
+
+
+@router.get("/api/agents/{name}/browser/artifact")
+async def get_agent_browser_artifact(name: str):
+    """Serve the latest browser snapshot artifact for an agent, if any."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    with deps._agent_state_lock:
+        artifact_path = str(deps._agent_browser_state.get(name, {}).get("artifact_path", ""))
+    if not artifact_path:
+        return JSONResponse({"error": "artifact not found"}, 404)
+    path = Path(artifact_path).resolve()
+    if not path.is_file():
+        return JSONResponse({"error": "artifact not found"}, 404)
+    return FileResponse(path)
+
+
 # ── Workspace viewer (v3.8.0) ──────────────────────────────────────
 
 _WORKSPACE_SKIP_NAMES = {"node_modules", "__pycache__", ".venv", "venv", ".git", "dist"}
@@ -1178,6 +1388,21 @@ async def get_agent_workspace_file(name: str, path: str = ""):
         return {"path": path, "content": content, "size": len(content)}
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
+
+
+@router.get("/api/agents/{name}/workspace/changes")
+async def get_agent_workspace_changes(name: str, since: float = 0, limit: int = 100):
+    """Return recent workspace changes attributed to an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    limit = max(1, min(limit, 200))
+    with deps._agent_state_lock:
+        events = [
+            dict(change)
+            for change in deps._workspace_changes
+            if change.get("agent") == name and change.get("timestamp", 0) > since
+        ]
+    return {"changes": events[-limit:]}
 
 
 @router.get("/api/agents/{name}/files")

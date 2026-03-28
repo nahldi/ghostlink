@@ -8,6 +8,7 @@ import collections
 import json
 import logging
 import subprocess
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -126,6 +127,11 @@ _tunnel_access_token: str = ""
 
 _activity_log: collections.deque[dict] = collections.deque(maxlen=100)
 _server_logs: collections.deque[dict] = collections.deque(maxlen=500)
+_agent_presence: dict[str, dict] = {}
+_agent_browser_state: dict[str, dict] = {}
+_terminal_streams: dict[str, dict] = {}
+_workspace_changes: collections.deque[dict] = collections.deque(maxlen=500)
+_agent_state_lock = threading.Lock()
 
 # ── Agent name validation ────────────────────────────────────────────
 

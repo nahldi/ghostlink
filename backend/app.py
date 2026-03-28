@@ -7,6 +7,7 @@ __version__ = "4.9.0"
 import json
 import importlib
 import os
+import subprocess
 import sys
 import time
 import collections
@@ -378,6 +379,155 @@ async def lifespan(_app: FastAPI):
     _main_loop = asyncio.get_running_loop()
     deps._main_loop = _main_loop
 
+    from routes.agents import (
+        _get_agent_workspace_path,
+        add_workspace_change,
+        set_agent_browser_state,
+        set_agent_presence,
+        set_terminal_stream,
+    )
+
+    def _dispatch(coro):
+        try:
+            asyncio.run_coroutine_threadsafe(coro, _main_loop)
+        except Exception as e:
+            log.debug("Background dispatch failed: %s", e)
+
+    def _presence_snapshot(agent_name: str) -> dict:
+        with deps._agent_state_lock:
+            return dict(deps._agent_presence.get(agent_name, {}))
+
+    def _trim_text(value: object, limit: int = 180) -> str:
+        text = str(value or "").strip().replace("\r", "")
+        return text[:limit]
+
+    def _last_terminal_line(output: str) -> str:
+        for line in reversed(output.splitlines()):
+            if line.strip():
+                return line.strip()[:180]
+        return ""
+
+    def _parse_artifact_path(result: str) -> str:
+        prefix = "Screenshot saved: "
+        if not result.startswith(prefix):
+            return ""
+        artifact = result[len(prefix):]
+        if " (" in artifact:
+            artifact = artifact.split(" (", 1)[0]
+        return artifact.strip()
+
+    def _scan_workspace_state(root: Path, max_depth: int = 3) -> dict[str, float]:
+        files: dict[str, float] = {}
+        skip_dirs = {"node_modules", "__pycache__", ".git", ".venv", "venv", "dist"}
+        visible_dotfiles = {".gitignore"}
+        try:
+            for current_root, dirs, filenames in os.walk(root):
+                current_path = Path(current_root)
+                rel_root = current_path.relative_to(root)
+                if len(rel_root.parts) >= max_depth:
+                    dirs[:] = []
+                else:
+                    dirs[:] = [d for d in dirs if d not in skip_dirs and not d.startswith(".")]
+                for filename in filenames:
+                    if filename.startswith(".") and filename not in visible_dotfiles:
+                        continue
+                    full_path = current_path / filename
+                    try:
+                        files[str(full_path.relative_to(root))] = full_path.stat().st_mtime
+                    except OSError:
+                        continue
+        except Exception:
+            return files
+        return files
+
+    def _tool_surface(tool_name: str, args: dict) -> tuple[str, str, str]:
+        if tool_name == "web_fetch":
+            return "browser", "Reading page", _trim_text(args.get("url"))
+        if tool_name == "web_search":
+            return "browser", "Searching web", _trim_text(args.get("query"))
+        if tool_name == "browser_snapshot":
+            return "browser", "Capturing browser", _trim_text(args.get("url"))
+        if tool_name == "code_execute":
+            language = _trim_text(args.get("language") or "python")
+            return "terminal", "Running code", language
+        if tool_name == "chat_read":
+            channel = _trim_text(args.get("channel") or "general")
+            return "messages", "Reading conversation", channel
+        if tool_name == "chat_send":
+            channel = _trim_text(args.get("channel") or "general")
+            return "messages", "Writing reply", channel
+        if tool_name == "delegate":
+            return "coordination", "Delegating task", _trim_text(args.get("agent"))
+        if tool_name.startswith("memory_"):
+            return "memory", "Updating memory", _trim_text(args.get("key") or args.get("query"))
+        return "tool", f"Using {tool_name}", ""
+
+    def _on_pre_tool_use(data: dict):
+        agent = str(data.get("agent", "")).strip()
+        tool_name = str(data.get("tool", "")).strip()
+        args = data.get("args") if isinstance(data.get("args"), dict) else {}
+        if not agent or not tool_name:
+            return
+        surface, status, detail = _tool_surface(tool_name, args)
+        if tool_name in {"web_fetch", "web_search", "browser_snapshot"}:
+            _dispatch(set_agent_browser_state(
+                agent,
+                mode=tool_name,
+                status=status,
+                url=str(args.get("url", "")),
+                query=str(args.get("query", "")),
+                title=detail,
+            ))
+            return
+        _dispatch(set_agent_presence(
+            agent,
+            surface=surface,
+            status=status,
+            detail=detail,
+            tool=tool_name,
+            url=str(args.get("url", "")),
+            query=str(args.get("query", "")),
+            command=str(args.get("language", "")) if tool_name == "code_execute" else "",
+        ))
+
+    def _on_post_tool_use(data: dict):
+        agent = str(data.get("agent", "")).strip()
+        tool_name = str(data.get("tool", "")).strip()
+        args = data.get("args") if isinstance(data.get("args"), dict) else {}
+        result = _trim_text(data.get("result", ""), 400)
+        if not agent or not tool_name:
+            return
+        if tool_name in {"web_fetch", "web_search", "browser_snapshot"}:
+            status = {
+                "web_fetch": "Page loaded",
+                "web_search": "Search results ready",
+                "browser_snapshot": "Snapshot captured",
+            }.get(tool_name, "Browser updated")
+            artifact_path = _parse_artifact_path(result) if tool_name == "browser_snapshot" else ""
+            _dispatch(set_agent_browser_state(
+                agent,
+                mode=tool_name,
+                status="Browser error" if result.lower().startswith(("error", "failed")) else status,
+                url=str(args.get("url", "")),
+                query=str(args.get("query", "")),
+                title=_trim_text(args.get("url") or args.get("query") or status),
+                preview=result,
+                artifact_path=artifact_path,
+            ))
+            return
+        surface, status, detail = _tool_surface(tool_name, args)
+        done_status = "Completed" if tool_name.startswith("memory_") else status
+        _dispatch(set_agent_presence(
+            agent,
+            surface=surface,
+            status=done_status,
+            detail=result or detail,
+            tool=tool_name,
+        ))
+
+    event_bus.on("pre_tool_use", _on_pre_tool_use)
+    event_bus.on("post_tool_use", _on_post_tool_use)
+
     # Start schedule checker background thread
     _schedule_stop = threading.Event()
 
@@ -441,6 +591,13 @@ async def lifespan(_app: FastAPI):
                     if elapsed > HEARTBEAT_STALE_THRESHOLD and inst.state not in ("offline", "pending"):
                         inst.state = "offline"
                         log.info("Agent %s marked offline (no heartbeat for %.0fs)", inst.name, elapsed)
+                        _dispatch(set_agent_presence(
+                            inst.name,
+                            surface="session",
+                            status="Offline",
+                            detail="Heartbeat lost",
+                            state="offline",
+                        ))
                         try:
                             from app_helpers import get_full_agent_list
                             asyncio.run_coroutine_threadsafe(
@@ -456,6 +613,89 @@ async def lifespan(_app: FastAPI):
     health_thread = threading.Thread(target=_health_monitor, daemon=True)
     health_thread.start()
     print("  Health monitor started (checks every 30s)")
+
+    _terminal_stop = threading.Event()
+
+    def _terminal_monitor():
+        while not _terminal_stop.is_set():
+            try:
+                for inst in registry.get_all():
+                    session_name = f"ghostlink-{inst.name}"
+                    output = ""
+                    active = False
+                    try:
+                        result = subprocess.run(
+                            ["tmux", "capture-pane", "-t", session_name, "-p", "-S", "-120"],
+                            capture_output=True,
+                            text=True,
+                            timeout=2,
+                        )
+                        if result.returncode == 0:
+                            output = result.stdout[-12000:]
+                            active = True
+                    except Exception:
+                        pass
+
+                    with deps._agent_state_lock:
+                        previous = dict(deps._terminal_streams.get(inst.name, {}))
+                    if output != previous.get("output", "") or active != previous.get("active", False):
+                        _dispatch(set_terminal_stream(inst.name, output, active))
+                        current_presence = _presence_snapshot(inst.name)
+                        stale = time.time() - float(current_presence.get("updated_at", 0) or 0) > 10
+                        if active and (current_presence.get("surface") in ("", "idle", "session", "terminal", "thinking") or stale):
+                            line = _last_terminal_line(output)
+                            _dispatch(set_agent_presence(
+                                inst.name,
+                                surface="terminal",
+                                status="Running command" if line else "Terminal active",
+                                detail=line or "Live session attached",
+                                command=line,
+                                state=inst.state,
+                            ))
+            except Exception as e:
+                log.debug("Terminal monitor error: %s", e)
+            _terminal_stop.wait(1.0)
+
+    terminal_thread = threading.Thread(target=_terminal_monitor, daemon=True)
+    terminal_thread.start()
+    print("  Terminal stream monitor started (checks every 1s)")
+
+    _workspace_stop = threading.Event()
+
+    def _workspace_monitor():
+        workspace_state: dict[str, dict[str, float]] = {}
+        while not _workspace_stop.is_set():
+            try:
+                for inst in registry.get_all():
+                    workspace = _get_agent_workspace_path(inst.name)
+                    if not workspace.is_dir():
+                        workspace_state.pop(inst.name, None)
+                        continue
+                    new_state = _scan_workspace_state(workspace)
+                    old_state = workspace_state.get(inst.name)
+                    workspace_state[inst.name] = new_state
+                    if old_state is None:
+                        continue
+
+                    changes: list[tuple[str, str]] = []
+                    for rel_path, mtime in new_state.items():
+                        if rel_path not in old_state:
+                            changes.append(("created", rel_path))
+                        elif old_state[rel_path] != mtime:
+                            changes.append(("modified", rel_path))
+                    for rel_path in old_state:
+                        if rel_path not in new_state:
+                            changes.append(("deleted", rel_path))
+
+                    for action, rel_path in changes[:20]:
+                        _dispatch(add_workspace_change(inst.name, action, rel_path))
+            except Exception as e:
+                log.debug("Workspace monitor error: %s", e)
+            _workspace_stop.wait(2.0)
+
+    workspace_thread = threading.Thread(target=_workspace_monitor, daemon=True)
+    workspace_thread.start()
+    print("  Workspace monitor started (checks every 2s)")
 
     # Load plugins
     try:
@@ -520,6 +760,8 @@ async def lifespan(_app: FastAPI):
         await _http_session.close()
     _schedule_stop.set()
     _health_stop.set()
+    _terminal_stop.set()
+    _workspace_stop.set()
     bridge_manager.stop_all()
     await store.close()
     await db.close()
