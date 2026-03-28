@@ -7,6 +7,8 @@ import json
 import logging
 import os
 import re
+import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -1405,6 +1407,9 @@ async def get_agent_file_diff(name: str, path: str = ""):
 _WORKSPACE_SKIP_NAMES = {"node_modules", "__pycache__", ".venv", "venv", ".git", "dist"}
 _WORKSPACE_VISIBLE_DOTFILES = {".gitignore"}
 _WORKSPACE_MAX_FILE_SIZE = 500_000
+_CHECKPOINT_RETENTION = 20
+_CHECKPOINT_LABEL_MAX = 120
+_VALID_CHECKPOINT_ID = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 
 
 def _get_agent_workspace_path(name: str) -> Path:
@@ -1417,6 +1422,11 @@ def _get_agent_workspace_path(name: str) -> Path:
                 workspace = pa.get("cwd", ".")
                 break
     return Path(workspace or ".").resolve()
+
+
+def _get_agent_checkpoints_root(name: str) -> Path:
+    data_dir = Path(deps.DATA_DIR or ".").resolve()
+    return data_dir / "checkpoints" / name
 
 
 def _resolve_workspace_target(workspace: Path, raw_path: str, *, expect_dir: bool | None = None) -> Path:
@@ -1432,6 +1442,28 @@ def _resolve_workspace_target(workspace: Path, raw_path: str, *, expect_dir: boo
     if expect_dir is False and not target.is_file():
         raise FileNotFoundError("file not found")
     return target
+
+
+def _iter_workspace_files(root: Path):
+    if not root.is_dir():
+        return
+    for current_root, dirs, filenames in os.walk(root):
+        current_path = Path(current_root)
+        dirs[:] = sorted(
+            d for d in dirs
+            if d not in _WORKSPACE_SKIP_NAMES and not d.startswith(".")
+        )
+        for filename in sorted(filenames):
+            if filename.startswith(".") and filename not in _WORKSPACE_VISIBLE_DOTFILES:
+                continue
+            full_path = current_path / filename
+            if full_path.is_symlink() or not full_path.is_file():
+                continue
+            try:
+                rel_path = full_path.relative_to(root)
+            except ValueError:
+                continue
+            yield rel_path, full_path
 
 
 def _list_workspace_entries(workspace: Path, current: Path) -> list[dict[str, object]]:
@@ -1485,6 +1517,204 @@ def _get_workspace_git_status(workspace: Path) -> tuple[str, dict[str, str]]:
     except Exception:
         pass
     return git_status, git_file_status
+
+
+def _copy_workspace_snapshot(source_root: Path, dest_root: Path) -> tuple[int, int]:
+    file_count = 0
+    size_bytes = 0
+    for rel_path, full_path in _iter_workspace_files(source_root):
+        target_path = dest_root / rel_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(full_path, target_path)
+        try:
+            size_bytes += full_path.stat().st_size
+        except OSError:
+            pass
+        file_count += 1
+    return file_count, size_bytes
+
+
+def _checkpoint_metadata_path(checkpoint_dir: Path) -> Path:
+    return checkpoint_dir / "metadata.json"
+
+
+def _normalize_checkpoint_label(label: object) -> str:
+    if isinstance(label, str):
+        cleaned = " ".join(label.strip().split())
+        if cleaned:
+            return cleaned[:_CHECKPOINT_LABEL_MAX]
+    return time.strftime("Checkpoint %H:%M:%S", time.localtime())
+
+
+def _make_checkpoint_metadata(
+    *,
+    checkpoint_id: str,
+    agent_name: str,
+    workspace: Path,
+    label: str,
+    file_count: int,
+    size_bytes: int,
+) -> dict[str, object]:
+    return {
+        "id": checkpoint_id,
+        "agent": agent_name,
+        "label": label,
+        "timestamp": time.time(),
+        "file_count": file_count,
+        "size_bytes": size_bytes,
+        "workspace": str(workspace),
+    }
+
+
+def _load_checkpoint_metadata(agent_name: str, checkpoint_id: str) -> tuple[Path, dict[str, object]]:
+    checkpoint_dir = _get_agent_checkpoints_root(agent_name) / checkpoint_id
+    metadata_path = _checkpoint_metadata_path(checkpoint_dir)
+    if not checkpoint_dir.is_dir() or not metadata_path.is_file():
+        raise FileNotFoundError("checkpoint not found")
+    try:
+        payload = json.loads(metadata_path.read_text("utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise FileNotFoundError("checkpoint not found") from exc
+    if not isinstance(payload, dict):
+        raise FileNotFoundError("checkpoint not found")
+    return checkpoint_dir, payload
+
+
+def _list_agent_checkpoints(name: str) -> list[dict[str, object]]:
+    root = _get_agent_checkpoints_root(name)
+    if not root.is_dir():
+        return []
+    checkpoints: list[dict[str, object]] = []
+    for checkpoint_dir in sorted(root.iterdir(), reverse=True):
+        if not checkpoint_dir.is_dir() or checkpoint_dir.name.startswith("."):
+            continue
+        metadata_path = _checkpoint_metadata_path(checkpoint_dir)
+        if not metadata_path.is_file():
+            continue
+        try:
+            payload = json.loads(metadata_path.read_text("utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            checkpoints.append(payload)
+    checkpoints.sort(key=lambda item: float(item.get("timestamp", 0) or 0), reverse=True)
+    return checkpoints
+
+
+def _apply_checkpoint_retention(name: str) -> None:
+    checkpoints = _list_agent_checkpoints(name)
+    for payload in checkpoints[_CHECKPOINT_RETENTION:]:
+        checkpoint_id = str(payload.get("id", ""))
+        if not checkpoint_id or not _VALID_CHECKPOINT_ID.match(checkpoint_id):
+            continue
+        checkpoint_dir = _get_agent_checkpoints_root(name) / checkpoint_id
+        shutil.rmtree(checkpoint_dir, ignore_errors=True)
+
+
+def _files_match(left: Path, right: Path) -> bool:
+    try:
+        if left.stat().st_size != right.stat().st_size:
+            return False
+        return left.read_bytes() == right.read_bytes()
+    except OSError:
+        return False
+
+
+def _remove_empty_workspace_dirs(workspace: Path) -> None:
+    for current_root, dirs, _files in os.walk(workspace, topdown=False):
+        current = Path(current_root)
+        if current == workspace:
+            continue
+        if current.name in _WORKSPACE_SKIP_NAMES or current.name.startswith("."):
+            continue
+        try:
+            current.rmdir()
+        except OSError:
+            pass
+
+
+def _restore_workspace_from_snapshot(snapshot_root: Path, workspace: Path) -> dict[str, int]:
+    current_files = {str(rel_path): full_path for rel_path, full_path in _iter_workspace_files(workspace)}
+    snapshot_files = {str(rel_path): full_path for rel_path, full_path in _iter_workspace_files(snapshot_root)}
+
+    deleted = 0
+    created = 0
+    modified = 0
+
+    for rel_path in sorted(set(current_files) - set(snapshot_files)):
+        current_files[rel_path].unlink(missing_ok=True)
+        deleted += 1
+
+    for rel_path, source_path in snapshot_files.items():
+        target_path = workspace / rel_path
+        existed = target_path.exists()
+        changed = not existed or not _files_match(source_path, target_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target_path)
+        if not changed:
+            continue
+        if existed:
+            modified += 1
+        else:
+            created += 1
+
+    _remove_empty_workspace_dirs(workspace)
+    return {
+        "file_count": len(snapshot_files),
+        "created": created,
+        "modified": modified,
+        "deleted": deleted,
+    }
+
+
+async def _create_checkpoint_snapshot(name: str, workspace: Path, label: str) -> dict[str, object]:
+    checkpoint_id = f"cp_{int(time.time() * 1000)}_{secrets.token_hex(4)}"
+    root = _get_agent_checkpoints_root(name)
+    root.mkdir(parents=True, exist_ok=True)
+    temp_dir = root / f".tmp-{checkpoint_id}"
+    checkpoint_dir = root / checkpoint_id
+    shutil.rmtree(temp_dir, ignore_errors=True)
+    shutil.rmtree(checkpoint_dir, ignore_errors=True)
+    snapshot_root = temp_dir / "files"
+    snapshot_root.mkdir(parents=True, exist_ok=True)
+    file_count, size_bytes = _copy_workspace_snapshot(workspace, snapshot_root)
+    metadata = _make_checkpoint_metadata(
+        checkpoint_id=checkpoint_id,
+        agent_name=name,
+        workspace=workspace,
+        label=label,
+        file_count=file_count,
+        size_bytes=size_bytes,
+    )
+    _checkpoint_metadata_path(temp_dir).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    temp_dir.replace(checkpoint_dir)
+    _apply_checkpoint_retention(name)
+    return metadata
+
+
+async def _emit_checkpoint_event(
+    name: str,
+    event_type: str,
+    *,
+    title: str,
+    detail: str,
+    metadata: dict[str, object] | None = None,
+) -> None:
+    await _record_activity("message", f"{title}: {detail}", agent=name)
+    await add_replay_event(
+        name,
+        event_type,
+        title=title,
+        detail=detail,
+        surface="checkpoints",
+        metadata=metadata or {},
+    )
+    await set_agent_presence(
+        name,
+        surface="checkpoints",
+        status=title,
+        detail=detail,
+    )
 
 
 @router.get("/api/agents/{name}/workspace")
@@ -1616,3 +1846,117 @@ async def write_agent_file(name: str, request: Request):
         }
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
+
+
+@router.get("/api/agents/{name}/checkpoints")
+async def list_agent_checkpoints(name: str):
+    """List saved workspace checkpoints for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    return {"checkpoints": _list_agent_checkpoints(name)}
+
+
+@router.post("/api/agents/{name}/checkpoints")
+async def create_agent_checkpoint(name: str, request: Request):
+    """Save a workspace checkpoint for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+
+    ws = _get_agent_workspace_path(name)
+    if not ws.is_dir():
+        return JSONResponse({"error": "workspace not found"}, 404)
+
+    body = await request.json()
+    label = _normalize_checkpoint_label(body.get("label", ""))
+    try:
+        metadata = await _create_checkpoint_snapshot(name, ws, label)
+    except Exception as exc:
+        return JSONResponse({"error": f"failed to create checkpoint: {exc}"}, 500)
+
+    await _emit_checkpoint_event(
+        name,
+        "checkpoint_create",
+        title="Saved checkpoint",
+        detail=str(metadata.get("label", label)),
+        metadata={
+            "checkpoint_id": metadata.get("id", ""),
+            "file_count": metadata.get("file_count", 0),
+            "size_bytes": metadata.get("size_bytes", 0),
+        },
+    )
+    return {"ok": True, "checkpoint": metadata}
+
+
+@router.post("/api/agents/{name}/checkpoints/{checkpoint_id}/restore")
+async def restore_agent_checkpoint(name: str, checkpoint_id: str):
+    """Restore an agent workspace from a saved checkpoint."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    if not _VALID_CHECKPOINT_ID.match(checkpoint_id):
+        return JSONResponse({"error": "invalid checkpoint id"}, 400)
+
+    ws = _get_agent_workspace_path(name)
+    if not ws.is_dir():
+        return JSONResponse({"error": "workspace not found"}, 404)
+
+    try:
+        checkpoint_dir, metadata = _load_checkpoint_metadata(name, checkpoint_id)
+    except FileNotFoundError as exc:
+        return JSONResponse({"error": str(exc)}, 404)
+
+    snapshot_root = checkpoint_dir / "files"
+    if not snapshot_root.is_dir():
+        return JSONResponse({"error": "checkpoint snapshot missing"}, 404)
+
+    backup_root = _get_agent_checkpoints_root(name) / f".restore-{checkpoint_id}-{secrets.token_hex(4)}"
+    backup_snapshot_root = backup_root / "files"
+    backup_root.mkdir(parents=True, exist_ok=True)
+    backup_snapshot_root.mkdir(parents=True, exist_ok=True)
+    _copy_workspace_snapshot(ws, backup_snapshot_root)
+
+    try:
+        stats = _restore_workspace_from_snapshot(snapshot_root, ws)
+    except Exception as exc:
+        try:
+            _restore_workspace_from_snapshot(backup_snapshot_root, ws)
+        except Exception:
+            pass
+        return JSONResponse({"error": f"failed to restore checkpoint: {exc}"}, 500)
+    finally:
+        shutil.rmtree(backup_root, ignore_errors=True)
+
+    await _emit_checkpoint_event(
+        name,
+        "checkpoint_restore",
+        title="Restored checkpoint",
+        detail=str(metadata.get("label", checkpoint_id)),
+        metadata={
+            "checkpoint_id": checkpoint_id,
+            **stats,
+        },
+    )
+    return {"ok": True, "checkpoint": metadata, "stats": stats}
+
+
+@router.delete("/api/agents/{name}/checkpoints/{checkpoint_id}")
+async def delete_agent_checkpoint(name: str, checkpoint_id: str):
+    """Delete a saved checkpoint for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    if not _VALID_CHECKPOINT_ID.match(checkpoint_id):
+        return JSONResponse({"error": "invalid checkpoint id"}, 400)
+
+    try:
+        checkpoint_dir, metadata = _load_checkpoint_metadata(name, checkpoint_id)
+    except FileNotFoundError as exc:
+        return JSONResponse({"error": str(exc)}, 404)
+
+    shutil.rmtree(checkpoint_dir, ignore_errors=True)
+    await _emit_checkpoint_event(
+        name,
+        "checkpoint_delete",
+        title="Deleted checkpoint",
+        detail=str(metadata.get("label", checkpoint_id)),
+        metadata={"checkpoint_id": checkpoint_id},
+    )
+    return {"ok": True}
