@@ -94,4 +94,84 @@ describe('chatStore', () => {
     expect(useChatStore.getState().selectMode).toBe(true);
     expect(Array.from(useChatStore.getState().selectedIds)).toEqual([1, 2]);
   });
+
+  // Cockpit state management
+  it('setCockpitAgent opens cockpit panel', () => {
+    useChatStore.getState().setCockpitAgent('claude');
+    expect(useChatStore.getState().cockpitAgent).toBe('claude');
+    expect(useChatStore.getState().sidebarPanel).toBe('cockpit');
+  });
+
+  it('setCockpitAgent(null) closes cockpit', () => {
+    useChatStore.getState().setCockpitAgent('claude');
+    useChatStore.getState().setCockpitAgent(null);
+    expect(useChatStore.getState().cockpitAgent).toBeNull();
+    expect(useChatStore.getState().sidebarPanel).toBeNull();
+  });
+
+  it('cleans up cockpit state when agent goes offline', () => {
+    const onlineAgents = [
+      { name: 'claude', base: 'claude', label: 'Claude', color: '#e8734a', state: 'active' as const, slot: 1 },
+      { name: 'codex', base: 'codex', label: 'Codex', color: '#10a37f', state: 'active' as const, slot: 2 },
+    ];
+    useChatStore.getState().setAgents(onlineAgents);
+    useChatStore.getState().setTerminalStream({ agent: 'claude', output: 'test', active: true, updated_at: Date.now() });
+    useChatStore.getState().setCockpitAgent('claude');
+
+    // Claude goes offline
+    const updatedAgents = [
+      { name: 'claude', base: 'claude', label: 'Claude', color: '#e8734a', state: 'offline' as const, slot: 1 },
+      { name: 'codex', base: 'codex', label: 'Codex', color: '#10a37f', state: 'active' as const, slot: 2 },
+    ];
+    useChatStore.getState().setAgents(updatedAgents);
+
+    // Cockpit should auto-close and state should be cleaned
+    expect(useChatStore.getState().cockpitAgent).toBeNull();
+    expect(useChatStore.getState().terminalStreams['claude']).toBeUndefined();
+  });
+
+  it('typing agents expire after 5 seconds', () => {
+    const now = Date.now();
+    useChatStore.setState({
+      typingAgents: {
+        'general': { 'old-agent': now - 10000 },  // 10s old — should expire
+      },
+    });
+    useChatStore.getState().setTyping('new-agent', 'general');
+    const typing = useChatStore.getState().typingAgents['general'];
+    expect(typing?.['old-agent']).toBeUndefined();  // expired
+    expect(typing?.['new-agent']).toBeDefined();     // fresh
+  });
+
+  it('fileDiffs are capped at 50 per agent', () => {
+    for (let i = 0; i < 60; i++) {
+      useChatStore.getState().setFileDiff({
+        agent: 'claude',
+        path: `file${i}.ts`,
+        action: 'modified',
+        before: '',
+        after: '',
+        diff: `+line ${i}`,
+        timestamp: Date.now(),
+      });
+    }
+    const diffs = useChatStore.getState().fileDiffs['claude'];
+    expect(Object.keys(diffs).length).toBeLessThanOrEqual(50);
+  });
+
+  it('normalizes diff paths on write', () => {
+    useChatStore.getState().setFileDiff({
+      agent: 'claude',
+      path: './src/../src/./App.tsx',
+      action: 'modified',
+      before: '',
+      after: '',
+      diff: '+test',
+      timestamp: Date.now(),
+    });
+    const diffs = useChatStore.getState().fileDiffs['claude'];
+    // Should be normalized — no leading ./ or /./
+    const keys = Object.keys(diffs);
+    expect(keys.every(k => !k.startsWith('./') && !k.includes('/./'))).toBe(true);
+  });
 });
