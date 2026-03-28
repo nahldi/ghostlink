@@ -1,347 +1,272 @@
-import { useState, useCallback } from 'react';
+/**
+ * Workflow Builder — visual automation trigger editor.
+ * Create event-driven workflows: "When X happens, have agent Y do Z"
+ */
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-interface WorkflowNode {
-  id: string;
-  type: 'agent' | 'condition' | 'action' | 'trigger';
-  label: string;
-  config: Record<string, string>;
-  x: number;
-  y: number;
-}
-
-interface WorkflowEdge {
-  from: string;
-  to: string;
-  label?: string;
-}
+import { useChatStore } from '../stores/chatStore';
+import { toast } from './Toast';
 
 interface Workflow {
   id: string;
   name: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
+  trigger: {
+    type: string;
+    config: Record<string, string>;
+  };
+  action: {
+    type: string;
+    agent: string;
+    config: Record<string, string>;
+  };
   enabled: boolean;
+  last_run?: number;
+  run_count: number;
 }
 
-interface WorkflowBuilderProps {
-  onClose: () => void;
-  onSave: (workflow: Workflow) => void;
-  initialWorkflow?: Workflow;
+const TRIGGER_TYPES = [
+  { value: 'schedule', label: 'On Schedule', icon: 'schedule', description: 'Run at specific times' },
+  { value: 'event', label: 'On Event', icon: 'bolt', description: 'When something happens' },
+  { value: 'file_change', label: 'On File Change', icon: 'edit_document', description: 'When files change' },
+  { value: 'agent_status', label: 'On Agent Status', icon: 'smart_toy', description: 'Agent online/offline' },
+  { value: 'webhook', label: 'On Webhook', icon: 'webhook', description: 'External service calls' },
+];
+
+const ACTION_TYPES = [
+  { value: 'message', label: 'Send Message', icon: 'chat' },
+  { value: 'task', label: 'Queue Task', icon: 'task_alt' },
+  { value: 'command', label: 'Run Command', icon: 'terminal' },
+  { value: 'checkpoint', label: 'Save Checkpoint', icon: 'save' },
+];
+
+const EVENT_OPTIONS = [
+  'agent_join', 'agent_leave', 'message_received', 'job_created',
+  'job_completed', 'error', 'test_failed', 'build_completed',
+];
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() / 1000 - ts;
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return new Date(ts * 1000).toLocaleDateString();
 }
 
-const NODE_TYPES = [
-  { type: 'trigger', label: 'Trigger', icon: 'bolt', color: '#f59e0b', desc: 'Start event (webhook, schedule, message)' },
-  { type: 'agent', label: 'Agent', icon: 'smart_toy', color: '#a78bfa', desc: 'Run an AI agent task' },
-  { type: 'condition', label: 'Condition', icon: 'call_split', color: '#38bdf8', desc: 'Branch based on a condition' },
-  { type: 'action', label: 'Action', icon: 'play_arrow', color: '#34d399', desc: 'Execute an action (send, post, save)' },
-] as const;
+export function WorkflowBuilder() {
+  const agents = useChatStore((s) => s.agents);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [triggerType, setTriggerType] = useState('schedule');
+  const [triggerConfig, setTriggerConfig] = useState<Record<string, string>>({});
+  const [actionType, setActionType] = useState('message');
+  const [actionAgent, setActionAgent] = useState('');
+  const [actionConfig, setActionConfig] = useState<Record<string, string>>({});
 
-let _nodeCounter = 0;
-
-/**
- * WorkflowBuilder — visual drag-and-drop workflow editor.
- * Connect agents, tools, conditions, and data flows visually.
- */
-export function WorkflowBuilder({ onClose, onSave, initialWorkflow }: WorkflowBuilderProps) {
-  const [workflow, setWorkflow] = useState<Workflow>(
-    initialWorkflow || { id: `wf-${Date.now()}`, name: 'New Workflow', nodes: [], edges: [], enabled: true }
-  );
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState<string | null>(null);
-
-  const addNode = useCallback((type: string) => {
-    const nodeType = NODE_TYPES.find(n => n.type === type);
-    if (!nodeType) return;
-    const id = `node-${++_nodeCounter}`;
-    const node: WorkflowNode = {
-      id,
-      type: type as WorkflowNode['type'],
-      label: nodeType.label,
-      config: {},
-      x: 100 + Math.random() * 300,
-      y: 80 + workflow.nodes.length * 100,
-    };
-    setWorkflow(w => ({ ...w, nodes: [...w.nodes, node] }));
-    setSelectedNode(id);
-  }, [workflow.nodes.length]);
-
-  const removeNode = useCallback((id: string) => {
-    setWorkflow(w => ({
-      ...w,
-      nodes: w.nodes.filter(n => n.id !== id),
-      edges: w.edges.filter(e => e.from !== id && e.to !== id),
-    }));
-    if (selectedNode === id) setSelectedNode(null);
-  }, [selectedNode]);
-
-  const startConnect = useCallback((id: string) => {
-    if (connecting) {
-      // Complete connection
-      if (connecting !== id) {
-        setWorkflow(w => ({
-          ...w,
-          edges: [...w.edges, { from: connecting, to: id }],
-        }));
+  const fetchWorkflows = useCallback(async () => {
+    try {
+      const res = await fetch('/api/workflows');
+      if (res.ok) {
+        const data = await res.json();
+        setWorkflows(data.workflows || []);
       }
-      setConnecting(null);
-    } else {
-      setConnecting(id);
-    }
-  }, [connecting]);
-
-  const updateNodeConfig = useCallback((id: string, key: string, value: string) => {
-    setWorkflow(w => ({
-      ...w,
-      nodes: w.nodes.map(n => n.id === id ? { ...n, config: { ...n.config, [key]: value } } : n),
-    }));
+    } catch { /* ignored */ }
+    setLoading(false);
   }, []);
 
-  const selected = workflow.nodes.find(n => n.id === selectedNode);
-  const nodeTypeInfo = selected ? NODE_TYPES.find(t => t.type === selected.type) : null;
+  useEffect(() => { fetchWorkflows(); }, [fetchWorkflows]);
+
+  const createWorkflow = async () => {
+    if (!name.trim()) { toast('Name required', 'warning'); return; }
+    try {
+      const res = await fetch('/api/workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          trigger: { type: triggerType, config: triggerConfig },
+          action: { type: actionType, agent: actionAgent, config: actionConfig },
+        }),
+      });
+      if (res.ok) {
+        toast('Workflow created', 'success');
+        setName(''); setTriggerConfig({}); setActionConfig({});
+        setCreating(false);
+        fetchWorkflows();
+      } else { toast('Failed to create', 'error'); }
+    } catch { toast('Failed to create', 'error'); }
+  };
+
+  const toggleWorkflow = async (id: string, enabled: boolean) => {
+    try {
+      await fetch(`/api/workflows/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      setWorkflows(prev => prev.map(w => w.id === id ? { ...w, enabled } : w));
+    } catch { /* ignored */ }
+  };
+
+  const deleteWorkflow = async (id: string) => {
+    try {
+      const res = await fetch(`/api/workflows/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setWorkflows(prev => prev.filter(w => w.id !== id));
+        toast('Workflow deleted', 'info');
+      }
+    } catch { /* ignored */ }
+  };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[60] flex"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+    <div className="h-full flex flex-col">
+      <div className="px-4 py-3 border-b border-outline-variant/10 flex items-center justify-between shrink-0">
+        <div>
+          <h2 className="text-sm font-semibold text-on-surface/80">Automations</h2>
+          <p className="text-[10px] text-on-surface-variant/30 mt-0.5">Event-driven workflows</p>
+        </div>
+        <button onClick={() => setCreating(!creating)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+          <span className="material-symbols-outlined text-[16px]">{creating ? 'close' : 'add'}</span>
+          {creating ? 'Cancel' : 'New'}
+        </button>
+      </div>
 
-        <motion.div
-          className="relative m-auto w-[1000px] max-w-[95vw] h-[80vh] rounded-2xl flex overflow-hidden"
-          style={{ background: 'linear-gradient(160deg, #141420 0%, #08080f 100%)', border: '1px solid rgba(167, 139, 250, 0.1)' }}
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Sidebar — Node Palette */}
-          <div className="w-56 border-r border-outline-variant/10 flex flex-col">
-            <div className="px-4 py-3 border-b border-outline-variant/10">
-              <input
-                type="text"
-                value={workflow.name}
-                onChange={e => setWorkflow(w => ({ ...w, name: e.target.value }))}
-                className="w-full bg-transparent text-sm font-semibold text-on-surface outline-none"
-                aria-label="Workflow name"
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-2">Add Node</div>
-              {NODE_TYPES.map(nt => (
-                <button
-                  key={nt.type}
-                  onClick={() => addNode(nt.type)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container/40 transition-colors text-left"
-                  aria-label={`Add ${nt.label} node`}
-                >
-                  <span className="material-symbols-outlined text-sm" style={{ color: nt.color }}>{nt.icon}</span>
-                  <div>
-                    <div className="text-[11px] font-medium text-on-surface">{nt.label}</div>
-                    <div className="text-[8px] text-on-surface-variant/30">{nt.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="p-3 border-t border-outline-variant/10 space-y-2">
-              <button
-                onClick={() => onSave(workflow)}
-                className="w-full py-2 rounded-xl bg-primary-container text-white text-xs font-semibold hover:brightness-110 transition-all"
-                aria-label="Save workflow"
-              >
-                Save Workflow
+      <AnimatePresence>
+        {creating && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden border-b border-outline-variant/10">
+            <div className="px-4 py-3 space-y-3">
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="Workflow name..." autoFocus
+                className="w-full bg-surface-container rounded-lg px-3 py-2 text-xs text-on-surface outline-none border border-outline-variant/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" />
+              <div>
+                <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider block mb-1.5">When</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {TRIGGER_TYPES.map((t) => (
+                    <button key={t.value} onClick={() => { setTriggerType(t.value); setTriggerConfig({}); }}
+                      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                        triggerType === t.value ? 'bg-primary/15 border border-primary/30' : 'bg-surface-container-high/30 border border-transparent hover:bg-surface-container-high/50'}`}>
+                      <span className="material-symbols-outlined text-[14px]" style={{ color: triggerType === t.value ? 'var(--primary)' : undefined }}>{t.icon}</span>
+                      <span className="text-[10px] font-medium text-on-surface/60">{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {triggerType === 'schedule' && (
+                  <input type="text" value={triggerConfig.cron || ''} onChange={(e) => setTriggerConfig({ cron: e.target.value })}
+                    placeholder="Cron (e.g. */5 * * * *)"
+                    className="mt-2 w-full bg-surface-container rounded-lg px-3 py-1.5 text-[10px] font-mono text-on-surface outline-none border border-outline-variant/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" />
+                )}
+                {triggerType === 'event' && (
+                  <select value={triggerConfig.event || ''} onChange={(e) => setTriggerConfig({ event: e.target.value })}
+                    className="mt-2 w-full bg-surface-container rounded-lg px-3 py-1.5 text-[10px] text-on-surface outline-none border border-outline-variant/10">
+                    <option value="">Select event...</option>
+                    {EVENT_OPTIONS.map(e => <option key={e} value={e}>{e.replace(/_/g, ' ')}</option>)}
+                  </select>
+                )}
+                {triggerType === 'file_change' && (
+                  <input type="text" value={triggerConfig.pattern || ''} onChange={(e) => setTriggerConfig({ pattern: e.target.value })}
+                    placeholder="Pattern (e.g. src/**/*.ts)"
+                    className="mt-2 w-full bg-surface-container rounded-lg px-3 py-1.5 text-[10px] font-mono text-on-surface outline-none border border-outline-variant/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" />
+                )}
+              </div>
+              <div>
+                <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider block mb-1.5">Then</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {ACTION_TYPES.map((a) => (
+                    <button key={a.value} onClick={() => { setActionType(a.value); setActionConfig({}); }}
+                      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                        actionType === a.value ? 'bg-primary/15 border border-primary/30' : 'bg-surface-container-high/30 border border-transparent hover:bg-surface-container-high/50'}`}>
+                      <span className="material-symbols-outlined text-[14px]" style={{ color: actionType === a.value ? 'var(--primary)' : undefined }}>{a.icon}</span>
+                      <span className="text-[10px] font-medium text-on-surface/60">{a.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <select value={actionAgent} onChange={(e) => setActionAgent(e.target.value)}
+                  className="mt-2 w-full bg-surface-container rounded-lg px-3 py-1.5 text-[10px] text-on-surface outline-none border border-outline-variant/10">
+                  <option value="">Select agent...</option>
+                  {agents.map(a => <option key={a.name} value={a.name}>{a.label || a.name}</option>)}
+                </select>
+                {(actionType === 'message' || actionType === 'task') && (
+                  <textarea value={actionConfig.content || ''} onChange={(e) => setActionConfig({ content: e.target.value })}
+                    placeholder={actionType === 'message' ? 'Message...' : 'Task description...'} rows={2}
+                    className="mt-2 w-full bg-surface-container rounded-lg px-3 py-1.5 text-[10px] text-on-surface outline-none border border-outline-variant/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all resize-none" />
+                )}
+                {actionType === 'command' && (
+                  <input type="text" value={actionConfig.command || ''} onChange={(e) => setActionConfig({ command: e.target.value })}
+                    placeholder="Command to run..."
+                    className="mt-2 w-full bg-surface-container rounded-lg px-3 py-1.5 text-[10px] font-mono text-on-surface outline-none border border-outline-variant/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" />
+                )}
+              </div>
+              <button onClick={createWorkflow}
+                className="w-full px-3 py-2 rounded-lg text-[11px] font-medium bg-primary text-on-primary hover:brightness-110 transition-all">
+                Create Workflow
               </button>
-              <button
-                onClick={onClose}
-                className="w-full py-2 rounded-xl bg-surface-container/50 text-on-surface-variant/60 text-xs hover:text-on-surface transition-colors"
-                aria-label="Cancel"
-              >
-                Cancel
-              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex-1 overflow-auto">
+        {loading ? (
+          <div className="py-2 space-y-1">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 rounded-lg skeleton-shimmer" />
+                <div className="flex-1 space-y-1">
+                  <div className="w-1/2 h-3 rounded skeleton-shimmer" />
+                  <div className="w-1/3 h-2 rounded skeleton-shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : workflows.length === 0 && !creating ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-8">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+              <span className="material-symbols-outlined text-2xl text-primary/30">bolt</span>
+            </div>
+            <div className="text-center space-y-1.5">
+              <p className="text-xs font-medium text-on-surface-variant/50">No automations</p>
+              <p className="text-[10px] text-on-surface-variant/30 leading-relaxed max-w-[200px]">
+                Create workflows that trigger agent actions on events, schedules, or file changes
+              </p>
             </div>
           </div>
-
-          {/* Canvas */}
-          <div className="flex-1 relative overflow-auto" style={{ backgroundImage: 'radial-gradient(circle, rgba(167,139,250,0.03) 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
-            {/* Edges (SVG lines) */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none">
-              {workflow.edges.map((edge, i) => {
-                const fromNode = workflow.nodes.find(n => n.id === edge.from);
-                const toNode = workflow.nodes.find(n => n.id === edge.to);
-                if (!fromNode || !toNode) return null;
-                return (
-                  <line
-                    key={i}
-                    x1={fromNode.x + 70} y1={fromNode.y + 25}
-                    x2={toNode.x + 70} y2={toNode.y + 25}
-                    stroke="rgba(167,139,250,0.3)"
-                    strokeWidth={2}
-                    markerEnd="url(#arrow)"
-                  />
-                );
-              })}
-              <defs>
-                <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(167,139,250,0.4)" />
-                </marker>
-              </defs>
-            </svg>
-
-            {/* Nodes */}
-            {workflow.nodes.map(node => {
-              const info = NODE_TYPES.find(t => t.type === node.type);
-              return (
-                <div
-                  key={node.id}
-                  className={`absolute cursor-pointer select-none rounded-xl border transition-all ${
-                    selectedNode === node.id
-                      ? 'border-primary/40 ring-2 ring-primary/15'
-                      : connecting === node.id
-                        ? 'border-secondary/40 ring-2 ring-secondary/15'
-                        : 'border-outline-variant/10 hover:border-outline-variant/20'
-                  }`}
-                  style={{
-                    left: node.x,
-                    top: node.y,
-                    width: 140,
-                    background: 'rgba(20,20,32,0.9)',
-                  }}
-                  onClick={() => setSelectedNode(node.id)}
-                  onDoubleClick={() => startConnect(node.id)}
-                >
-                  <div className="flex items-center gap-2 px-3 py-2">
-                    <span className="material-symbols-outlined text-sm" style={{ color: info?.color }}>{info?.icon}</span>
-                    <span className="text-[10px] font-medium text-on-surface truncate">{node.config.label || node.label}</span>
+        ) : (
+          <div className="py-1">
+            {workflows.map((w) => (
+              <div key={w.id} className="px-4 py-3 flex items-start gap-3 hover:bg-surface-container-high/30 transition-colors group border-b border-outline-variant/5">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${w.enabled ? 'bg-primary/10' : 'bg-surface-container-highest/30'}`}>
+                  <span className="material-symbols-outlined text-[16px]" style={{ color: w.enabled ? 'var(--primary)' : '#8b8b8b' }}>
+                    {TRIGGER_TYPES.find(t => t.value === w.trigger.type)?.icon || 'bolt'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-on-surface/70 font-medium truncate">{w.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-[9px] text-on-surface-variant/30">{TRIGGER_TYPES.find(t => t.value === w.trigger.type)?.label}</span>
+                    <span className="text-[9px] text-on-surface-variant/15">→</span>
+                    <span className="text-[9px] text-on-surface-variant/30">{ACTION_TYPES.find(a => a.value === w.action.type)?.label}</span>
+                    {w.last_run && <span className="text-[9px] text-on-surface-variant/20">Last: {timeAgo(w.last_run)}</span>}
                   </div>
                 </div>
-              );
-            })}
-
-            {connecting && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-secondary/15 border border-secondary/20 text-[10px] text-secondary font-medium">
-                Click another node to connect
-              </div>
-            )}
-
-            {workflow.nodes.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <span className="material-symbols-outlined text-3xl text-on-surface-variant/10">account_tree</span>
-                  <div className="text-[11px] text-on-surface-variant/20 mt-2">Add nodes from the sidebar to build your workflow</div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[9px] text-on-surface-variant/20">{w.run_count}x</span>
+                  <button onClick={() => toggleWorkflow(w.id, !w.enabled)}
+                    className={`w-8 h-4 rounded-full transition-colors relative ${w.enabled ? 'bg-primary' : 'bg-surface-container-highest'}`}>
+                    <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-all ${w.enabled ? 'left-4' : 'left-0.5'}`} />
+                  </button>
+                  <button onClick={() => deleteWorkflow(w.id)}
+                    className="p-0.5 rounded hover:bg-red-500/10 text-on-surface-variant/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                  </button>
                 </div>
               </div>
-            )}
+            ))}
           </div>
-
-          {/* Properties Panel */}
-          {selected && (
-            <div className="w-56 border-l border-outline-variant/10 flex flex-col">
-              <div className="px-4 py-3 border-b border-outline-variant/10 flex items-center justify-between">
-                <div className="text-xs font-semibold text-on-surface flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm" style={{ color: nodeTypeInfo?.color }}>{nodeTypeInfo?.icon}</span>
-                  Properties
-                </div>
-                <button onClick={() => removeNode(selected.id)} className="p-1 rounded hover:bg-red-500/10 text-on-surface-variant/30 hover:text-red-400 transition-colors" aria-label="Delete node">
-                  <span className="material-symbols-outlined text-sm">delete</span>
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                <div>
-                  <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-1 block">Label</label>
-                  <input
-                    type="text"
-                    value={selected.config.label || selected.label}
-                    onChange={e => updateNodeConfig(selected.id, 'label', e.target.value)}
-                    className="setting-input text-[11px]"
-                    aria-label="Node label"
-                  />
-                </div>
-
-                {selected.type === 'agent' && (
-                  <div>
-                    <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-1 block">Agent</label>
-                    <input
-                      type="text"
-                      value={selected.config.agent || ''}
-                      onChange={e => updateNodeConfig(selected.id, 'agent', e.target.value)}
-                      className="setting-input text-[11px]"
-                      placeholder="claude, codex, gemini..."
-                      aria-label="Agent name"
-                    />
-                  </div>
-                )}
-
-                {selected.type === 'trigger' && (
-                  <div>
-                    <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-1 block">Event</label>
-                    <select
-                      value={selected.config.event || ''}
-                      onChange={e => updateNodeConfig(selected.id, 'event', e.target.value)}
-                      className="setting-input text-[11px]"
-                      aria-label="Trigger event"
-                    >
-                      <option value="">Select trigger...</option>
-                      <option value="webhook">Webhook</option>
-                      <option value="schedule">Schedule (cron)</option>
-                      <option value="message">New message</option>
-                      <option value="agent_join">Agent join</option>
-                    </select>
-                  </div>
-                )}
-
-                {selected.type === 'condition' && (
-                  <div>
-                    <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-1 block">Condition</label>
-                    <input
-                      type="text"
-                      value={selected.config.condition || ''}
-                      onChange={e => updateNodeConfig(selected.id, 'condition', e.target.value)}
-                      className="setting-input text-[11px]"
-                      placeholder="e.g. result.success === true"
-                      aria-label="Condition expression"
-                    />
-                  </div>
-                )}
-
-                {selected.type === 'action' && (
-                  <div>
-                    <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-1 block">Action</label>
-                    <select
-                      value={selected.config.action || ''}
-                      onChange={e => updateNodeConfig(selected.id, 'action', e.target.value)}
-                      className="setting-input text-[11px]"
-                      aria-label="Action type"
-                    >
-                      <option value="">Select action...</option>
-                      <option value="send_message">Send message</option>
-                      <option value="spawn_agent">Spawn agent</option>
-                      <option value="webhook">Call webhook</option>
-                      <option value="save_file">Save to file</option>
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-1 block">Notes</label>
-                  <textarea
-                    value={selected.config.notes || ''}
-                    onChange={e => updateNodeConfig(selected.id, 'notes', e.target.value)}
-                    className="setting-input text-[11px] h-16 resize-none"
-                    placeholder="Optional description..."
-                    aria-label="Node notes"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        )}
+      </div>
+    </div>
   );
 }
