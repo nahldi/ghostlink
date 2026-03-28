@@ -273,6 +273,46 @@ html, body {
   flex-direction: column;
 }
 
+.providers-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.providers-empty-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.12);
+  color: #a78bfa;
+  flex-shrink: 0;
+  font-size: 18px;
+}
+
+.providers-empty-copy {
+  min-width: 0;
+}
+
+.providers-empty-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.providers-empty-subtitle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.spinner-icon {
+  animation: spin 0.8s linear infinite;
+}
+
 .provider-card {
   display: flex;
   align-items: center;
