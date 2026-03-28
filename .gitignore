@@ -40,3 +40,13 @@ memory/
 
 # Claude Code
 .claude/
+
+# Codex agent config
+.codex/
+backend/.codex/
+
+# GhostLink local context/worktrees
+.ghostlink-context.md
+backend/.ghostlink-context.md
+backend/.ghostlink-worktrees/
+backend/config.toml.bak
