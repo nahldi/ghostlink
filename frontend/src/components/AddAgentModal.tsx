@@ -110,6 +110,9 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
   const setAgents = useChatStore((s) => s.setAgents);
   const updateSettings = useChatStore((s) => s.updateSettings);
   const settings = useChatStore((s) => s.settings);
+  const mode = settings.experienceMode || 'standard';
+  const isBeginner = mode === 'beginner';
+  const isAdvanced = mode === 'advanced';
 
   const agentBases = agents.map(a => a.base).sort().join(',');
   const persistentBases = (settings.persistentAgents || []).map((a: { base: string }) => a.base).sort().join(',');
@@ -347,8 +350,8 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
             </div>
           </details>
 
-          {/* Advanced Options — collapsed by default */}
-          <details className="group">
+          {/* Advanced Options — hidden in beginner mode, collapsed by default in standard, open in advanced */}
+          <details className="group" open={isAdvanced} style={isBeginner ? { display: 'none' } : undefined}>
             <summary className="text-[10px] font-semibold text-on-surface-variant/40 uppercase tracking-wider cursor-pointer hover:text-on-surface-variant/60 select-none flex items-center gap-1 py-1">
               <span className="material-symbols-outlined text-[14px] transition-transform group-open:rotate-90">chevron_right</span>
               Advanced Options
