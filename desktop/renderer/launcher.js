@@ -199,6 +199,26 @@ const ICON_LETTERS = {
 };
 
 /**
+ * Canonical pricing taxonomy per agent.
+ * Used in launcher badges so users know what's free vs paid.
+ */
+const PRICING_MAP = {
+  anthropic: { label: 'Paid', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  openai:    { label: 'Paid', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  grok:      { label: 'Paid', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  github:    { label: 'Paid', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  cursor:    { label: 'Paid', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+  google:    { label: 'Free Tier', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  cody:      { label: 'Free Tier', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  pi:        { label: 'Free Tier', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  ollama:    { label: 'Local', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  aider:     { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  goose:     { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  opencode:  { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  continue:  { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+};
+
+/**
  * Truncate a string to maxLen characters, adding "..." if truncated.
  */
 function truncate(str, maxLen) {
@@ -291,6 +311,15 @@ function renderProviders(statuses) {
     const name = document.createElement('div');
     name.className = 'provider-name';
     name.textContent = s.name;
+
+    // Pricing badge
+    const pricing = PRICING_MAP[s.provider] || PRICING_MAP[s.command];
+    if (pricing) {
+      const badge = document.createElement('span');
+      badge.textContent = pricing.label;
+      badge.style.cssText = 'font-size:8px;padding:1px 5px;border-radius:4px;margin-left:6px;font-weight:600;vertical-align:middle;color:' + pricing.color + ';background:' + pricing.bg;
+      name.appendChild(badge);
+    }
 
     const notInstalled = !s.installed && !s.authenticated;
     const isConnected = s.authenticated;
