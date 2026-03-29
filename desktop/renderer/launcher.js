@@ -368,6 +368,21 @@ function renderProviders(statuses) {
       badge.className = 'connected-badge';
       badge.textContent = 'Connected';
       action.appendChild(badge);
+    } else if (needsReauth) {
+      // "Reconnect" button — logout + login flow
+      const btn = document.createElement('button');
+      btn.className = 'connect-btn';
+      btn.textContent = 'Reconnect';
+      btn.style.background = 'rgba(245, 158, 11, 0.15)';
+      btn.style.color = '#f59e0b';
+      btn.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+      btn.addEventListener('click', async () => {
+        btn.textContent = 'Reconnecting...';
+        btn.disabled = true;
+        await api.invoke('auth:login', s.provider);
+        setTimeout(() => refreshAuth(), 5000);
+      });
+      action.appendChild(btn);
     } else if (notInstalled) {
       // "Install" button — opens terminal with install command
       const btn = document.createElement('button');

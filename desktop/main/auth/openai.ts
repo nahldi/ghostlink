@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { AuthStatus } from './index';
-import { WSL_EXE, hasCommand, isWsl, spawnInTerminal, execAsync, terminalCommand, terminalShell } from './index';
+import { WSL_EXE, hasCommand, isWsl, spawnInTerminal, execAsync, execCmd, terminalCommand, terminalShell } from './index';
 
 const PROVIDER = 'openai';
 const NAME     = 'Codex';
@@ -46,21 +46,38 @@ export async function checkOpenAI(): Promise<AuthStatus> {
   }
   base.installed = true;
 
-  // Check auth — prefer the actual Codex auth file over loose directory existence.
+  // Check API key first (always valid if present)
+  try {
+    if (isWsl()) {
+      const envCheck = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
+        encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (String(envCheck).includes('set')) {
+        return { ...base, authenticated: true, user: 'API key' };
+      }
+    } else {
+      if (process.env.OPENAI_API_KEY) {
+        return { ...base, authenticated: true, user: 'API key' };
+      }
+    }
+  } catch {}
+
+  // Check auth via `codex login status` for real token health
+  try {
+    const statusOutput = await execCmd('codex', ['login', 'status']);
+    if (/logged in|authenticated|active/i.test(statusOutput) && !/not (logged|authenticated)/i.test(statusOutput)) {
+      return { ...base, authenticated: true, user: '(session)' };
+    }
+  } catch {}
+
+  // Check auth files as fallback
   try {
     if (isWsl()) {
       const authFile = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', '(test -f ~/.codex/auth.json || test -f ~/.config/codex/auth.json) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(authFile).includes('found')) {
-        return { ...base, authenticated: true };
-      }
-
-      const envCheck = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
-        encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      if (String(envCheck).includes('set')) {
-        return { ...base, authenticated: true, user: 'API key' };
+        return { ...base, authenticated: false, installed: true, error: 'Needs re-auth — click Reconnect' };
       }
     } else {
       const home = os.homedir();
@@ -70,11 +87,8 @@ export async function checkOpenAI(): Promise<AuthStatus> {
       ];
       for (const file of authFiles) {
         if (fs.existsSync(file)) {
-          return { ...base, authenticated: true };
+          return { ...base, authenticated: false, installed: true, error: 'Needs re-auth — click Reconnect' };
         }
-      }
-      if (process.env.OPENAI_API_KEY) {
-        return { ...base, authenticated: true, user: 'API key' };
       }
     }
   } catch {}
@@ -83,12 +97,15 @@ export async function checkOpenAI(): Promise<AuthStatus> {
 }
 
 export async function loginOpenAI(): Promise<void> {
-  spawnInTerminal(terminalCommand('codex', ['auth', 'login']));
+  spawnInTerminal(terminalShell(
+    'codex logout 2>/dev/null; codex login',
+    'codex logout 2>nul & codex login'
+  ));
 }
 
 export async function installOpenAI(): Promise<void> {
   spawnInTerminal(terminalShell(
-    'npm install -g @openai/codex && echo "Done! Now run: codex auth login"',
-    'npm install -g @openai/codex && echo Done! Now run: codex auth login'
+    'npm install -g @openai/codex && echo "Done! Now run: codex login"',
+    'npm install -g @openai/codex && echo Done! Now run: codex login'
   ));
 }
