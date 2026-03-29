@@ -1,5 +1,29 @@
 # GhostLink Changelog
 
+## v5.1.2 — 2026-03-29
+### Multi-Agent Runtime + UX Overhaul
+- **WSL detection fixed** — `wsl.exe -e` flag resolves argument parsing, full path in all files
+- **All 13 CLI agents** in launcher with real install/connect/reconnect status
+- **Multi-agent runtime** — Claude, Codex, Gemini spawn, register, route, and respond end-to-end
+- **Free/Paid pricing badges** — every agent labeled Paid, Free Tier, Free + Setup, or Local
+- **Experience mode system** — Beginner/Standard/Advanced picker in wizard and settings
+- **Auth detection honesty** — `codex login status`, credential file checks, no false re-auth
+- **Codex CLI commands corrected** — `codex login` (not `codex auth login`), correct bypass flag
+- **Reconnect button** — amber "Reconnect" for stale auth, distinct from Connect/Install
+- **Spawn race fix** — registration check prioritized over process exit check
+- **Stale tmux cleanup** — auto-kills old `ghostlink-*` sessions on server start
+- **OneDrive workspace warning** — wizard and spawn both warn about WSL/OneDrive path issues
+- **Shared auth safety** — warns before spawning Codex if another instance is using shared auth
+- **Spawn warnings in UI** — backend warnings surface as toast notifications in Add Agent modal
+- **Launcher CSS polish** — gradient buttons, logo glow, pricing badge styles, hover effects
+- **Docs clarified** — "13 CLI agents" vs "13 API providers" clearly separated everywhere
+- **Agent colors synced** — consistent across auth detection, launcher, and frontend
+- **Gemini provider label** — "Google DeepMind" corrected to "Google"
+- **PATH expansion** — backend spawn includes `~/.local/bin`, `~/.npm-global/bin`, `/usr/local/bin`
+- **tmux env export** — critical env vars (PATH, HOME, etc.) exported inline for npm CLIs
+- **Continue false positive** fixed — `type -P` replaces `command -v` to skip shell builtins
+- **Agent arg validation** — regex allows leading hyphens for `--flags`
+
 ## v4.11.0 — 2026-03-28
 ### Premium Upgrade — Agent Cockpit & Command Palette
 - **Agent Cockpit** — in-app workspace viewer with Terminal, Files, Browser, Activity tabs
