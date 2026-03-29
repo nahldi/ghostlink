@@ -19,15 +19,22 @@ export async function checkGitHub(): Promise<AuthStatus> {
   const base: AuthStatus = {
     provider: PROVIDER, name: NAME, authenticated: false, installed: false,
     icon: ICON, color: COLOR, command: COMMAND,
-    installCommand: isWsl() ? 'sudo apt install gh' : 'winget install GitHub.cli',
+    installCommand: 'gh extension install github/gh-copilot',
   };
 
   if (!await hasCommand('gh')) {
     return { ...base, error: 'Not installed' };
   }
-  base.installed = true;
 
   try {
+    const extensions = await execCmd('gh', ['extension', 'list']);
+    const hasCopilot = /github\/gh-copilot\b/i.test(extensions);
+    if (!hasCopilot) {
+      return { ...base, error: 'Not installed' };
+    }
+
+    base.installed = true;
+
     const output = await execCmd('gh', ['auth', 'status']);
 
     const match = output.match(/Logged in to github\.com\s+(?:as\s+)?(\S+)/i);
@@ -56,7 +63,12 @@ export async function loginGitHub(): Promise<void> {
 }
 
 export async function installGitHub(): Promise<void> {
-  spawnInTerminal(isWsl()
-    ? terminalShell('sudo apt install gh -y && echo "Done! Now run: gh auth login --web"')
-    : terminalCommand('winget', ['install', 'GitHub.cli']));
+  if (!await hasCommand('gh')) {
+    spawnInTerminal(isWsl()
+      ? terminalShell('sudo apt install gh -y && echo "Done! Next: gh auth login --web && gh extension install github/gh-copilot"')
+      : terminalCommand('winget', ['install', 'GitHub.cli']));
+    return;
+  }
+
+  spawnInTerminal(terminalCommand('gh', ['extension', 'install', 'github/gh-copilot']));
 }
