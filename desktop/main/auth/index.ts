@@ -422,10 +422,10 @@ const _extraAgents: { command: string; name: string; color: string; installCmd: 
   { command: 'goose',    name: 'Goose',    color: '#f59e0b', installCmd: 'brew install goose' },
   { command: 'opencode', name: 'OpenCode', color: '#22c55e', installCmd: 'curl -fsSL https://opencode.ai/install | bash' },
   { command: 'ollama',   name: 'Ollama',   color: '#ffffff', installCmd: 'curl -fsSL https://ollama.com/install.sh | sh' },
-  { command: 'pi',       name: 'Pi',       color: '#8b5cf6', installCmd: 'npm i -g @anthropic-ai/pi' },
-  { command: 'cursor',   name: 'Cursor',   color: '#7c3aed', installCmd: 'Download from cursor.com' },
-  { command: 'cody',     name: 'Cody',     color: '#ff5543', installCmd: 'Download from sourcegraph.com/cody' },
-  { command: 'continue', name: 'Continue', color: '#0ea5e9', installCmd: 'Install Continue extension in VS Code' },
+  { command: 'pi',       name: 'Pi',       color: '#8b5cf6', installCmd: 'npm i -g @inflection-ai/pi' },
+  { command: 'cursor',   name: 'Cursor',   color: '#7c3aed', installCmd: 'Download from https://cursor.com' },
+  { command: 'cody',     name: 'Cody',     color: '#ff5543', installCmd: 'npm i -g @sourcegraph/cody' },
+  { command: 'continue', name: 'Continue', color: '#0ea5e9', installCmd: 'Install from https://continue.dev' },
 ];
 
 async function checkExtraAgent(agent: typeof _extraAgents[0]): Promise<AuthStatus> {

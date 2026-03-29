@@ -219,6 +219,25 @@ const PRICING_MAP = {
 };
 
 /**
+ * Beginner-friendly one-line descriptions per agent.
+ */
+const AGENT_DESCRIPTIONS = {
+  anthropic: 'AI coding assistant by Anthropic',
+  openai:    'AI coding agent by OpenAI',
+  google:    'AI coding assistant by Google',
+  github:    'GitHub\'s AI pair programmer',
+  grok:      'AI assistant by xAI',
+  aider:     'Terminal-based AI pair programmer',
+  goose:     'AI developer agent by Block',
+  opencode:  'Open-source AI coding tool',
+  ollama:    'Run AI models locally on your machine',
+  pi:        'Conversational AI by Inflection',
+  cursor:    'AI-powered code editor',
+  cody:      'AI code assistant by Sourcegraph',
+  continue:  'Open-source AI coding extension',
+};
+
+/**
  * Truncate a string to maxLen characters, adding "..." if truncated.
  */
 function truncate(str, maxLen) {
@@ -356,6 +375,16 @@ function renderProviders(statuses) {
     }
 
     info.appendChild(name);
+
+    // Agent description for beginners
+    const agentDesc = AGENT_DESCRIPTIONS[s.provider] || AGENT_DESCRIPTIONS[s.command];
+    if (agentDesc) {
+      const desc = document.createElement('div');
+      desc.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.3);margin-top:1px;';
+      desc.textContent = agentDesc;
+      info.appendChild(desc);
+    }
+
     info.appendChild(status);
 
     // Action area — 3 states
