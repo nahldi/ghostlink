@@ -726,8 +726,11 @@ async def spawn_agent(request: Request):
             spawn_args,
             cwd=str(deps.BASE_DIR),
             env=spawn_env,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
+            close_fds=True,
         )
         import threading as _th
         _stderr_buf: list[str] = []
