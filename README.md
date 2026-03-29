@@ -22,7 +22,7 @@
 
 GhostLink puts all your AI agents in one shared chat room. They talk to each other and to you — in real time. No more switching tabs between Claude, Codex, Gemini, and Grok.
 
-- **Multiple AI providers in one interface** — connect any combination of 13 supported agents
+- **Multiple AI agents in one interface** — spawn any combination of 13 supported CLI agents
 - **Agents collaborate** — they hand off tasks, debate approaches, and build on each other's work
 - **Everything runs locally** — your data never leaves your machine, no telemetry
 - **Works with free AI** — Gemini free tier, Ollama local models, Groq, Together AI, Hugging Face
@@ -31,7 +31,9 @@ GhostLink puts all your AI agents in one shared chat room. They talk to each oth
 
 ---
 
-## Supported Agents (13)
+## Supported CLI Agents (13)
+
+These are the AI coding agents you can spawn and run inside GhostLink:
 
 | Agent | Provider | Cost | Install |
 |-------|----------|------|---------|
@@ -53,7 +55,9 @@ You don't need all of them. Start with just one — even a free option like Gemi
 
 ---
 
-## AI Providers (13)
+## API Providers (13)
+
+Separate from CLI agents, GhostLink can route requests to 13 API providers for chat, image generation, TTS, and more. Configure these in Settings > AI.
 
 | Provider | Capabilities | Free Tier |
 |----------|-------------|-----------|
@@ -71,7 +75,7 @@ You don't need all of them. Start with just one — even a free option like Gemi
 | Hugging Face | Chat, Image, STT | **Yes** |
 | Ollama | Chat, Code, Embedding | **Yes** (local) |
 
-Configure providers in Settings > AI. Paste an API key or use a free provider — GhostLink auto-detects capabilities and routes to the best available provider. Model failover is automatic — if one provider returns an error, GhostLink switches to the next available.
+Paste an API key or use a free provider — GhostLink auto-detects capabilities and routes to the best available provider. Model failover is automatic — if one provider returns an error, GhostLink switches to the next available.
 
 ---
 

@@ -422,6 +422,10 @@ const _extraAgents: { command: string; name: string; color: string; installCmd: 
   { command: 'goose',    name: 'Goose',    color: '#f59e0b', installCmd: 'brew install goose' },
   { command: 'opencode', name: 'OpenCode', color: '#22c55e', installCmd: 'curl -fsSL https://opencode.ai/install | bash' },
   { command: 'ollama',   name: 'Ollama',   color: '#ffffff', installCmd: 'curl -fsSL https://ollama.com/install.sh | sh' },
+  { command: 'pi',       name: 'Pi',       color: '#ff8c00', installCmd: 'npm i -g @anthropic-ai/pi' },
+  { command: 'cursor',   name: 'Cursor',   color: '#00b4d8', installCmd: 'Download from cursor.com' },
+  { command: 'cody',     name: 'Cody',     color: '#ff5733', installCmd: 'Download from sourcegraph.com/cody' },
+  { command: 'continue', name: 'Continue', color: '#7c3aed', installCmd: 'Install Continue extension in VS Code' },
 ];
 
 async function checkExtraAgent(agent: typeof _extraAgents[0]): Promise<AuthStatus> {
