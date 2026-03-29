@@ -212,10 +212,10 @@ const PRICING_MAP = {
   cody:      { label: 'Free Tier', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
   pi:        { label: 'Free Tier', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
   ollama:    { label: 'Local', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
-  aider:     { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-  goose:     { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-  opencode:  { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-  continue:  { label: 'Free', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  aider:     { label: 'Free + Setup', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  goose:     { label: 'Free + Setup', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  opencode:  { label: 'Free + Setup', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+  continue:  { label: 'Free + Setup', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
 };
 
 /**
