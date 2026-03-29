@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { AuthStatus } from './index';
-import { execCmd, hasCommand, isCommandNotFound, isWsl, spawnInTerminal, execAsync, terminalCommand, terminalShell } from './index';
+import { WSL_EXE, execCmd, hasCommand, isCommandNotFound, isWsl, spawnInTerminal, execAsync, terminalCommand, terminalShell } from './index';
 
 const PROVIDER = 'google';
 const NAME     = 'Gemini';
@@ -70,7 +70,7 @@ export async function checkGoogle(): Promise<AuthStatus> {
   // Check token files
   if (isWsl()) {
     try {
-      const checkDirs = await execAsync('wsl', ['bash', '-lc', '(test -d ~/.config/gemini || test -d ~/.gemini) && echo found'], {
+      const checkDirs = await execAsync(WSL_EXE, ['bash', '-lc', '(test -d ~/.config/gemini || test -d ~/.gemini) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(checkDirs).includes('found')) {

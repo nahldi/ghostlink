@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { AuthStatus } from './index';
-import { hasCommand, isWsl, spawnInTerminal, execAsync, terminalCommand, terminalShell } from './index';
+import { WSL_EXE, hasCommand, isWsl, spawnInTerminal, execAsync, terminalCommand, terminalShell } from './index';
 
 const PROVIDER = 'openai';
 const NAME     = 'Codex';
@@ -31,7 +31,7 @@ export async function checkOpenAI(): Promise<AuthStatus> {
     let hasApiKey = false;
     try {
       if (isWsl()) {
-        const envCheck = await execAsync('wsl', ['bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
+        const envCheck = await execAsync(WSL_EXE, ['bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
           encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
         });
         hasApiKey = String(envCheck).includes('set');
@@ -49,14 +49,14 @@ export async function checkOpenAI(): Promise<AuthStatus> {
   // Check auth — look for config dirs and API key
   try {
     if (isWsl()) {
-      const checkDirs = await execAsync('wsl', ['bash', '-lc', '(test -d ~/.codex || test -d ~/.config/codex) && echo found'], {
+      const checkDirs = await execAsync(WSL_EXE, ['bash', '-lc', '(test -d ~/.codex || test -d ~/.config/codex) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(checkDirs).includes('found')) {
         return { ...base, authenticated: true };
       }
 
-      const envCheck = await execAsync('wsl', ['bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
+      const envCheck = await execAsync(WSL_EXE, ['bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(envCheck).includes('set')) {

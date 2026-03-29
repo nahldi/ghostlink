@@ -7,7 +7,7 @@
  */
 
 import type { AuthStatus } from './index';
-import { execCmd, isWsl, isCommandNotFound, spawnInTerminal, hasClaudeCli, execAsync, terminalCommand, terminalShell } from './index';
+import { WSL_EXE, execCmd, isWsl, isCommandNotFound, spawnInTerminal, hasClaudeCli, execAsync, terminalCommand, terminalShell } from './index';
 
 const PROVIDER = 'anthropic';
 const NAME     = 'Claude';
@@ -29,7 +29,7 @@ export async function checkAnthropic(): Promise<AuthStatus> {
   let hasApiKey = false;
   try {
     if (isWsl()) {
-      const envCheck = await execAsync('wsl', ['bash', '-lc', 'test -n "$ANTHROPIC_API_KEY" && echo set'], {
+      const envCheck = await execAsync(WSL_EXE, ['bash', '-lc', 'test -n "$ANTHROPIC_API_KEY" && echo set'], {
         encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5_000,
       });
       hasApiKey = String(envCheck).includes('set');
@@ -68,7 +68,7 @@ export async function checkAnthropic(): Promise<AuthStatus> {
   // Check ~/.claude/ directory (indicates prior auth session)
   try {
     if (isWsl()) {
-      const result = await execAsync('wsl', ['bash', '-lc', 'test -d ~/.claude && echo found'], {
+      const result = await execAsync(WSL_EXE, ['bash', '-lc', 'test -d ~/.claude && echo found'], {
         encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5_000,
       });
       if (String(result).includes('found')) {

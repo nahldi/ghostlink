@@ -86,8 +86,11 @@ function assertSafeCommandName(name: string): void {
   }
 }
 
+// Use full path to wsl.exe to ensure packaged app finds it
+export const WSL_EXE = process.platform === 'win32' ? 'C:\\Windows\\System32\\wsl.exe' : 'wsl';
+
 async function execWslBash(args: string[], options: any = {}): Promise<string> {
-  return execFileAsync('wsl', ['bash', ...args], {
+  return execFileAsync(WSL_EXE, ['bash', ...args], {
     windowsHide: true,
     ...options,
   });
@@ -154,7 +157,7 @@ export function isWsl(): boolean {
   if (_wslDetected === null) {
     try {
       const { execFileSync } = require('child_process');
-      execFileSync('wsl', ['echo', 'ok'], { stdio: 'pipe', timeout: 3000, windowsHide: true });
+      execFileSync(WSL_EXE, ['echo', 'ok'], { stdio: 'pipe', timeout: 3000, windowsHide: true });
       _wslDetected = true;
     } catch {
       _wslDetected = false;
