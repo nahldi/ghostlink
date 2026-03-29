@@ -99,15 +99,20 @@ def route_mentions(sender: str, text: str, channel: str):
 
     agent_names = [inst.name for inst in deps.registry.get_all()]
     targets = []
+    preliminary_targets: list[str] = []
 
     if mentions:
         if "all" in mentions:
-            targets = [n for n in agent_names if n != sender]
+            preliminary_targets = [n for n in agent_names if n != sender]
         else:
-            targets = [m for m in mentions if m in agent_names and m != sender]
+            preliminary_targets = [m for m in mentions if m in agent_names and m != sender]
 
         # Loop guard via router
         targets = deps.router_inst.get_targets(sender, text, channel, agent_names)
+        log.info(
+            "[routing] sender=%s channel=%s mentions=%s agent_names=%s preliminary_targets=%s router_targets=%s",
+            sender, channel, mentions, agent_names, preliminary_targets, targets,
+        )
 
     # Add agents with 'always' or 'listen' responseMode (even without @mention)
     for inst in deps.registry.get_all():
@@ -133,5 +138,9 @@ def route_mentions(sender: str, text: str, channel: str):
         queue_file = deps.DATA_DIR / f"{target}_queue.jsonl"
         try:
             _append_jsonl_locked(queue_file, {"channel": channel})
+            log.info("[routing] queued target=%s queue_file=%s", target, queue_file)
         except Exception as e:
             log.warning("Queue write failed for %s: %s", target, e)
+
+    if mentions and not targets:
+        log.info("[routing] mentions_present_but_no_targets sender=%s channel=%s mentions=%s agent_names=%s", sender, channel, mentions, agent_names)
