@@ -140,9 +140,22 @@ export function getSettings(): Record<string, any> | null {
   }
 }
 
+let _wslDetected: boolean | null = null;
 export function isWsl(): boolean {
   const settings = getSettings();
-  return settings?.platform === 'wsl';
+  if (settings?.platform === 'wsl') return true;
+  if (settings?.platform === 'windows' || settings?.platform === 'macos' || settings?.platform === 'linux') return false;
+  // Auto-detect WSL if platform not explicitly set (fresh install)
+  if (_wslDetected === null) {
+    try {
+      const { execFileSync } = require('child_process');
+      execFileSync('wsl', ['echo', 'ok'], { stdio: 'pipe', timeout: 3000, windowsHide: true });
+      _wslDetected = true;
+    } catch {
+      _wslDetected = false;
+    }
+  }
+  return _wslDetected;
 }
 
 export function winToWsl(windowsPath: string): string {
