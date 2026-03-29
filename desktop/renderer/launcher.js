@@ -218,9 +218,15 @@ function renderProviders(statuses) {
   providerStatuses = statuses;
   while ($providers.firstChild) $providers.removeChild($providers.firstChild);
 
-  // Split: connected/installed go in Connections, rest go in Supported Agents
+  // Show ALL agents in Connections with real status — no hiding
   const connected = statuses.filter(s => s.authenticated || s.installed);
   const notInstalled = statuses.filter(s => !s.authenticated && !s.installed);
+
+  // If detection returned nothing, show explicit message
+  if (statuses.length === 0) {
+    renderConnectionsEmptyState();
+    return;
+  }
 
   // Populate Supported Agents section with not-installed ones
   const $agentsBody = document.getElementById('agents-body');
@@ -263,12 +269,11 @@ function renderProviders(statuses) {
     }
   }
 
-  // Only show connected/installed in Connections
-  if (connected.length === 0) {
-    renderConnectionsEmptyState();
-  }
+  // Show ALL agents — connected ones first, then not-installed with Install buttons
+  // Never show empty connections when we have statuses
+  const allToShow = connected.length > 0 ? connected : statuses;
 
-  connected.forEach((s) => {
+  allToShow.forEach((s) => {
     const card = document.createElement('div');
     card.className = 'provider-card';
     card.dataset.provider = s.provider;

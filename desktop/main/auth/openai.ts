@@ -46,13 +46,13 @@ export async function checkOpenAI(): Promise<AuthStatus> {
   }
   base.installed = true;
 
-  // Check auth — look for config dirs and API key
+  // Check auth — prefer the actual Codex auth file over loose directory existence.
   try {
     if (isWsl()) {
-      const checkDirs = await execAsync(WSL_EXE, ['bash', '-lc', '(test -d ~/.codex || test -d ~/.config/codex) && echo found'], {
+      const authFile = await execAsync(WSL_EXE, ['bash', '-lc', '(test -f ~/.codex/auth.json || test -f ~/.config/codex/auth.json) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
-      if (String(checkDirs).includes('found')) {
+      if (String(authFile).includes('found')) {
         return { ...base, authenticated: true };
       }
 
@@ -64,16 +64,13 @@ export async function checkOpenAI(): Promise<AuthStatus> {
       }
     } else {
       const home = os.homedir();
-      const configDirs = [
-        path.join(home, '.codex'),
-        path.join(home, '.config', 'codex'),
+      const authFiles = [
+        path.join(home, '.codex', 'auth.json'),
+        path.join(home, '.config', 'codex', 'auth.json'),
       ];
-      for (const dir of configDirs) {
-        if (fs.existsSync(dir)) {
-          try {
-            const files = fs.readdirSync(dir);
-            if (files.length > 0) return { ...base, authenticated: true };
-          } catch {}
+      for (const file of authFiles) {
+        if (fs.existsSync(file)) {
+          return { ...base, authenticated: true };
         }
       }
       if (process.env.OPENAI_API_KEY) {

@@ -65,10 +65,10 @@ export async function checkAnthropic(): Promise<AuthStatus> {
     }
   }
 
-  // Check ~/.claude/ directory (indicates prior auth session)
+  // Check the actual Claude credentials file, not just any ~/.claude directory.
   try {
     if (isWsl()) {
-      const result = await execAsync(WSL_EXE, ['bash', '-lc', 'test -d ~/.claude && echo found'], {
+      const result = await execAsync(WSL_EXE, ['bash', '-lc', 'test -f ~/.claude/.credentials.json && echo found'], {
         encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5_000,
       });
       if (String(result).includes('found')) {
@@ -78,7 +78,7 @@ export async function checkAnthropic(): Promise<AuthStatus> {
       const { existsSync } = require('fs');
       const { join } = require('path');
       const { homedir } = require('os');
-      if (existsSync(join(homedir(), '.claude'))) {
+      if (existsSync(join(homedir(), '.claude', '.credentials.json'))) {
         return { ...base, authenticated: true, user: '(session)' };
       }
     }

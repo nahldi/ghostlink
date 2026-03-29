@@ -67,30 +67,24 @@ export async function checkGoogle(): Promise<AuthStatus> {
     }
   }
 
-  // Check token files
+  // Check the actual Gemini OAuth credential file, not just a non-empty config dir.
   if (isWsl()) {
     try {
-      const checkDirs = await execAsync(WSL_EXE, ['bash', '-lc', '(test -d ~/.config/gemini || test -d ~/.gemini) && echo found'], {
+      const authFile = await execAsync(WSL_EXE, ['bash', '-lc', '(test -f ~/.gemini/oauth_creds.json || test -f ~/.config/gemini/oauth_creds.json) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
-      if (String(checkDirs).includes('found')) {
+      if (String(authFile).includes('found')) {
         return { ...base, authenticated: true, user: 'token-file' };
       }
     } catch {}
   } else {
     const tokenPaths = [
-      path.join(os.homedir(), '.config', 'gemini'),
-      path.join(os.homedir(), '.gemini'),
+      path.join(os.homedir(), '.config', 'gemini', 'oauth_creds.json'),
+      path.join(os.homedir(), '.gemini', 'oauth_creds.json'),
     ];
-    for (const dir of tokenPaths) {
-      if (fs.existsSync(dir)) {
-        // Verify directory contains actual token/config files, not just an empty dir
-        try {
-          const files = fs.readdirSync(dir);
-          if (files.length > 0) {
-            return { ...base, authenticated: true, user: 'token-file' };
-          }
-        } catch {}
+    for (const file of tokenPaths) {
+      if (fs.existsSync(file)) {
+        return { ...base, authenticated: true, user: 'token-file' };
       }
     }
   }
