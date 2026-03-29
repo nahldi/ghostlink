@@ -366,7 +366,7 @@ def _validate_spawn_args(base: str, extra_args: object, cfg_args: object) -> lis
 async def _wait_for_spawn_health(proc: subprocess.Popen, base: str, stderr_buf: list[str]) -> None:
     delay = 0.25
     max_delay = 2.0
-    deadline = time.time() + 6.0
+    deadline = time.time() + 15.0
 
     while time.time() < deadline:
         if proc.poll() is not None:
@@ -414,6 +414,29 @@ def _drain_pipe(pipe, agent_base: str, buf: list | None = None, log_path: Path |
             pass
 
 
+async def _post_register_setup(agent_name: str) -> None:
+    """Run slow registration side effects after the wrapper gets its response."""
+    try:
+        inst = deps.registry.get(agent_name)
+        if inst is None:
+            return
+        if hasattr(deps, "worktree_manager") and deps.worktree_manager:
+            await asyncio.to_thread(deps.worktree_manager.create_worktree, inst.name)
+        else:
+            _warn_missing_worktree_manager("register", inst.name)
+        from app_helpers import get_full_agent_list
+        await deps.broadcast("status", {"agents": get_full_agent_list()})
+        await _record_activity("agent_join", f"{inst.label or inst.name} connected", agent=inst.name)
+        await add_replay_event(inst.name, "agent_join", title="Agent connected", detail="Session started", surface="session")
+        await set_agent_presence(inst.name, surface="session", status="Connected", detail="Agent online", state=inst.state)
+        event_bus.emit("on_agent_join", {"agent": inst.name, "label": inst.label or inst.name})
+        if getattr(deps, "automation_manager", None):
+            await deps.automation_manager.process_trigger("event", {"event": "agent_join", "agent": inst.name, "status": "online"})
+            await deps.automation_manager.process_trigger("agent_status", {"agent": inst.name, "status": "online"})
+    except Exception as exc:
+        log.warning("Post-register setup failed for %s: %s", agent_name, exc)
+
+
 @router.post("/api/register")
 async def register_agent(request: Request):
     body = await request.json()
@@ -427,10 +450,6 @@ async def register_agent(request: Request):
     inst = deps.registry.register(base, label, color)
     if role:
         inst.role = role
-    if hasattr(deps, "worktree_manager") and deps.worktree_manager:
-        deps.worktree_manager.create_worktree(inst.name)
-    else:
-        _warn_missing_worktree_manager("register", inst.name)
     if wrapper_pid is not None:
         try:
             pid_int = int(wrapper_pid)
@@ -441,15 +460,7 @@ async def register_agent(request: Request):
                 proc = deps._pending_spawns.pop(pid_int, None)
                 if proc is not None:
                     deps._agent_processes[inst.name] = proc
-    from app_helpers import get_full_agent_list
-    await deps.broadcast("status", {"agents": get_full_agent_list()})
-    await _record_activity("agent_join", f"{inst.label or inst.name} connected", agent=inst.name)
-    await add_replay_event(inst.name, "agent_join", title="Agent connected", detail="Session started", surface="session")
-    await set_agent_presence(inst.name, surface="session", status="Connected", detail="Agent online", state=inst.state)
-    event_bus.emit("on_agent_join", {"agent": inst.name, "label": inst.label or inst.name})
-    if getattr(deps, "automation_manager", None):
-        await deps.automation_manager.process_trigger("event", {"event": "agent_join", "agent": inst.name, "status": "online"})
-        await deps.automation_manager.process_trigger("agent_status", {"agent": inst.name, "status": "online"})
+    asyncio.create_task(_post_register_setup(inst.name))
     return inst.to_dict()
 
 

@@ -283,7 +283,7 @@ def _register(server_port: int, base: str, label: str = "", role: str = "") -> d
         data=body,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=5) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read())
 
 
