@@ -115,7 +115,7 @@ async function commandExists(commandName: string): Promise<boolean> {
       log.info(`[auth] commandExists(${commandName}): checking via WSL`);
       await execWslBash([
         '-lc',
-        `${WSL_PATH_PREFIX}; command -v "$1" >/dev/null 2>&1`,
+        `${WSL_PATH_PREFIX}; type -P "$1" >/dev/null 2>&1`,
         'bash',
         commandName,
       ], { stdio: 'pipe', timeout: 5_000 });
@@ -433,7 +433,7 @@ async function checkExtraAgent(agent: typeof _extraAgents[0]): Promise<AuthStatu
   return {
     provider: agent.command,
     name: agent.name,
-    authenticated: installed,
+    authenticated: false,  // Extra agents: no real auth check, only install detection
     installed,
     icon: agent.command,
     color: agent.color,
