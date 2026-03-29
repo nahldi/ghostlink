@@ -7,7 +7,7 @@
  * On first run (no settings file), shows the setup wizard before the launcher.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage } from 'electron';
 import log from 'electron-log';
 import path from 'path';
 import fs from 'fs';
@@ -607,11 +607,22 @@ function setupIPC(): void {
       // Save to process env so auth checks pick it up immediately
       process.env[envVar] = key;
 
-      // Persist to settings for next startup
+      // Persist encrypted key to settings for next startup
       const currentSettings = loadSettingsFile() as Record<string, any> | null;
       if (currentSettings) {
-        if (!currentSettings.apiKeys) currentSettings.apiKeys = {};
-        (currentSettings.apiKeys as Record<string, string>)[provider] = key;
+        if (!currentSettings.encryptedKeys) currentSettings.encryptedKeys = {};
+        if (safeStorage.isEncryptionAvailable()) {
+          const encrypted = safeStorage.encryptString(key).toString('base64');
+          (currentSettings.encryptedKeys as Record<string, string>)[provider] = encrypted;
+        } else {
+          // Fallback: at least don't store raw — use basic obfuscation
+          (currentSettings.encryptedKeys as Record<string, string>)[provider] = Buffer.from(key).toString('base64');
+        }
+        // Remove any legacy plaintext keys
+        if (currentSettings.apiKeys) {
+          delete (currentSettings.apiKeys as Record<string, any>)[provider];
+          if (Object.keys(currentSettings.apiKeys).length === 0) delete currentSettings.apiKeys;
+        }
         saveSettingsFile(currentSettings);
       }
 
@@ -738,6 +749,30 @@ app.whenReady().then(async () => {
   // Wire up IPC (always needed — both wizard and launcher use shared channels)
   setupWizardIPC();
   setupIPC();
+
+  // Restore encrypted API keys to process.env on startup
+  try {
+    const startupSettings = loadSettings();
+    const encKeys = (startupSettings as any)?.encryptedKeys as Record<string, string> | undefined;
+    if (encKeys) {
+      const PROVIDER_ENV_MAP: Record<string, string> = {
+        anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY',
+        google: 'GEMINI_API_KEY', github: 'GITHUB_TOKEN',
+      };
+      for (const [provider, encrypted] of Object.entries(encKeys)) {
+        const envVar = PROVIDER_ENV_MAP[provider];
+        if (!envVar || process.env[envVar]) continue; // don't overwrite existing env
+        try {
+          if (safeStorage.isEncryptionAvailable()) {
+            process.env[envVar] = safeStorage.decryptString(Buffer.from(encrypted, 'base64'));
+          } else {
+            process.env[envVar] = Buffer.from(encrypted, 'base64').toString('utf-8');
+          }
+          log.info(`Restored API key for ${provider} from encrypted storage`);
+        } catch { /* key decrypt failed — skip */ }
+      }
+    }
+  } catch { /* settings not loaded yet — skip */ }
 
   // Check if first run
   if (settingsExist()) {
