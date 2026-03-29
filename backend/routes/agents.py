@@ -38,6 +38,7 @@ _KNOWN_AGENT_ARG_PRESETS: dict[str, set[tuple[str, ...]]] = {
     },
     "codex": {
         (),
+        ("--dangerously-bypass-approvals-and-sandbox",),
         ("--sandbox", "danger-full-access", "-a", "never"),
         ("--full-auto",),
     },
@@ -582,7 +583,7 @@ async def agent_templates(connected: str = ""):
         })
     KNOWN_AGENTS = [
         ("claude", "claude", "Claude", "#e8734a", "Anthropic", ["--dangerously-skip-permissions"]),
-        ("codex", "codex", "Codex", "#10a37f", "OpenAI", ["--sandbox", "danger-full-access", "-a", "never"]),
+        ("codex", "codex", "Codex", "#10a37f", "OpenAI", ["--dangerously-bypass-approvals-and-sandbox"]),
         ("gemini", "gemini", "Gemini", "#4285f4", "Google", ["-y"]),
         ("grok", "grok", "Grok", "#ff6b35", "xAI", []),
         ("copilot", "gh", "Copilot", "#6cc644", "GitHub", ["copilot", "chat"]),
