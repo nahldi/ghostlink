@@ -278,6 +278,19 @@ async def lifespan(_app: FastAPI):
 
     _load_settings()
     deps._settings["_server_start"] = time.time()
+
+    # Clean up stale ghostlink tmux sessions from previous runs
+    try:
+        import subprocess as _sp
+        result = _sp.run(['tmux', 'list-sessions', '-F', '#{session_name}'],
+                         capture_output=True, text=True, timeout=5)
+        for session in result.stdout.strip().split('\n'):
+            if session.startswith('ghostlink-'):
+                _sp.run(['tmux', 'kill-session', '-t', session],
+                        capture_output=True, timeout=5)
+                log.info("Cleaned up stale tmux session: %s", session)
+    except Exception:
+        pass  # tmux not available or no sessions — fine
     if not HAS_AIOHTTP:
         log.warning("aiohttp is not installed; pooled outbound HTTP features are disabled")
 
