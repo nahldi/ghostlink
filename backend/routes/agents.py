@@ -83,6 +83,18 @@ def _which_cli(command: str, path_value: str | None = None) -> str | None:
     return shutil.which(command, path=_expanded_cli_path(path_value))
 
 
+def _workspace_spawn_warning(cwd: str) -> str | None:
+    path = Path(cwd)
+    parts_lower = {part.lower() for part in path.parts}
+    is_wsl_mounted_windows_path = len(path.parts) >= 3 and path.parts[0] == "/" and path.parts[1] == "mnt"
+    if is_wsl_mounted_windows_path and any(part.startswith("onedrive") for part in parts_lower):
+        return (
+            "Workspace is on OneDrive via /mnt. Some agent CLIs may fail or behave unpredictably "
+            "from WSL-mounted OneDrive folders. A local Linux workspace path is safer."
+        )
+    return None
+
+
 def _warn_missing_worktree_manager(action: str, agent_name: str) -> None:
     log.warning("Worktree cleanup skipped during %s for %s: manager unavailable", action, agent_name)
 
@@ -628,6 +640,7 @@ async def spawn_agent(request: Request):
     cwd = body.get("cwd", "").strip()
     extra_args = body.get("args", [])
     role_description = body.get("roleDescription", "").strip()
+    spawn_warning: str | None = None
 
     if not base:
         return JSONResponse({"error": "base is required"}, 400)
@@ -643,6 +656,7 @@ async def spawn_agent(request: Request):
         if any(cwd_str.startswith(b) for b in blocked):
             return JSONResponse({"error": "workspace path not allowed"}, 400)
         cwd = cwd_str
+        spawn_warning = _workspace_spawn_warning(cwd)
 
     # Resolve the agent command — check config.toml first, then known agent defaults
     agents_cfg = deps.CONFIG.get("agents", {})
@@ -786,12 +800,15 @@ async def spawn_agent(request: Request):
                 deps._pending_spawns.pop(proc.pid, None)
             return JSONResponse({"error": error_msg}, 400)
 
-        return {
+        payload = {
             "ok": True,
             "pid": proc.pid,
             "base": base,
             "message": f"Agent '{base}' spawning (pid {proc.pid})",
         }
+        if spawn_warning:
+            payload["warning"] = spawn_warning
+        return payload
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
 
