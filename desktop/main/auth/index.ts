@@ -106,8 +106,10 @@ export async function execWslCommand(command: string, args: string[] = [], optio
 
 async function commandExists(commandName: string): Promise<boolean> {
   assertSafeCommandName(commandName);
+  const log = require('electron-log');
   try {
     if (isWsl()) {
+      log.info(`[auth] commandExists(${commandName}): checking via WSL`);
       await execWslBash([
         '-lc',
         `${WSL_PATH_PREFIX}; command -v "$1" >/dev/null 2>&1`,
@@ -116,14 +118,17 @@ async function commandExists(commandName: string): Promise<boolean> {
       ], { stdio: 'pipe', timeout: 5_000 });
     } else {
       const checker = process.platform === 'win32' ? 'where' : 'which';
+      log.info(`[auth] commandExists(${commandName}): checking via ${checker}`);
       await execFileAsync(checker, [commandName], {
         windowsHide: true,
         stdio: 'pipe',
         timeout: 5_000,
       });
     }
+    log.info(`[auth] commandExists(${commandName}): FOUND`);
     return true;
-  } catch {
+  } catch (err: unknown) {
+    log.info(`[auth] commandExists(${commandName}): NOT FOUND (${err instanceof Error ? err.message : String(err)})`);
     return false;
   }
 }
@@ -432,12 +437,19 @@ async function checkExtraAgent(agent: typeof _extraAgents[0]): Promise<AuthStatu
 
 class AuthManager {
   async checkAll(): Promise<AuthStatus[]> {
+    const log = require('electron-log');
+    log.info('[auth] checkAll starting, isWsl=' + isWsl() + ', platform=' + (getSettings()?.platform || 'unset'));
+
     const mainResults = await Promise.allSettled(
       Object.values(_providers).map(p => p.check())
     );
     const main = mainResults.map((r, i) => {
-      if (r.status === 'fulfilled') return r.value;
       const key = Object.keys(_providers)[i];
+      if (r.status === 'fulfilled') {
+        log.info(`[auth] ${key}: installed=${r.value.installed}, authenticated=${r.value.authenticated}, error=${r.value.error || 'none'}`);
+        return r.value;
+      }
+      log.warn(`[auth] ${key}: check REJECTED: ${(r as PromiseRejectedResult).reason}`);
       return {
         provider: key,
         name: key,
@@ -446,7 +458,7 @@ class AuthManager {
         icon: key,
         color: '#888',
         command: key,
-        error: 'Check failed',
+        error: 'Check failed: ' + String((r as PromiseRejectedResult).reason),
       };
     });
 

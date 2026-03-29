@@ -120,9 +120,11 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
     api.getAgentTemplates(connectedBases).then((r) => {
       setTemplates(r.templates);
       const available = r.templates.filter(t => t.available);
-      if (available.length > 0) {
-        setSelected(available[0].base);
-      }
+      // Preserve current selection if still available, otherwise pick first
+      setSelected((prev) => {
+        if (prev && available.some(t => t.base === prev)) return prev;
+        return available.length > 0 ? available[0].base : '';
+      });
     }).catch((e) => console.warn('Agent templates fetch:', e.message || e));
   }, [agentBases, persistentBases]);
 
