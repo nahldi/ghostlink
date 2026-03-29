@@ -151,6 +151,8 @@ export interface Settings {
   showTypingIndicator?: boolean;
   showTimestamps?: boolean;
   showSenderLabels?: boolean;
+  // Experience mode — controls UI density and feature visibility
+  experienceMode?: 'beginner' | 'standard' | 'advanced';
   // First-run
   setupComplete?: boolean;
 }

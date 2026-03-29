@@ -286,6 +286,7 @@ export const useChatStore = create<ChatState>((set) => ({
     desktopNotifications: false,
     quietHoursStart: 22,
     quietHoursEnd: 8,
+    experienceMode: 'standard' as const,
     debugMode: false,
     showStatsPanel: true,
     statsSections: { session: true, tokens: true, agents: true, activity: true },

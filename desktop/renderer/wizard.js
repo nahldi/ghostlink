@@ -31,7 +31,7 @@ if (!api) {
 // ── State ────────────────────────────────────────────────────────────────────
 
 let currentStep = 0;
-const totalSteps = 6; // 0-5
+const totalSteps = 7; // 0-6
 
 const settings = {
   platform: 'windows',
@@ -43,6 +43,7 @@ const settings = {
   theme: 'dark',
   autoStart: false,
   setupComplete: true,
+  experienceMode: 'standard',
 };
 
 let wslAvailable = false;
@@ -100,7 +101,7 @@ function goToStep(step) {
   if (currentStep === 3) {
     runPythonCheck();
   }
-  if (currentStep === 5) {
+  if (currentStep === 6) {
     renderSummary();
   }
 }
@@ -326,7 +327,23 @@ document.getElementById('btn-workspace-next')?.addEventListener('click', () => {
   nextStep();
 });
 
-// ── Screen 5: Done ───────────────────────────────────────────────────────────
+// ── Screen 5: Experience Mode ────────────────────────────────────────────────
+
+document.querySelectorAll('#experience-radios .radio-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('#experience-radios .radio-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    const radio = card.querySelector('input[type="radio"]');
+    radio.checked = true;
+    settings.experienceMode = radio.value;
+  });
+});
+
+document.getElementById('btn-experience-next')?.addEventListener('click', () => {
+  nextStep();
+});
+
+// ── Screen 6: Done ───────────────────────────────────────────────────────────
 
 function renderSummary() {
   const $summary = document.getElementById('settings-summary');
@@ -345,11 +362,18 @@ function renderSummary() {
     terminal: 'Terminal',
   };
 
+  const modeLabels = {
+    beginner: 'Beginner',
+    standard: 'Standard',
+    advanced: 'Advanced',
+  };
+
   const rows = [
     ['Platform', platformLabels[settings.platform] || settings.platform],
     ['Shell', shellLabels[settings.shell] || settings.shell],
     ['Python', settings.pythonVersion || settings.pythonPath || 'Not detected'],
     ['Workspace', settings.workspace || 'Not set'],
+    ['Experience', modeLabels[settings.experienceMode] || 'Standard'],
     ['Port', String(settings.port)],
   ];
 

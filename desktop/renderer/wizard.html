@@ -27,6 +27,7 @@
       <span class="step-dot" data-step="3"></span>
       <span class="step-dot" data-step="4"></span>
       <span class="step-dot" data-step="5"></span>
+      <span class="step-dot" data-step="6"></span>
     </div>
   </div>
 
@@ -168,8 +169,43 @@
       </div>
     </div>
 
-    <!-- Screen 5: Done -->
+    <!-- Screen 5: Experience Mode -->
     <div class="wizard-screen" data-screen="5">
+      <div class="screen-body">
+        <h2 class="screen-heading">How experienced are you with AI tools?</h2>
+        <p class="screen-desc">This adjusts the interface complexity. You can change this anytime in Settings.</p>
+        <div class="radio-group" id="experience-radios">
+          <label class="radio-card selected" data-value="standard">
+            <input type="radio" name="experience" value="standard" checked>
+            <div class="radio-content">
+              <span class="radio-label">Standard</span>
+              <span class="radio-hint">Balanced view with all features accessible. Recommended for most users.</span>
+            </div>
+          </label>
+          <label class="radio-card" data-value="beginner">
+            <input type="radio" name="experience" value="beginner">
+            <div class="radio-content">
+              <span class="radio-label">Beginner</span>
+              <span class="radio-hint">Simplified interface with guided actions. Free agents highlighted first.</span>
+            </div>
+          </label>
+          <label class="radio-card" data-value="advanced">
+            <input type="radio" name="experience" value="advanced">
+            <div class="radio-content">
+              <span class="radio-label">Advanced</span>
+              <span class="radio-hint">Full controls, debug tools, agent config, and terminal access visible.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="screen-footer">
+        <button class="secondary-btn btn-back" data-back>Back</button>
+        <button class="primary-btn btn-next" id="btn-experience-next">Next</button>
+      </div>
+    </div>
+
+    <!-- Screen 6: Done -->
+    <div class="wizard-screen" data-screen="6">
       <div class="screen-body centered">
         <div class="done-check">&#10003;</div>
         <h1 class="wizard-title">You're all set!</h1>
