@@ -23,7 +23,7 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 _VALID_AGENT_NAME = deps._VALID_AGENT_NAME
-_SAFE_AGENT_ARG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/=+\-@]*$")
+_SAFE_AGENT_ARG_RE = re.compile(r"^[-A-Za-z0-9][A-Za-z0-9._:/=+\-@]*$")
 _KNOWN_AGENT_ARG_PRESETS: dict[str, set[tuple[str, ...]]] = {
     "claude": {
         (),
