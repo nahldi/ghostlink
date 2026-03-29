@@ -33,6 +33,11 @@ except ModuleNotFoundError:
 
 ROOT = Path(__file__).parent
 SERVER_NAME = "ghostlink"
+_CLI_PATH_HINTS = (
+    str(Path.home() / ".npm-global" / "bin"),
+    str(Path.home() / ".local" / "bin"),
+    "/usr/local/bin",
+)
 
 # ── v2.5.0: ANSI escape code pattern for thinking output cleanup ──
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[.*?[@-~]')
@@ -49,6 +54,15 @@ _THINKING_FILTER_PATTERNS = [
     re.compile(r'^\s*\$\s*(?:claude|codex|gemini|grok|aider|ollama)\b.*', re.MULTILINE),
     re.compile(r'^\s*env\s+-u\s+\S+.*$', re.MULTILINE),
 ]
+
+
+def _expanded_cli_path(path_value: str | None = None) -> str:
+    existing = [p for p in (path_value or os.environ.get("PATH", "")).split(os.pathsep) if p]
+    ordered: list[str] = []
+    for candidate in [*_CLI_PATH_HINTS, *existing]:
+        if candidate and candidate not in ordered:
+            ordered.append(candidate)
+    return os.pathsep.join(ordered)
 
 
 def _sanitize_thinking(text: str) -> str:
@@ -800,8 +814,10 @@ def main():
     if queue_file.exists():
         queue_file.write_text("", "utf-8")
 
-    # Resolve command
-    resolved = shutil.which(command)
+    # Resolve command against the same expanded PATH the server uses.
+    cli_path = _expanded_cli_path()
+    os.environ["PATH"] = cli_path
+    resolved = shutil.which(command, path=cli_path)
     if not resolved:
         print(f"  Error: '{command}' not found on PATH.")
         sys.exit(1)
@@ -812,6 +828,7 @@ def main():
     # Build MCP config via inject system
     strip_vars = {"CLAUDECODE"} | set(agent_cfg.get("strip_env", []))
     env = {k: v for k, v in os.environ.items() if k not in strip_vars}
+    env["PATH"] = cli_path
 
     mcp_args, inject_env, mcp_settings_path = _apply_mcp_inject(
         inject_cfg, assigned_name, data_dir, proxy_url,

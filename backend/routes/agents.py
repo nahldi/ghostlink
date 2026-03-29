@@ -24,6 +24,11 @@ log = logging.getLogger(__name__)
 
 _VALID_AGENT_NAME = deps._VALID_AGENT_NAME
 _SAFE_AGENT_ARG_RE = re.compile(r"^[-A-Za-z0-9][A-Za-z0-9._:/=+\-@]*$")
+_CLI_PATH_HINTS = (
+    str(Path.home() / ".npm-global" / "bin"),
+    str(Path.home() / ".local" / "bin"),
+    "/usr/local/bin",
+)
 _KNOWN_AGENT_ARG_PRESETS: dict[str, set[tuple[str, ...]]] = {
     "claude": {
         (),
@@ -62,6 +67,19 @@ _KNOWN_MODEL_FLAGS: dict[str, str] = {
     "grok": "--model",
     "aider": "--model",
 }
+
+
+def _expanded_cli_path(path_value: str | None = None) -> str:
+    existing = [p for p in (path_value or os.environ.get("PATH", "")).split(os.pathsep) if p]
+    ordered: list[str] = []
+    for candidate in [*_CLI_PATH_HINTS, *existing]:
+        if candidate and candidate not in ordered:
+            ordered.append(candidate)
+    return os.pathsep.join(ordered)
+
+
+def _which_cli(command: str, path_value: str | None = None) -> str | None:
+    return shutil.which(command, path=_expanded_cli_path(path_value))
 
 
 def _warn_missing_worktree_manager(action: str, agent_name: str) -> None:
@@ -488,11 +506,16 @@ async def agent_templates(connected: str = ""):
         return result
 
     def _do_check_available(name: str, cmd: str) -> bool:
-        if _shutil.which(cmd):
+        if _which_cli(cmd):
             # Extra validation for agents that need subcommands/extensions
             if name == "copilot" and cmd == "gh":
                 try:
-                    r = subprocess.run(["gh", "copilot", "--help"], capture_output=True, timeout=5)
+                    r = subprocess.run(
+                        ["gh", "copilot", "--help"],
+                        capture_output=True,
+                        timeout=5,
+                        env={**os.environ, "PATH": _expanded_cli_path()},
+                    )
                     if r.returncode != 0:
                         return False
                 except Exception:
@@ -501,23 +524,23 @@ async def agent_templates(connected: str = ""):
         for key in _API_KEY_ENV.get(name, []):
             if os.environ.get(key):
                 return True
-        wsl_checks = [
-            f'which {cmd} 2>/dev/null',
-            f'command -v {cmd} 2>/dev/null',
-            f'test -f "$HOME/.nvm/versions/node/*/bin/{cmd}" 2>/dev/null && echo found',
-            f'test -f "/usr/local/bin/{cmd}" 2>/dev/null && echo found',
-            f'ls $(npm root -g 2>/dev/null)/.bin/{cmd} 2>/dev/null',
-        ]
-        for check in wsl_checks:
-            try:
-                r = subprocess.run(
-                    ['wsl', 'bash', '-ic', check],
-                    capture_output=True, timeout=8,
-                )
-                if r.returncode == 0 and r.stdout.strip():
-                    return True
-            except Exception:
-                pass
+        if sys.platform == "win32":
+            wsl_checks = [
+                f'which {cmd} 2>/dev/null',
+                f'test -f "$HOME/.nvm/versions/node/*/bin/{cmd}" 2>/dev/null && echo found',
+                f'test -f "/usr/local/bin/{cmd}" 2>/dev/null && echo found',
+                f'ls $(npm root -g 2>/dev/null)/.bin/{cmd} 2>/dev/null',
+            ]
+            for check in wsl_checks:
+                try:
+                    r = subprocess.run(
+                        ['wsl', 'bash', '-ic', check],
+                        capture_output=True, timeout=8,
+                    )
+                    if r.returncode == 0 and r.stdout.strip():
+                        return True
+                except Exception:
+                    pass
         return False
 
     agents_cfg = deps.CONFIG.get("agents", {})
@@ -608,32 +631,39 @@ async def spawn_agent(request: Request):
     import shutil as _shutil
 
     # Extra check for agents that need subcommands/extensions
-    if base == "copilot" and _shutil.which("gh"):
+    spawn_path = _expanded_cli_path()
+
+    if base == "copilot" and _which_cli("gh", spawn_path):
         try:
-            r = subprocess.run(["gh", "copilot", "--help"], capture_output=True, timeout=5)
+            r = subprocess.run(
+                ["gh", "copilot", "--help"],
+                capture_output=True,
+                timeout=5,
+                env={**os.environ, "PATH": spawn_path},
+            )
             if r.returncode != 0:
                 return JSONResponse({"error": "GitHub Copilot extension not installed. Run: gh extension install github/gh-copilot"}, 400)
         except Exception:
             return JSONResponse({"error": "GitHub Copilot extension not installed. Run: gh extension install github/gh-copilot"}, 400)
 
-    if not _shutil.which(command):
+    if not _which_cli(command, spawn_path):
         found_in_wsl = False
-        wsl_checks = [
-            f'which {command} 2>/dev/null',
-            f'command -v {command} 2>/dev/null',
-            f'npx --yes {command} --version 2>/dev/null && echo found',
-            f'test -f "$HOME/.nvm/versions/node/*/bin/{command}" 2>/dev/null && echo found',
-            f'ls $(npm root -g 2>/dev/null)/.bin/{command} 2>/dev/null',
-            f'pip show {command} 2>/dev/null && echo found',
-        ]
-        for check in wsl_checks:
-            try:
-                r = subprocess.run(['wsl', 'bash', '-ic', check], capture_output=True, timeout=10)
-                if r.returncode == 0 and r.stdout.strip():
-                    found_in_wsl = True
-                    break
-            except Exception:
-                pass
+        if sys.platform == "win32":
+            wsl_checks = [
+                f'which {command} 2>/dev/null',
+                f'npx --yes {command} --version 2>/dev/null && echo found',
+                f'test -f "$HOME/.nvm/versions/node/*/bin/{command}" 2>/dev/null && echo found',
+                f'ls $(npm root -g 2>/dev/null)/.bin/{command} 2>/dev/null',
+                f'pip show {command} 2>/dev/null && echo found',
+            ]
+            for check in wsl_checks:
+                try:
+                    r = subprocess.run(['wsl', 'bash', '-ic', check], capture_output=True, timeout=10)
+                    if r.returncode == 0 and r.stdout.strip():
+                        found_in_wsl = True
+                        break
+                except Exception:
+                    pass
         if not found_in_wsl:
             # Provide specific install instructions per agent
             _INSTALL_HINTS = {
@@ -685,6 +715,7 @@ async def spawn_agent(request: Request):
 
     try:
         spawn_env = os.environ.copy()
+        spawn_env["PATH"] = spawn_path
         if cwd:
             spawn_env["GHOSTLINK_AGENT_CWD"] = cwd
         if role_description:
