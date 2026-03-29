@@ -135,6 +135,12 @@ async def send_message(request: Request):
     if not channel or len(channel) > 50:
         return JSONResponse({"error": "invalid channel name (1-50 chars)"}, 400)
 
+    metadata_payload = {}
+    try:
+        metadata_payload = json.loads(metadata_str) if metadata_str else {}
+    except (json.JSONDecodeError, TypeError, ValueError):
+        metadata_payload = {}
+
     msg = await deps.store.add(
         sender=sender,
         text=text,
@@ -151,18 +157,20 @@ async def send_message(request: Request):
 
     # Forward to channel bridges (Discord, Telegram, etc.)
     try:
-        deps.bridge_manager.handle_ghostlink_message(sender, text, channel)
+        deps.bridge_manager.handle_ghostlink_message(
+            sender,
+            text,
+            channel,
+            msg_type=msg_type,
+            message_id=msg.get("id"),
+            metadata=metadata_payload,
+        )
     except Exception:
         pass
 
     # Emit event for hooks
     event_bus.emit("on_message", {"sender": sender, "text": text, "channel": channel, "id": msg.get("id")})
     if getattr(deps, "automation_manager", None):
-        metadata_payload = {}
-        try:
-            metadata_payload = json.loads(metadata_str) if metadata_str else {}
-        except (json.JSONDecodeError, TypeError, ValueError):
-            metadata_payload = {}
         await deps.automation_manager.process_trigger("event", {
             "event": "message_received",
             "sender": sender,

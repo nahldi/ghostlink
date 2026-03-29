@@ -1,5 +1,14 @@
 # GhostLink Changelog
 
+## v5.1.5 — 2026-03-29
+### In-App Auth + Experience Modes
+- **In-app API key auth** — paste API keys directly in the launcher, no terminal needed
+- **Encrypted key storage** — API keys encrypted via OS-level safeStorage (DPAPI/Keychain/libsecret)
+- **In-app browser OAuth** — Claude and Codex auth opens browser automatically from the launcher
+- **Experience modes** — Beginner/Standard/Advanced adapts SettingsPanel, AddAgentModal, AgentBar, CommandPalette
+- **Honest Gemini auth** — removed fake `gemini auth login` claims, uses API key / gcloud path
+- **Settings sanitizer** — preserves `encryptedKeys` and `experienceMode` through save/load
+
 ## v5.1.2 — 2026-03-29
 ### Multi-Agent Runtime + UX Overhaul
 - **WSL detection fixed** — `wsl.exe -e` flag resolves argument parsing, full path in all files
