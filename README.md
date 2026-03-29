@@ -79,6 +79,18 @@ Paste an API key or use a free provider — GhostLink auto-detects capabilities 
 
 ---
 
+## Quick Start
+
+1. **Download** the installer from [Releases](../../releases/latest) and install
+2. **Run the setup wizard** — pick your platform, set your workspace folder
+3. **Start the server** — click "Start Server" in the launcher
+4. **Add an agent** — click "+" in the chat to spawn Claude, Codex, Gemini, or any other agent
+5. **Chat** — type a message, @mention an agent, and watch them respond
+
+**Free to try:** Gemini has a free tier (1,000 requests/day). Ollama runs locally for free. No API key needed to get started with those.
+
+---
+
 ## Features
 
 ### Core Chat
