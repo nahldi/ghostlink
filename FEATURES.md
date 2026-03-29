@@ -100,14 +100,14 @@
 
 ### Settings & Configuration (v1.8.0)
 - [x] **Persistent agent editor** — edit label, workspace, CLI args, and color for saved agents
-- [x] **13 AI providers** — Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Perplexity, Cohere, OpenRouter, Groq, Together, HuggingFace, Ollama
+- [x] **13 API providers** — Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Perplexity, Cohere, OpenRouter, Groq, Together, HuggingFace, Ollama
 - [x] **Capability-based provider routing** — auto-selects best provider per capability
 - [x] **Free tier detection** — highlights free providers (Groq, Together, HuggingFace, Ollama)
 
 ### Additional
 - [x] **Cloudflare tunnel** — one-click remote access
 - [x] **Server shutdown endpoint** — graceful agent termination
-- [x] **13 known AI CLI agents** — Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama
+- [x] **13 supported CLI agents** — Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama
 - [x] **Brand-accurate SVG icons** — per-provider icons and colors
 - [x] **Agent thinking glow** — spinning border animation while agent works
 - [x] **Webhook integration** — CRUD for webhook endpoints
