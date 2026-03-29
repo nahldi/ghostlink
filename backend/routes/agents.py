@@ -370,19 +370,28 @@ async def _wait_for_spawn_health(proc: subprocess.Popen, base: str, stderr_buf: 
     deadline = time.time() + 15.0
 
     while time.time() < deadline:
-        if proc.poll() is not None:
-            await asyncio.sleep(0.2)
-            stderr_output = "\n".join(stderr_buf[-30:]).strip()
-            error_msg = stderr_output or f"Agent '{base}' exited immediately. Is the '{base}' CLI installed and authenticated?"
-            raise RuntimeError(error_msg)
-
+        # Check if registration completed (pid removed from pending by /api/register)
         async with deps._agent_lock:
             if proc.pid not in deps._pending_spawns:
                 return
 
+        if proc.poll() is not None:
+            # Process exited — but give registration a moment to finalize
+            await asyncio.sleep(1.0)
+            async with deps._agent_lock:
+                if proc.pid not in deps._pending_spawns:
+                    return  # Registered successfully despite early exit
+            stderr_output = "\n".join(stderr_buf[-30:]).strip()
+            error_msg = stderr_output or f"Agent '{base}' exited immediately. Is the '{base}' CLI installed and authenticated?"
+            raise RuntimeError(error_msg)
+
         await asyncio.sleep(delay)
         delay = min(max_delay, delay * 2)
 
+    # Deadline reached — check one more time if registration snuck in
+    async with deps._agent_lock:
+        if proc.pid not in deps._pending_spawns:
+            return
     if proc.poll() is not None:
         stderr_output = "\n".join(stderr_buf[-30:]).strip()
         error_msg = stderr_output or f"Agent '{base}' exited before registration completed."

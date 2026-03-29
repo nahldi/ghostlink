@@ -294,21 +294,36 @@ function renderProviders(statuses) {
 
     const notInstalled = !s.installed && !s.authenticated;
     const isConnected = s.authenticated;
+    const needsReauth = s.error && s.error.includes('re-auth');
     const installedNotAuth = s.installed && !s.authenticated;
 
     const status = document.createElement('div');
     if (isConnected) {
       status.className = 'provider-status connected';
-      status.innerHTML = '<span class="check">&#10003;</span> Connected' +
-        (s.user ? ' &middot; ' + escapeHtml(s.user) : '');
+      const check = document.createElement('span');
+      check.className = 'check';
+      check.textContent = '\u2713';
+      status.appendChild(check);
+      status.appendChild(document.createTextNode(' Connected'));
+      if (s.user) {
+        status.appendChild(document.createTextNode(' \u00b7 ' + s.user));
+      }
+    } else if (needsReauth) {
+      status.className = 'provider-status';
+      status.textContent = 'Needs re-authentication';
+      status.style.color = '#f59e0b';
     } else if (notInstalled) {
       status.className = 'provider-status not-installed';
       status.textContent = 'Not installed';
       status.style.color = '#888';
-    } else {
+    } else if (installedNotAuth) {
       status.className = 'provider-status';
-      status.textContent = 'Installed — not connected';
+      status.textContent = 'Installed \u2014 not connected';
       status.style.color = '#facc15';
+    } else {
+      status.className = 'provider-status not-installed';
+      status.textContent = 'Not installed';
+      status.style.color = '#888';
     }
 
     info.appendChild(name);

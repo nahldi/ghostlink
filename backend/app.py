@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "5.0.25"
+__version__ = "5.0.26"
 
 import json
 import importlib
