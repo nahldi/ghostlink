@@ -147,6 +147,22 @@
 - [x] **Auto-updates** — electron-updater with latest.yml from GitHub Releases
 - [x] **System tray** — quick actions, server control
 
+### v5.x — Multi-Agent Runtime & UX
+- [x] **WSL agent detection** — full wsl.exe path + `-e` flag for reliable CLI detection from packaged app
+- [x] **All 13 agents in launcher** — every supported CLI shown with install/connect/reconnect status
+- [x] **Free/Paid pricing badges** — Paid, Free Tier, Free + Setup, Local labels per agent
+- [x] **Experience mode picker** — Beginner/Standard/Advanced in wizard and settings
+- [x] **Honest auth detection** — `codex login status`, credential file checks, correct CLI commands
+- [x] **Reconnect button** — one-click re-auth for agents with stale tokens
+- [x] **Multi-agent spawn** — Claude, Codex, Gemini all spawn and respond via API
+- [x] **Stale session auto-cleanup** — old tmux sessions killed on server start
+- [x] **Spawn race fix** — registration check prioritized over process exit
+- [x] **OneDrive workspace warning** — wizard + spawn warn about WSL/OneDrive path issues
+- [x] **Shared auth safety** — warns before spawning agent if another instance uses shared auth
+- [x] **Spawn warnings in UI** — backend warnings surface as toast in Add Agent modal
+- [x] **PATH expansion** — backend includes `~/.local/bin`, `~/.npm-global/bin` for CLI resolution
+- [x] **tmux env export** — critical vars exported inline for npm-based CLIs
+
 ### Skills
 - [x] **Skills marketplace** — browse, install, create, export/import custom skills
 - [x] **Custom skill creator** — API with name, description, category, implementation type

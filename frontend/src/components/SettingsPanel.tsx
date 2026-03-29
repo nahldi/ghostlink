@@ -170,9 +170,9 @@ export function SettingsPanel() {
         )}
       </div>
 
-      {/* Tab Bar */}
+      {/* Tab Bar — Advanced tab hidden in beginner mode */}
       <div className="flex border-b border-outline-variant/8">
-        {TABS.map((t) => (
+        {TABS.filter(t => settings.experienceMode === 'beginner' ? t.id !== 'advanced' : true).map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -223,8 +223,33 @@ function GeneralTab({
   applyInstant: (u: Partial<Settings>) => void;
   settings: Settings;
 }) {
+  const MODE_OPTIONS = [
+    { value: 'beginner', label: 'Beginner', desc: 'Simplified interface, guided experience' },
+    { value: 'standard', label: 'Standard', desc: 'Balanced — all features, normal density' },
+    { value: 'advanced', label: 'Advanced', desc: 'Full controls, debug tools, technical detail' },
+  ] as const;
+
   return (
     <>
+      <Section title="Experience Mode" icon="tune" defaultOpen>
+        <div className="grid grid-cols-3 gap-2">
+          {MODE_OPTIONS.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => applyInstant({ experienceMode: m.value })}
+              className={`p-2.5 rounded-xl text-left transition-all border ${
+                (display.experienceMode || 'standard') === m.value
+                  ? 'border-primary/40 bg-primary/10'
+                  : 'border-outline-variant/10 hover:border-outline-variant/20'
+              }`}
+            >
+              <div className="text-[11px] font-semibold text-on-surface/80">{m.label}</div>
+              <div className="text-[9px] text-on-surface-variant/40 mt-0.5">{m.desc}</div>
+            </button>
+          ))}
+        </div>
+      </Section>
+
       <Section title="Profile" icon="person" defaultOpen>
         <SettingField label="Username">
           <input type="text" value={display.username} onChange={(e) => updateDraft({ username: e.target.value })} className="setting-input" />
