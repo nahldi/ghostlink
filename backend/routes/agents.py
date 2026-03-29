@@ -742,7 +742,6 @@ async def spawn_agent(request: Request):
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            close_fds=True,
         )
         import threading as _th
         _stderr_buf: list[str] = []

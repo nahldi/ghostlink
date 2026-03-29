@@ -1,6 +1,6 @@
 [project]
 name = "ghostlink-backend"
-version = "5.0.21"
+version = "5.0.22"
 requires-python = ">=3.10"
 
 [tool.ruff]
