@@ -30,6 +30,8 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const clearUnread = useChatStore((s) => s.clearUnread);
   const setSidebarPanel = useChatStore((s) => s.setSidebarPanel);
   const setCockpitAgent = useChatStore((s) => s.setCockpitAgent);
+  const mode = useChatStore((s) => s.settings.experienceMode) || 'standard';
+  const isBeginner = mode === 'beginner';
 
   const items = useMemo<CommandItem[]>(() => {
     const results: CommandItem[] = [];
@@ -94,9 +96,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       });
     }
 
-    // Cockpit quick actions for active agents
+    // Cockpit quick actions for active agents — hidden in beginner mode
     const onlineAgents = agents.filter(a => a.state === 'active' || a.state === 'idle' || a.state === 'thinking');
-    if (onlineAgents.length > 0) {
+    if (onlineAgents.length > 0 && !isBeginner) {
       for (const a of onlineAgents) {
         results.push(
           {

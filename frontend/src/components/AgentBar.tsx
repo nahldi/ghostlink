@@ -10,6 +10,8 @@ function AgentChip({ agent }: { agent: Agent }) {
   const [showInfo, setShowInfo] = useState(false);
   const [busy, setBusy] = useState(false);
   const setAgents = useChatStore((s) => s.setAgents);
+  const mode = useChatStore((s) => s.settings.experienceMode) || 'standard';
+  const isBeginner = mode === 'beginner';
 
   const isOnline = agent.state === 'active' || agent.state === 'thinking' || agent.state === 'idle';
   const isThinking = agent.state === 'thinking';
@@ -73,13 +75,13 @@ function AgentChip({ agent }: { agent: Agent }) {
             <span className={isOffline ? 'text-on-surface-variant' : undefined}>
               {agent.label}
             </span>
-            {agent.role === 'manager' && (
+            {!isBeginner && agent.role === 'manager' && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 leading-none uppercase">MGR</span>
             )}
-            {agent.role === 'worker' && (
+            {!isBeginner && agent.role === 'worker' && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-400 leading-none uppercase">WKR</span>
             )}
-            {agent.role === 'peer' && (
+            {!isBeginner && agent.role === 'peer' && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-400 leading-none uppercase">PEER</span>
             )}
           </div>
