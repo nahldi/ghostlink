@@ -11,12 +11,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
+_APPROVAL_CMD_RE = re.compile(r"^/(approve-session|approve|deny)\s+(\d+)\s*$", re.IGNORECASE)
 
 
 # ── Bridge configuration persistence ────────────────────────────────
@@ -125,12 +127,28 @@ class BridgeManager:
         for platform in list(self._bridges):
             self.stop_bridge(platform)
 
-    def handle_ghostlink_message(self, sender: str, text: str, channel: str):
+    def handle_ghostlink_message(
+        self,
+        sender: str,
+        text: str,
+        channel: str,
+        *,
+        msg_type: str = "chat",
+        message_id: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ):
         """Forward a GhostLink message to all active bridges."""
         for platform, bridge in self._bridges.items():
             if bridge.is_connected():
                 try:
-                    bridge.send_outbound(sender, text, channel)
+                    bridge.send_outbound(
+                        sender,
+                        text,
+                        channel,
+                        msg_type=msg_type,
+                        message_id=message_id,
+                        metadata=metadata or {},
+                    )
                 except Exception as e:
                     log.debug("Bridge outbound failed for %s: %s", platform, e)
 
@@ -159,9 +177,78 @@ class BaseBridge:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
 
-    def send_outbound(self, sender: str, text: str, channel: str):
+    def send_outbound(
+        self,
+        sender: str,
+        text: str,
+        channel: str,
+        *,
+        msg_type: str = "chat",
+        message_id: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ):
         """Send a GhostLink message to the external platform."""
         raise NotImplementedError
+
+    def _parse_approval_command(self, text: str) -> tuple[int, str] | None:
+        match = _APPROVAL_CMD_RE.match((text or "").strip())
+        if not match:
+            return None
+        command, raw_id = match.groups()
+        response = {
+            "approve": "allow_once",
+            "approve-session": "allow_session",
+            "deny": "deny",
+        }[command.lower()]
+        return int(raw_id), response
+
+    def _submit_approval_response(self, message_id: int, response: str) -> bool:
+        import urllib.request
+
+        try:
+            body = json.dumps({
+                "message_id": message_id,
+                "response": response,
+            }).encode()
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{self._config.get('server_port', 8300)}/api/approval/respond",
+                data=body,
+                method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=5)
+            return True
+        except Exception as e:
+            log.debug("Failed to submit approval response: %s", e)
+            return False
+
+    def _format_outbound(
+        self,
+        sender: str,
+        text: str,
+        *,
+        msg_type: str = "chat",
+        message_id: int | None = None,
+        metadata: dict[str, Any] | None = None,
+        markdown: bool = False,
+    ) -> str:
+        metadata = metadata or {}
+        if msg_type != "approval_request":
+            sender_fmt = f"*{sender}*" if markdown else f"**{sender}**"
+            return f"{sender_fmt}: {text}"
+
+        agent = str(metadata.get("agent") or sender)
+        prompt = str(metadata.get("prompt") or text).strip()
+        prompt = prompt[:600] + ("..." if len(prompt) > 600 else "")
+        intro = f"Approval needed for {agent}"
+        commands = (
+            f"/approve {message_id} | /approve-session {message_id} | /deny {message_id}"
+            if message_id
+            else "/approve <id> | /approve-session <id> | /deny <id>"
+        )
+        if markdown:
+            return f"*{intro}*\n```{prompt}```\nReply: `{commands}`"
+        return f"{intro}\n{prompt}\nReply: {commands}"
 
     def _get_mapped_channel(self, external_channel: str) -> str:
         """Map external channel ID to GhostLink channel name."""
@@ -296,11 +383,20 @@ class DiscordBridge(BaseBridge):
             author = msg.get("author", {}).get("username", "discord-user")
             content = msg.get("content", "")
             if content:
+                approval = self._parse_approval_command(content)
+                if approval:
+                    approval_message_id, response = approval
+                    if self._submit_approval_response(approval_message_id, response):
+                        self._discord_request("POST", f"/channels/{channel_id}/messages", {
+                            "content": f"Approval recorded: {response} for #{approval_message_id}",
+                        })
+                        self._last_message_ids[channel_id] = msg_id
+                        continue
                 self._post_to_ghostlink(f"discord:{author}", content, gl_channel)
 
             self._last_message_ids[channel_id] = msg_id
 
-    def send_outbound(self, sender: str, text: str, channel: str):
+    def send_outbound(self, sender: str, text: str, channel: str, *, msg_type: str = "chat", message_id: int | None = None, metadata: dict[str, Any] | None = None):
         """Send a GhostLink message to Discord."""
         ext_channel = self._get_external_channel(channel)
         if not ext_channel:
@@ -310,8 +406,7 @@ class DiscordBridge(BaseBridge):
         if sender.startswith("discord:"):
             return
 
-        # Format with sender name
-        content = f"**{sender}**: {text}"
+        content = self._format_outbound(sender, text, msg_type=msg_type, message_id=message_id, metadata=metadata)
         # Discord max message length is 2000
         if len(content) > 2000:
             content = content[:1997] + "..."
@@ -393,9 +488,18 @@ class TelegramBridge(BaseBridge):
         chat_id = str(msg["chat"]["id"])
         username = msg.get("from", {}).get("username") or msg.get("from", {}).get("first_name", "user")
         gl_channel = self._get_mapped_channel(chat_id)
+        approval = self._parse_approval_command(text)
+        if approval:
+            approval_message_id, response = approval
+            if self._submit_approval_response(approval_message_id, response):
+                self._tg_request("sendMessage", {
+                    "chat_id": chat_id,
+                    "text": f"Approval recorded: {response} for #{approval_message_id}",
+                })
+                return
         self._post_to_ghostlink(f"telegram:{username}", text, gl_channel)
 
-    def send_outbound(self, sender: str, text: str, channel: str):
+    def send_outbound(self, sender: str, text: str, channel: str, *, msg_type: str = "chat", message_id: int | None = None, metadata: dict[str, Any] | None = None):
         """Send a GhostLink message to Telegram."""
         ext_channel = self._get_external_channel(channel)
         if not ext_channel:
@@ -403,7 +507,7 @@ class TelegramBridge(BaseBridge):
         if sender.startswith("telegram:"):
             return
 
-        content = f"*{sender}*: {text}"
+        content = self._format_outbound(sender, text, msg_type=msg_type, message_id=message_id, metadata=metadata, markdown=True)
         if len(content) > 4096:
             content = content[:4093] + "..."
 
@@ -433,14 +537,14 @@ class SlackBridge(BaseBridge):
     def stop(self):
         self._connected = False
 
-    def send_outbound(self, sender: str, text: str, channel: str):
+    def send_outbound(self, sender: str, text: str, channel: str, *, msg_type: str = "chat", message_id: int | None = None, metadata: dict[str, Any] | None = None):
         """Send to Slack via incoming webhook."""
         if sender.startswith("slack:"):
             return
         import urllib.request
         try:
             body = json.dumps({
-                "text": f"*{sender}*: {text}",
+                "text": self._format_outbound(sender, text, msg_type=msg_type, message_id=message_id, metadata=metadata, markdown=True),
                 "username": f"GhostLink ({sender})",
                 "icon_emoji": ":robot_face:",
             }).encode()
@@ -472,7 +576,7 @@ class WhatsAppBridge(BaseBridge):
     def stop(self):
         self._connected = False
 
-    def send_outbound(self, sender: str, text: str, channel: str):
+    def send_outbound(self, sender: str, text: str, channel: str, *, msg_type: str = "chat", message_id: int | None = None, metadata: dict[str, Any] | None = None):
         """Send to WhatsApp via Cloud API."""
         if sender.startswith("whatsapp:"):
             return
@@ -485,7 +589,7 @@ class WhatsAppBridge(BaseBridge):
                 "messaging_product": "whatsapp",
                 "to": ext_channel,
                 "type": "text",
-                "text": {"body": f"{sender}: {text}"},
+                "text": {"body": self._format_outbound(sender, text, msg_type=msg_type, message_id=message_id, metadata=metadata)},
             }).encode()
             req = urllib.request.Request(
                 f"https://graph.facebook.com/v21.0/{self._phone_id}/messages",
@@ -517,17 +621,19 @@ class WebhookBridge(BaseBridge):
     def stop(self):
         self._connected = False
 
-    def send_outbound(self, sender: str, text: str, channel: str):
+    def send_outbound(self, sender: str, text: str, channel: str, *, msg_type: str = "chat", message_id: int | None = None, metadata: dict[str, Any] | None = None):
         """POST to configured webhook URL."""
         if not self._outbound_url or sender.startswith("webhook:"):
             return
         import urllib.request
         try:
             body = json.dumps({
-                "event": "message",
+                "event": "approval_request" if msg_type == "approval_request" else "message",
                 "sender": sender,
                 "text": text,
                 "channel": channel,
+                "message_id": message_id,
+                "metadata": metadata or {},
                 "timestamp": time.time(),
                 "source": "ghostlink",
             }).encode()

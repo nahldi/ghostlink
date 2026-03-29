@@ -1087,12 +1087,31 @@ async def respond_approval(request: Request):
     response = (body.get("response", "") or "").strip()
     message_id = body.get("message_id", 0)
 
-    if not agent_name or not response:
-        return JSONResponse({"error": "agent and response required"}, 400)
-    if not _VALID_AGENT_NAME.match(agent_name):
-        return JSONResponse({"error": "invalid agent name"}, 400)
+    if not response:
+        return JSONResponse({"error": "response required"}, 400)
     if response not in ("allow_once", "allow_session", "deny"):
         return JSONResponse({"error": "response must be allow_once, allow_session, or deny"}, 400)
+
+    if not agent_name and message_id and deps.store._db:
+        try:
+            cursor = await deps.store._db.execute("SELECT metadata FROM messages WHERE id = ?", (message_id,))
+            try:
+                row = await cursor.fetchone()
+            finally:
+                await cursor.close()
+            if row:
+                try:
+                    meta = json.loads(row["metadata"]) if row["metadata"] else {}
+                except (json.JSONDecodeError, TypeError):
+                    meta = {}
+                agent_name = str(meta.get("agent") or "").strip()
+        except Exception as e:
+            log.warning("Failed to resolve approval agent from message metadata: %s", e)
+
+    if not agent_name:
+        return JSONResponse({"error": "agent or resolvable message_id required"}, 400)
+    if not _VALID_AGENT_NAME.match(agent_name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
 
     response_file = deps.DATA_DIR / f"{agent_name}_approval.json"
     response_data = json.dumps({
