@@ -97,6 +97,45 @@ def test_workspace_spawn_warning_ignores_normal_linux_paths():
     assert _workspace_spawn_warning("/home/skull/project") is None
 
 
+def test_shared_auth_spawn_warning_detects_external_codex(monkeypatch: pytest.MonkeyPatch):
+    """A non-GhostLink Codex process should emit a shared-auth warning."""
+    import subprocess
+    from routes.agents import _shared_auth_spawn_warning
+
+    def fake_run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(
+            args=["pgrep", "-af", "codex"],
+            returncode=0,
+            stdout="1234 codex chat\n5678 python wrapper.py codex --headless\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    warning = _shared_auth_spawn_warning("codex", "codex")
+
+    assert warning is not None
+    assert "shared authentication" in warning
+
+
+def test_shared_auth_spawn_warning_ignores_ghostlink_processes(monkeypatch: pytest.MonkeyPatch):
+    """GhostLink-owned wrapper processes should not trigger the warning."""
+    import subprocess
+    from routes.agents import _shared_auth_spawn_warning
+
+    def fake_run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(
+            args=["pgrep", "-af", "codex"],
+            returncode=0,
+            stdout="5678 python wrapper.py codex --headless\n9012 ghostlink-codex helper\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert _shared_auth_spawn_warning("codex", "codex") is None
+
+
 def test_private_url_blocks_loopback_variants():
     """Loopback and local-only URL variants are rejected."""
     from deps import _is_private_url

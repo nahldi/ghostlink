@@ -95,6 +95,46 @@ def _workspace_spawn_warning(cwd: str) -> str | None:
     return None
 
 
+def _shared_auth_spawn_warning(base: str, command: str) -> str | None:
+    if base != "codex":
+        return None
+    try:
+        result = subprocess.run(
+            ["pgrep", "-af", command],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, OSError, subprocess.SubprocessError):
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    matches = []
+    for line in result.stdout.splitlines():
+        entry = line.strip()
+        if not entry:
+            continue
+        if "wrapper.py" in entry or "ghostlink" in entry:
+            continue
+        matches.append(entry)
+
+    if matches:
+        return "Another Codex instance is already running. Spawning here may affect shared authentication."
+    return None
+
+
+def _combine_spawn_warnings(existing: str | None, new_warning: str | None) -> str | None:
+    if not new_warning:
+        return existing
+    if not existing:
+        return new_warning
+    if new_warning in existing:
+        return existing
+    return f"{existing} {new_warning}"
+
+
 def _warn_missing_worktree_manager(action: str, agent_name: str) -> None:
     log.warning("Worktree cleanup skipped during %s for %s: manager unavailable", action, agent_name)
 
@@ -731,6 +771,8 @@ async def spawn_agent(request: Request):
             }
             hint = _INSTALL_HINTS.get(base, "check the agent's documentation")
             return JSONResponse({"error": f"'{base}' is not installed. Install: {hint}"}, 400)
+
+    spawn_warning = _combine_spawn_warnings(spawn_warning, _shared_auth_spawn_warning(base, command))
 
     # Update in-memory config for this session
     if cwd or extra_args:

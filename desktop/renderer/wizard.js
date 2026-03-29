@@ -304,22 +304,36 @@ document.getElementById('btn-python-next')?.addEventListener('click', () => {
 
 const $workspacePath = document.getElementById('workspace-path');
 
+const $workspaceWarning = document.getElementById('workspace-warning');
+
+function checkWorkspacePath(folderPath) {
+  if (settings.platform === 'wsl' && folderPath && /onedrive/i.test(folderPath)) {
+    $workspaceWarning.textContent = 'OneDrive folders can cause issues with WSL agents. For best results, use a local Linux path like ~/projects';
+    $workspaceWarning.style.display = 'block';
+  } else {
+    $workspaceWarning.style.display = 'none';
+  }
+}
+
 document.getElementById('btn-browse')?.addEventListener('click', async () => {
   const folder = await api.invoke('wizard:pick-folder');
   if (folder) {
     $workspacePath.value = folder;
     settings.workspace = folder;
+    checkWorkspacePath(folder);
   }
 });
 
 $workspacePath?.addEventListener('input', () => {
   settings.workspace = $workspacePath.value;
+  checkWorkspacePath($workspacePath.value);
 });
 
 // Listen for folder picked event
 api.on('wizard:folder-picked', (path) => {
   $workspacePath.value = path;
   settings.workspace = path;
+  checkWorkspacePath(path);
 });
 
 document.getElementById('btn-workspace-next')?.addEventListener('click', () => {

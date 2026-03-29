@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
 import { useChatStore } from '../stores/chatStore';
 import { AgentIcon } from './AgentIcon';
+import { toast } from './Toast';
 import type { AgentTemplate } from '../types';
 
 interface AddAgentModalProps {
@@ -175,7 +176,11 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
         }
       }
 
-      await api.spawnAgent(selected, finalLabel, finalCwd, finalArgs, roleDescription);
+      const spawnResult = await api.spawnAgent(selected, finalLabel, finalCwd, finalArgs, roleDescription);
+      // Show any spawn warnings (e.g. OneDrive workspace)
+      if (spawnResult && typeof spawnResult === 'object' && 'warning' in spawnResult) {
+        toast(String((spawnResult as { warning: string }).warning), 'warning');
+      }
 
       // v3.7.0: Configure bridge if selected
       if (bridgePlatform && bridgeToken) {
