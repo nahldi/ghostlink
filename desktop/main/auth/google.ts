@@ -2,14 +2,14 @@
  * Google / Gemini CLI authentication provider.
  *
  * Install: `pip install google-genai` or use Google AI Studio API key
- * Auth:    `gemini auth login`, `gcloud auth login`, or GOOGLE_API_KEY / GEMINI_API_KEY env var
+ * Auth:    Google AI Studio API key, existing Gemini OAuth creds, or `gcloud auth login`
  */
 
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { AuthStatus } from './index';
-import { WSL_EXE, execCmd, hasCommand, isCommandNotFound, isWsl, spawnInTerminal, execAsync, terminalCommand, terminalShell } from './index';
+import { WSL_EXE, execCmd, hasCommand, isWsl, spawnInTerminal, execAsync, terminalCommand, terminalShell } from './index';
 
 const PROVIDER = 'google';
 const NAME     = 'Gemini';
@@ -52,22 +52,8 @@ export async function checkGoogle(): Promise<AuthStatus> {
   }
   base.installed = true;
 
-  // Check gemini auth
-  if (geminiInstalled) {
-    try {
-      const output = await execCmd('gemini', ['auth', 'status']);
-      if ((/\b(logged in|authenticated|active)\b/i.test(output) && !/not (logged in|authenticated|active)/i.test(output)) || output.length > 0) {
-        const userMatch = output.match(/(?:as|user|email|account)\s+(\S+)/i);
-        return { ...base, authenticated: true, user: userMatch ? userMatch[1] : undefined };
-      }
-    } catch (err: any) {
-      if (!isCommandNotFound(err)) {
-        // fall through
-      }
-    }
-  }
-
-  // Check the actual Gemini OAuth credential file, not just a non-empty config dir.
+  // The installed Gemini CLI on this machine does not expose `gemini auth ...`,
+  // so the OAuth credential file is the best available CLI-backed signal.
   if (isWsl()) {
     try {
       const authFile = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', '(test -f ~/.gemini/oauth_creds.json || test -f ~/.config/gemini/oauth_creds.json) && echo found'], {
@@ -103,20 +89,17 @@ export async function checkGoogle(): Promise<AuthStatus> {
 }
 
 export async function loginGoogle(): Promise<void> {
-  // Try gemini CLI first, then gcloud, then show API key instructions
-  const hasGemini = await hasCommand('gemini');
+  // Only surface reconnect flows GhostLink can truthfully support here.
   const hasGcloud = await hasCommand('gcloud');
 
-  if (hasGemini) {
-    spawnInTerminal(terminalCommand('gemini', ['auth', 'login']));
-  } else if (hasGcloud) {
+  if (hasGcloud) {
     spawnInTerminal(terminalCommand('gcloud', ['auth', 'login']));
   } else {
-    // Neither CLI available — guide user to set API key
+    // Guide the user toward the flows we know actually exist today.
     spawnInTerminal(terminalShell(
       isWsl()
-        ? 'echo "=== Gemini Setup ===" && echo "" && echo "Option 1: Set API key (recommended)" && echo "  Get a free key at: https://aistudio.google.com/app/apikey" && echo "  Then set it: export GEMINI_API_KEY=your_key_here" && echo "  Add to ~/.bashrc to persist" && echo "" && echo "Option 2: Install Gemini CLI" && echo "  pip install google-genai" && echo "  gemini auth login"'
-        : 'echo === Gemini Setup === && echo. && echo Option 1: Set API key (recommended) && echo   Get a free key at: https://aistudio.google.com/app/apikey && echo   Set it in GhostLink Settings ^> AI tab && echo. && echo Option 2: Install Gemini CLI && echo   pip install google-genai && echo   gemini auth login'
+        ? 'echo "=== Gemini Setup ===" && echo "" && echo "Option 1: Set API key (recommended)" && echo "  Get a free key at: https://aistudio.google.com/app/apikey" && echo "  Then set it: export GEMINI_API_KEY=your_key_here" && echo "  Add to ~/.bashrc to persist" && echo "" && echo "Option 2: Install and connect Google Cloud" && echo "  pip install google-genai" && echo "  gcloud auth login"'
+        : 'echo === Gemini Setup === && echo. && echo Option 1: Set API key (recommended) && echo   Get a free key at: https://aistudio.google.com/app/apikey && echo   Set it in GhostLink Settings ^> AI tab && echo. && echo Option 2: Install and connect Google Cloud && echo   pip install google-genai && echo   gcloud auth login'
     ));
   }
 }
@@ -124,12 +107,12 @@ export async function loginGoogle(): Promise<void> {
 export async function installGoogle(): Promise<void> {
   if (isWsl()) {
     spawnInTerminal(terminalShell(
-      'pip install google-genai && echo "" && echo "Done! Now run: gemini auth login" && echo "Or set GEMINI_API_KEY in Settings > AI tab"'
+      'pip install google-genai && echo "" && echo "Done! Next: set GEMINI_API_KEY or run gcloud auth login"'
     ));
   } else {
     spawnInTerminal(terminalShell(
-      'pip install google-genai && echo "Done! Now run: gemini auth login" && echo "Or set GEMINI_API_KEY in Settings > AI tab"',
-      'pip install google-genai && echo Done! Now run: gemini auth login && echo Or set GEMINI_API_KEY in GhostLink Settings AI tab'
+      'pip install google-genai && echo "Done! Next: set GEMINI_API_KEY or run gcloud auth login"',
+      'pip install google-genai && echo Done! Next: set GEMINI_API_KEY in GhostLink Settings or run gcloud auth login'
     ));
   }
 }

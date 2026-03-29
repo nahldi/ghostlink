@@ -65,7 +65,7 @@ export async function checkAnthropic(): Promise<AuthStatus> {
     }
   }
 
-  // Check the actual Claude credentials file, not just any ~/.claude directory.
+  // Credentials file exists — trust it as connected (CLI status check may have timed out)
   try {
     if (isWsl()) {
       const result = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', 'test -f ~/.claude/.credentials.json && echo found'], {

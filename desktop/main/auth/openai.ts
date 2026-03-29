@@ -2,15 +2,15 @@
  * OpenAI / Codex CLI authentication provider.
  *
  * Install: `npm install -g @openai/codex`
- * Auth:    `codex auth login` or OPENAI_API_KEY env var
- * Check:   Config dirs (~/.codex/ or ~/.config/codex/) or env var
+ * Auth:    `codex login` or OPENAI_API_KEY env var
+ * Check:   `codex login status` or auth files (~/.codex/ or ~/.config/codex/)
  */
 
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import type { AuthStatus } from './index';
-import { WSL_EXE, hasCommand, isWsl, spawnInTerminal, execAsync, execCmd, terminalCommand, terminalShell } from './index';
+import { WSL_EXE, hasCommand, isWsl, spawnInTerminal, execAsync, execCmd, terminalShell } from './index';
 
 const PROVIDER = 'openai';
 const NAME     = 'Codex';
@@ -70,14 +70,14 @@ export async function checkOpenAI(): Promise<AuthStatus> {
     }
   } catch {}
 
-  // Check auth files as fallback
+  // Check auth files as fallback — trust them as connected
   try {
     if (isWsl()) {
       const authFile = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', '(test -f ~/.codex/auth.json || test -f ~/.config/codex/auth.json) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(authFile).includes('found')) {
-        return { ...base, authenticated: false, installed: true, error: 'Needs re-auth — click Reconnect' };
+        return { ...base, authenticated: true };
       }
     } else {
       const home = os.homedir();
@@ -87,7 +87,7 @@ export async function checkOpenAI(): Promise<AuthStatus> {
       ];
       for (const file of authFiles) {
         if (fs.existsSync(file)) {
-          return { ...base, authenticated: false, installed: true, error: 'Needs re-auth — click Reconnect' };
+          return { ...base, authenticated: true };
         }
       }
     }
@@ -98,8 +98,8 @@ export async function checkOpenAI(): Promise<AuthStatus> {
 
 export async function loginOpenAI(): Promise<void> {
   spawnInTerminal(terminalShell(
-    'codex logout 2>/dev/null; codex login',
-    'codex logout 2>nul & codex login'
+    'codex login',
+    'codex login'
   ));
 }
 
