@@ -89,10 +89,32 @@ def run_agent(
     # Build the full command as a proper shell command string
     cmd_parts = [shlex.quote(command)] + [shlex.quote(a) for a in extra_args]
 
-    # Build env(1) prefix for vars inside the tmux session
+    # Build env(1) prefix for vars inside the tmux session.
+    # tmux does not reliably propagate the client environment into the command
+    # it starts, especially when a long-lived tmux server already exists.
+    # Export the critical runtime vars inline so npm-installed CLIs that use
+    # `#!/usr/bin/env node` can still find `node` and their auth/config paths.
+    essential_keys = (
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "LANG",
+        "TERM",
+        "XDG_CONFIG_HOME",
+        "XDG_STATE_HOME",
+        "XDG_DATA_HOME",
+    )
     env_parts = []
     if strip_env:
         env_parts.extend(f"-u {shlex.quote(v)}" for v in strip_env)
+    for key in essential_keys:
+        if strip_env and key in strip_env:
+            continue
+        value = env.get(key)
+        if value:
+            env_parts.append(f"{shlex.quote(key)}={shlex.quote(value)}")
     if inject_env:
         env_parts.extend(
             f"{shlex.quote(k)}={shlex.quote(v)}"
