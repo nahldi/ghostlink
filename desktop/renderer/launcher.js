@@ -416,17 +416,37 @@ function renderProviders(statuses) {
       });
       btnGroup.appendChild(keyBtn);
 
-      // Provider login button
+      // Provider login button — in-app browser auth
       const loginBtn = document.createElement('button');
       loginBtn.className = 'connect-btn';
       loginBtn.textContent = 'Login';
-      loginBtn.title = 'Open provider login in terminal';
+      loginBtn.title = 'Sign in via browser — no terminal needed';
       loginBtn.style.fontSize = '10px';
       loginBtn.addEventListener('click', async () => {
-        loginBtn.textContent = '...';
+        loginBtn.textContent = 'Opening...';
         loginBtn.disabled = true;
-        await api.invoke('auth:login', s.provider);
-        setTimeout(() => refreshAuth(), 5000);
+        keyBtn.disabled = true;
+        // Show inline auth status
+        showAuthProgress(s, card);
+        try {
+          const result = await api.invoke('auth:browser-login', s.provider);
+          if (result && result.success) {
+            removeAuthProgress(card);
+            refreshAuth();
+          } else {
+            // Fallback to terminal login if browser auth not supported
+            removeAuthProgress(card);
+            await api.invoke('auth:login', s.provider);
+            setTimeout(() => refreshAuth(), 5000);
+          }
+        } catch {
+          removeAuthProgress(card);
+          await api.invoke('auth:login', s.provider);
+          setTimeout(() => refreshAuth(), 5000);
+        }
+        loginBtn.textContent = 'Login';
+        loginBtn.disabled = false;
+        keyBtn.disabled = false;
       });
       btnGroup.appendChild(loginBtn);
 
@@ -439,6 +459,44 @@ function renderProviders(statuses) {
     $providers.appendChild(card);
   });
 }
+
+/**
+ * Show auth progress indicator on a provider card.
+ */
+function showAuthProgress(provider, card) {
+  removeAuthProgress(card);
+  const row = document.createElement('div');
+  row.className = 'auth-progress-row';
+  row.style.cssText = 'display:flex;gap:8px;padding:8px 16px 10px;align-items:center;border-top:1px solid rgba(255,255,255,0.04);';
+
+  const spinner = document.createElement('span');
+  spinner.className = 'spinner-icon';
+  spinner.textContent = '\u21BB';
+  spinner.style.cssText = 'font-size:14px;color:#a78bfa;';
+
+  const text = document.createElement('span');
+  text.style.cssText = 'font-size:11px;color:rgba(255,255,255,0.5);';
+  text.textContent = 'Opening browser for authentication...';
+
+  row.appendChild(spinner);
+  row.appendChild(text);
+  card.appendChild(row);
+}
+
+function removeAuthProgress(card) {
+  const existing = card.querySelector('.auth-progress-row');
+  if (existing) existing.remove();
+}
+
+// Listen for auth URL events from main process
+api.on('auth:login-url', (provider, url) => {
+  // The main process opened the browser — no action needed from the renderer
+  // The URL is shown in the browser, not in the launcher
+});
+
+api.on('auth:login-complete', (provider) => {
+  refreshAuth();
+});
 
 /**
  * Show an inline API key input on a provider card.

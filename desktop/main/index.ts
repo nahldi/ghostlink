@@ -589,6 +589,110 @@ function setupIPC(): void {
     }
   });
 
+  // In-app browser OAuth — captures auth URL from CLI, opens browser, polls for completion
+  // Only providers with real CLI browser/device auth flows
+  const AUTH_COMMANDS: Record<string, { command: string; args: string[]; statusCmd: string; statusArgs: string[] }> = {
+    anthropic: { command: 'claude', args: ['auth', 'login'], statusCmd: 'claude', statusArgs: ['auth', 'status'] },
+    openai: { command: 'codex', args: ['login', '--device-auth'], statusCmd: 'codex', statusArgs: ['login', 'status'] },
+    // Gemini: no `gemini auth login` exists — use API key path instead
+  };
+
+  ipcMain.handle('auth:browser-login', async (_event, provider: string) => {
+    log.info('auth:browser-login for provider:', provider);
+    const authConfig = AUTH_COMMANDS[provider];
+    if (!authConfig) return { success: false, error: `No browser auth for ${provider}` };
+
+    const launcher = getLauncherWindow();
+    const { shell } = require('electron');
+    const { spawn: spawnChild } = require('child_process');
+    const { isWsl, WSL_EXE } = require('./auth/index');
+
+    try {
+      // Spawn the auth command and capture stdout for URLs
+      const useWsl = isWsl();
+      const cmd = useWsl ? WSL_EXE : authConfig.command;
+      const args = useWsl
+        ? ['-e', 'bash', '-lc', `export PATH="$PATH:$HOME/.npm-global/bin:$HOME/.local/bin:/usr/local/bin"; ${authConfig.command} ${authConfig.args.join(' ')}`]
+        : authConfig.args;
+
+      const child = spawnChild(cmd, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+
+      let urlFound = false;
+
+      // Watch stdout for auth URLs
+      child.stdout?.on('data', (data: Buffer) => {
+        const text = data.toString();
+        log.info('[auth:browser] stdout:', text.slice(0, 200));
+        // Look for URLs
+        const urlMatch = text.match(/https?:\/\/[^\s"'<>]+/);
+        if (urlMatch && !urlFound) {
+          urlFound = true;
+          const url = urlMatch[0];
+          log.info('[auth:browser] Found auth URL:', url);
+          shell.openExternal(url);
+          if (launcher && !launcher.isDestroyed()) {
+            launcher.webContents.send('auth:login-url', { provider, url });
+          }
+        }
+      });
+
+      child.stderr?.on('data', (data: Buffer) => {
+        const text = data.toString();
+        log.info('[auth:browser] stderr:', text.slice(0, 200));
+        // Some CLIs put URLs in stderr
+        const urlMatch = text.match(/https?:\/\/[^\s"'<>]+/);
+        if (urlMatch && !urlFound) {
+          urlFound = true;
+          shell.openExternal(urlMatch[0]);
+          if (launcher && !launcher.isDestroyed()) {
+            launcher.webContents.send('auth:login-url', { provider, url: urlMatch[0] });
+          }
+        }
+      });
+
+      // Wait for process to complete (with timeout)
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          child.kill();
+          reject(new Error('Auth timed out after 120s'));
+        }, 120000);
+
+        child.on('close', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+
+        child.on('error', (err: Error) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
+
+      // Check if auth succeeded
+      const statuses = await authManager.checkAll();
+      const providerStatus = statuses.find((s: { provider: string }) => s.provider === provider);
+
+      if (launcher && !launcher.isDestroyed()) {
+        launcher.webContents.send('auth:status', statuses);
+        launcher.webContents.send('auth:login-complete', {
+          provider,
+          success: providerStatus?.authenticated ?? false,
+        });
+      }
+
+      return { success: providerStatus?.authenticated ?? false };
+    } catch (err: any) {
+      log.error('auth:browser-login failed:', err);
+      if (launcher && !launcher.isDestroyed()) {
+        launcher.webContents.send('auth:login-complete', { provider, success: false, error: err.message });
+      }
+      return { success: false, error: err.message ?? String(err) };
+    }
+  });
+
   // In-app API key save — no terminal needed
   const PROVIDER_ENV_MAP: Record<string, string> = {
     anthropic: 'ANTHROPIC_API_KEY',
