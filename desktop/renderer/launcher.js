@@ -401,18 +401,36 @@ function renderProviders(statuses) {
       });
       action.appendChild(btn);
     } else {
-      // "Connect" button — installed but not authenticated
-      const btn = document.createElement('button');
-      btn.className = 'connect-btn';
-      btn.textContent = 'Connect';
-      btn.addEventListener('click', async () => {
-        btn.textContent = 'Opening...';
-        btn.disabled = true;
+      // Two-option connect: API key or provider login
+      const btnGroup = document.createElement('div');
+      btnGroup.style.cssText = 'display:flex;gap:4px;align-items:center;';
+
+      // API Key button
+      const keyBtn = document.createElement('button');
+      keyBtn.className = 'connect-btn';
+      keyBtn.textContent = 'API Key';
+      keyBtn.title = 'Paste your API key — no terminal needed';
+      keyBtn.style.fontSize = '10px';
+      keyBtn.addEventListener('click', () => {
+        showApiKeyInput(s, card);
+      });
+      btnGroup.appendChild(keyBtn);
+
+      // Provider login button
+      const loginBtn = document.createElement('button');
+      loginBtn.className = 'connect-btn';
+      loginBtn.textContent = 'Login';
+      loginBtn.title = 'Open provider login in terminal';
+      loginBtn.style.fontSize = '10px';
+      loginBtn.addEventListener('click', async () => {
+        loginBtn.textContent = '...';
+        loginBtn.disabled = true;
         await api.invoke('auth:login', s.provider);
-        // Re-check after user completes login
         setTimeout(() => refreshAuth(), 5000);
       });
-      action.appendChild(btn);
+      btnGroup.appendChild(loginBtn);
+
+      action.appendChild(btnGroup);
     }
 
     card.appendChild(icon);
@@ -420,6 +438,57 @@ function renderProviders(statuses) {
     card.appendChild(action);
     $providers.appendChild(card);
   });
+}
+
+/**
+ * Show an inline API key input on a provider card.
+ */
+const _API_KEY_NAMES = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GEMINI_API_KEY',
+};
+
+function showApiKeyInput(provider, card) {
+  // Remove existing input if any
+  const existing = card.querySelector('.api-key-row');
+  if (existing) { existing.remove(); return; }
+
+  const envName = _API_KEY_NAMES[provider.provider] || `${provider.provider.toUpperCase()}_API_KEY`;
+
+  const row = document.createElement('div');
+  row.className = 'api-key-row';
+  row.style.cssText = 'display:flex;gap:6px;padding:6px 16px 10px;align-items:center;border-top:1px solid rgba(255,255,255,0.04);';
+
+  const input = document.createElement('input');
+  input.type = 'password';
+  input.placeholder = `Paste ${envName}`;
+  input.className = 'setting-input-text';
+  input.style.cssText = 'flex:1;font-size:11px;padding:5px 8px;';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'connect-btn';
+  saveBtn.textContent = 'Save';
+  saveBtn.style.fontSize = '10px';
+  saveBtn.addEventListener('click', async () => {
+    const key = input.value.trim();
+    if (!key) return;
+    saveBtn.textContent = '...';
+    saveBtn.disabled = true;
+    try {
+      await api.invoke('auth:save-key', provider.provider, key);
+      row.remove();
+      setTimeout(() => refreshAuth(), 1000);
+    } catch (err) {
+      saveBtn.textContent = 'Error';
+      setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 2000);
+    }
+  });
+
+  row.appendChild(input);
+  row.appendChild(saveBtn);
+  card.appendChild(row);
+  input.focus();
 }
 
 /**

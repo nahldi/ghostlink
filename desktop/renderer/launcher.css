@@ -420,6 +420,27 @@ html, body {
   box-shadow: 0 0 8px rgba(74, 222, 128, 0.1);
 }
 
+/* ── API key input row ───────────────────────────────────────────────── */
+
+.api-key-row input {
+  background: rgba(18, 18, 28, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #e4e4ec;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.api-key-row input:focus {
+  border-color: rgba(124, 58, 237, 0.4);
+}
+
+.api-key-row input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+  font-family: inherit;
+}
+
 /* ── Pricing badges ──────────────────────────────────────────────────── */
 
 .pricing-badge {

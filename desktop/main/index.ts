@@ -589,6 +589,46 @@ function setupIPC(): void {
     }
   });
 
+  // In-app API key save — no terminal needed
+  const PROVIDER_ENV_MAP: Record<string, string> = {
+    anthropic: 'ANTHROPIC_API_KEY',
+    openai: 'OPENAI_API_KEY',
+    google: 'GEMINI_API_KEY',
+    github: 'GITHUB_TOKEN',
+  };
+
+  ipcMain.handle('auth:save-key', async (_event, provider: string, key: string) => {
+    log.info('auth:save-key for provider:', provider);
+    try {
+      const envVar = PROVIDER_ENV_MAP[provider];
+      if (!envVar) return { success: false, error: `Unknown provider: ${provider}` };
+      if (!key || key.length < 10) return { success: false, error: 'Invalid API key' };
+
+      // Save to process env so auth checks pick it up immediately
+      process.env[envVar] = key;
+
+      // Persist to settings for next startup
+      const currentSettings = loadSettingsFile() as Record<string, any> | null;
+      if (currentSettings) {
+        if (!currentSettings.apiKeys) currentSettings.apiKeys = {};
+        (currentSettings.apiKeys as Record<string, string>)[provider] = key;
+        saveSettingsFile(currentSettings);
+      }
+
+      // Trigger auth refresh
+      const launcher = getLauncherWindow();
+      if (launcher && !launcher.isDestroyed()) {
+        const statuses = await authManager.checkAll();
+        launcher.webContents.send('auth:status', statuses);
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      log.error('auth:save-key failed:', err);
+      return { success: false, error: err.message ?? String(err) };
+    }
+  });
+
   ipcMain.handle('auth:install', async (_event, provider: string) => {
     log.info('auth:install requested for provider:', provider);
     try {
