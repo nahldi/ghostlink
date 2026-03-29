@@ -189,6 +189,11 @@ export function sanitizeSettings(raw: unknown): Record<string, unknown> {
     autoStart: getBoolean(input.autoStart, false),
     setupComplete: getBoolean(input.setupComplete, false),
     appVersion: getString(input.appVersion, '', 32),
+    experienceMode: getEnum(input.experienceMode, ['beginner', 'standard', 'advanced'] as const, 'standard'),
+    // Encrypted API keys — passthrough, not sanitized (opaque base64 blobs)
+    ...(input.encryptedKeys && typeof input.encryptedKeys === 'object' && !Array.isArray(input.encryptedKeys)
+      ? { encryptedKeys: input.encryptedKeys }
+      : {}),
   };
 }
 

@@ -615,8 +615,7 @@ function setupIPC(): void {
           const encrypted = safeStorage.encryptString(key).toString('base64');
           (currentSettings.encryptedKeys as Record<string, string>)[provider] = encrypted;
         } else {
-          // Fallback: at least don't store raw — use basic obfuscation
-          (currentSettings.encryptedKeys as Record<string, string>)[provider] = Buffer.from(key).toString('base64');
+          log.warn('safeStorage encryption not available — API key will work for this session but cannot be securely persisted');
         }
         // Remove any legacy plaintext keys
         if (currentSettings.apiKeys) {
@@ -765,10 +764,10 @@ app.whenReady().then(async () => {
         try {
           if (safeStorage.isEncryptionAvailable()) {
             process.env[envVar] = safeStorage.decryptString(Buffer.from(encrypted, 'base64'));
+            log.info(`Restored API key for ${provider} from encrypted storage`);
           } else {
-            process.env[envVar] = Buffer.from(encrypted, 'base64').toString('utf-8');
+            log.warn(`Cannot decrypt API key for ${provider} — safeStorage not available`);
           }
-          log.info(`Restored API key for ${provider} from encrypted storage`);
         } catch { /* key decrypt failed — skip */ }
       }
     }
