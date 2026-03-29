@@ -479,6 +479,6 @@ function ContextPanel({ agent }: { agent: Agent }) {
 }
 
 function providerName(base: string): string {
-  const map: Record<string, string> = { claude: 'Anthropic', codex: 'OpenAI', gemini: 'Google DeepMind', grok: 'xAI', copilot: 'GitHub', aider: 'Aider', goose: 'Block', ollama: 'Ollama (Local)', opencode: 'OpenCode', cody: 'Sourcegraph', cursor: 'Cursor', continue: 'Continue', pi: 'Inflection' };
+  const map: Record<string, string> = { claude: 'Anthropic', codex: 'OpenAI', gemini: 'Google', grok: 'xAI', copilot: 'GitHub', aider: 'Aider', goose: 'Block', ollama: 'Ollama (Local)', opencode: 'OpenCode', cody: 'Sourcegraph', cursor: 'Cursor', continue: 'Continue', pi: 'Inflection' };
   return map[base] || base.charAt(0).toUpperCase() + base.slice(1);
 }
