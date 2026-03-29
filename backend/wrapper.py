@@ -841,6 +841,8 @@ def main():
     for a in extra:
         if a not in combined_args:
             combined_args.append(a)
+    if agent == "codex" and "--no-alt-screen" not in combined_args:
+        combined_args.append("--no-alt-screen")
     launch_args = combined_args + mcp_args
 
     # ── v2.5.0: Agent identity injection ──────────────────────────────
