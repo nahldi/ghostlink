@@ -388,17 +388,30 @@ async def _wait_for_spawn_health(proc: subprocess.Popen, base: str, stderr_buf: 
         raise RuntimeError(error_msg)
 
 
-def _drain_pipe(pipe, agent_base: str, buf: list | None = None) -> None:
-    """Drain a subprocess pipe line-by-line, logging output at DEBUG."""
+def _drain_pipe(pipe, agent_base: str, buf: list | None = None, log_path: Path | None = None) -> None:
+    """Drain a subprocess pipe line-by-line, logging output at DEBUG and optionally teeing to disk."""
     try:
+        log_handle = None
+        if log_path is not None:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_handle = log_path.open("a", encoding="utf-8")
         for raw in iter(pipe.readline, b""):
             line = raw.decode("utf-8", errors="replace").rstrip()
             if line:
                 log.debug("[wrapper/%s] %s", agent_base, line)
                 if buf is not None:
                     buf.append(line)
+                if log_handle is not None:
+                    log_handle.write(line + "\n")
+                    log_handle.flush()
     except Exception:
         pass
+    finally:
+        try:
+            if log_handle is not None:
+                log_handle.close()
+        except Exception:
+            pass
 
 
 @router.post("/api/register")
@@ -734,8 +747,11 @@ async def spawn_agent(request: Request):
         )
         import threading as _th
         _stderr_buf: list[str] = []
-        _th.Thread(target=_drain_pipe, args=(proc.stdout, base), daemon=True).start()
-        _th.Thread(target=_drain_pipe, args=(proc.stderr, base, _stderr_buf), daemon=True).start()
+        spawn_log_dir = Path(deps.DATA_DIR or deps.BASE_DIR).resolve() / "logs" / "agent-spawn"
+        stdout_log = spawn_log_dir / f"{base}-stdout.log"
+        stderr_log = spawn_log_dir / f"{base}-stderr.log"
+        _th.Thread(target=_drain_pipe, args=(proc.stdout, base, None, stdout_log), daemon=True).start()
+        _th.Thread(target=_drain_pipe, args=(proc.stderr, base, _stderr_buf, stderr_log), daemon=True).start()
 
         async with deps._agent_lock:
             deps._pending_spawns[proc.pid] = proc
