@@ -17,6 +17,7 @@ import http from 'http';
 import net from 'net';
 import log from 'electron-log';
 import { getSettingsPath, loadSettingsFile } from './settings';
+import { WSL_EXE } from './auth/index';
 
 interface ServerStatus {
   running: boolean;
@@ -99,11 +100,11 @@ class ServerManager {
   }
 
   private execWsl(args: string[], options: Record<string, any> = {}): string {
-    return this.exec('wsl', args, options);
+    return this.exec(WSL_EXE, args, options);
   }
 
   private tryExecWsl(args: string[], options: Record<string, any> = {}): string | null {
-    return this.tryExec('wsl', args, options);
+    return this.tryExec(WSL_EXE, args, options);
   }
 
   private isPortAvailable(port: number): Promise<boolean> {
@@ -477,7 +478,7 @@ class ServerManager {
     let serverOutput = '';
 
     try {
-      this.process = spawn('wsl', ['env', `PORT=${this.port}`, 'PYTHONUNBUFFERED=1', wslPython, joinWslPath(wslBackend, 'app.py')], {
+      this.process = spawn(WSL_EXE, ['env', `PORT=${this.port}`, 'PYTHONUNBUFFERED=1', wslPython, joinWslPath(wslBackend, 'app.py')], {
         env: { ...process.env },
         stdio: ['ignore', 'pipe', 'pipe'],
       });

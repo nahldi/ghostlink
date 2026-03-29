@@ -22,6 +22,7 @@ const http_1 = __importDefault(require("http"));
 const net_1 = __importDefault(require("net"));
 const electron_log_1 = __importDefault(require("electron-log"));
 const settings_1 = require("./settings");
+const index_1 = require("./auth/index");
 // ── Platform helpers ─────────────────────────────────────────────────────────
 function getSettings() {
     try {
@@ -84,10 +85,10 @@ class ServerManager {
         }
     }
     execWsl(args, options = {}) {
-        return this.exec('wsl', args, options);
+        return this.exec(index_1.WSL_EXE, args, options);
     }
     tryExecWsl(args, options = {}) {
-        return this.tryExec('wsl', args, options);
+        return this.tryExec(index_1.WSL_EXE, args, options);
     }
     isPortAvailable(port) {
         return new Promise((resolve) => {
@@ -410,7 +411,7 @@ class ServerManager {
         // Capture all output for crash diagnostics
         let serverOutput = '';
         try {
-            this.process = (0, child_process_1.spawn)('wsl', ['env', `PORT=${this.port}`, 'PYTHONUNBUFFERED=1', wslPython, joinWslPath(wslBackend, 'app.py')], {
+            this.process = (0, child_process_1.spawn)(index_1.WSL_EXE, ['env', `PORT=${this.port}`, 'PYTHONUNBUFFERED=1', wslPython, joinWslPath(wslBackend, 'app.py')], {
                 env: { ...process.env },
                 stdio: ['ignore', 'pipe', 'pipe'],
             });

@@ -31,7 +31,7 @@ export async function checkOpenAI(): Promise<AuthStatus> {
     let hasApiKey = false;
     try {
       if (isWsl()) {
-        const envCheck = await execAsync(WSL_EXE, ['bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
+        const envCheck = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
           encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
         });
         hasApiKey = String(envCheck).includes('set');
@@ -49,14 +49,14 @@ export async function checkOpenAI(): Promise<AuthStatus> {
   // Check auth — prefer the actual Codex auth file over loose directory existence.
   try {
     if (isWsl()) {
-      const authFile = await execAsync(WSL_EXE, ['bash', '-lc', '(test -f ~/.codex/auth.json || test -f ~/.config/codex/auth.json) && echo found'], {
+      const authFile = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', '(test -f ~/.codex/auth.json || test -f ~/.config/codex/auth.json) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(authFile).includes('found')) {
         return { ...base, authenticated: true };
       }
 
-      const envCheck = await execAsync(WSL_EXE, ['bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
+      const envCheck = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', 'test -n "$OPENAI_API_KEY" && echo set'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(envCheck).includes('set')) {

@@ -33,8 +33,8 @@ export async function checkGoogle(): Promise<AuthStatus> {
   try {
     if (isWsl()) {
       const envCheck = await execAsync(
-        'wsl',
-        ['bash', '-lc', 'test -n "$GOOGLE_API_KEY" -o -n "$GEMINI_API_KEY" && echo set'],
+        WSL_EXE,
+        ['-e', 'bash', '-lc', 'test -n "$GOOGLE_API_KEY" -o -n "$GEMINI_API_KEY" && echo set'],
         { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'] }
       );
       hasApiKey = String(envCheck).includes('set');
@@ -70,7 +70,7 @@ export async function checkGoogle(): Promise<AuthStatus> {
   // Check the actual Gemini OAuth credential file, not just a non-empty config dir.
   if (isWsl()) {
     try {
-      const authFile = await execAsync(WSL_EXE, ['bash', '-lc', '(test -f ~/.gemini/oauth_creds.json || test -f ~/.config/gemini/oauth_creds.json) && echo found'], {
+      const authFile = await execAsync(WSL_EXE, ['-e', 'bash', '-lc', '(test -f ~/.gemini/oauth_creds.json || test -f ~/.config/gemini/oauth_creds.json) && echo found'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (String(authFile).includes('found')) {

@@ -13,6 +13,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { execFileSync } from 'child_process';
+import { WSL_EXE } from './auth/index';
 
 let launcherRef: BrowserWindow | null = null;
 type LauncherPayload = Record<string, unknown>;
@@ -23,7 +24,7 @@ function isGitHubToken(value: string): boolean {
 
 function tryReadWslOutput(args: string[]): string {
   try {
-    return execFileSync('wsl', args, {
+    return execFileSync(WSL_EXE, args, {
       encoding: 'utf-8',
       timeout: 8000,
       stdio: ['pipe', 'pipe', 'pipe'],

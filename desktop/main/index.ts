@@ -20,7 +20,7 @@ import { createLauncherWindow, getLauncherWindow } from './launcher';
 import { getSettingsPath, loadSettingsFile, saveSettingsFile, sanitizeSettings } from './settings';
 import { setupTray, updateTrayMenu } from './tray';
 import { setupUpdater, checkForUpdates, downloadUpdate, installUpdate } from './updater';
-import { authManager, winToWsl } from './auth/index';
+import { authManager, winToWsl, WSL_EXE } from './auth/index';
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -48,7 +48,7 @@ function getCommandOutput(result: { stdout: string; stderr: string }): string {
 async function findPythonVersion(command: string, useWsl: boolean): Promise<string | null> {
   try {
     const result = useWsl
-      ? await runCommand('wsl', [command, '--version'])
+      ? await runCommand(WSL_EXE, [command, '--version'])
       : await runCommand(command, ['--version']);
     const match = getCommandOutput(result).match(/Python\s+([\d.]+)/);
     return match ? match[1] : null;
@@ -79,7 +79,7 @@ async function isPythonModuleAvailable(command: string, moduleName: string, useW
   ];
   try {
     if (useWsl) {
-      await runCommand('wsl', [command, ...probeArgs]);
+      await runCommand(WSL_EXE, [command, ...probeArgs]);
     } else {
       await runCommand(command, probeArgs);
     }
@@ -92,7 +92,7 @@ async function isPythonModuleAvailable(command: string, moduleName: string, useW
 async function findExecutable(command: string, useWsl: boolean): Promise<boolean> {
   try {
     if (useWsl) {
-      await runCommand('wsl', ['which', command], 5_000);
+      await runCommand(WSL_EXE, ['which', command], 5_000);
     } else if (process.platform === 'win32') {
       await runCommand('where', [command], 5_000);
     } else {
@@ -110,7 +110,7 @@ function detectHostPlatform(): { platform: WizardPlatform; platformLabel: string
   switch (process.platform) {
     case 'win32':
       try {
-        execFileSync('wsl', ['--status'], { timeout: 5000, stdio: 'pipe', windowsHide: true });
+        execFileSync(WSL_EXE, ['--status'], { timeout: 5000, stdio: 'pipe', windowsHide: true });
         return { platform: 'wsl', platformLabel: 'Windows (WSL)', wslAvailable: true };
       } catch {
         return { platform: 'windows', platformLabel: 'Windows (Native)', wslAvailable: false };
@@ -377,7 +377,7 @@ function setupWizardIPC(): void {
 
       if (useWsl) {
         const wslReqPath = winToWsl(reqPath);
-        await runCommand('wsl', [supportedPython.command, '-m', 'pip', 'install', '-r', wslReqPath], 120_000);
+        await runCommand(WSL_EXE, [supportedPython.command, '-m', 'pip', 'install', '-r', wslReqPath], 120_000);
       } else {
         await runCommand(supportedPython.command, ['-m', 'pip', 'install', '-r', reqPath], 120_000);
       }
@@ -738,11 +738,11 @@ app.on('before-quit', async (event) => {
       // These commands use only hardcoded safe strings — no user input
       try {
         const { execFileSync: efs } = require('child_process');
-        efs('wsl', ['bash', '-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null || true"], { stdio: 'ignore', timeout: 5000 });
+        efs(WSL_EXE, ['-e', 'bash', '-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null || true"], { stdio: 'ignore', timeout: 5000 });
       } catch { /* best-effort */ }
       try {
         const { execFileSync: efs } = require('child_process');
-        efs('wsl', ['bash', '-c', 'rm -rf /tmp/ghostlink-backend /tmp/ghostlink-frontend'], { stdio: 'ignore', timeout: 5000 });
+        efs(WSL_EXE, ['-e', 'bash', '-c', 'rm -rf /tmp/ghostlink-backend /tmp/ghostlink-frontend'], { stdio: 'ignore', timeout: 5000 });
       } catch { /* best-effort */ }
     } else {
       // macOS / Linux: kill tmux sessions directly

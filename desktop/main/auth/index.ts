@@ -90,7 +90,7 @@ function assertSafeCommandName(name: string): void {
 export const WSL_EXE = process.platform === 'win32' ? 'C:\\Windows\\System32\\wsl.exe' : 'wsl';
 
 async function execWslBash(args: string[], options: any = {}): Promise<string> {
-  return execFileAsync(WSL_EXE, ['bash', ...args], {
+  return execFileAsync(WSL_EXE, ['-e', 'bash', ...args], {
     windowsHide: true,
     ...options,
   });
@@ -157,7 +157,7 @@ export function isWsl(): boolean {
   if (_wslDetected === null) {
     try {
       const { execFileSync } = require('child_process');
-      execFileSync(WSL_EXE, ['echo', 'ok'], { stdio: 'pipe', timeout: 3000, windowsHide: true });
+      execFileSync(WSL_EXE, ['-e', 'echo', 'ok'], { stdio: 'pipe', timeout: 3000, windowsHide: true });
       _wslDetected = true;
     } catch {
       _wslDetected = false;
@@ -359,7 +359,7 @@ export function spawnInTerminal(spec: TerminalLaunchSpec): void {
       const wrapperPath = writeTempLauncher('ghostlink-auth', '.sh', buildPosixWrapper(spec, true));
       const wslWrapperPath = winToWsl(wrapperPath);
       const args = spec.kind === 'argv' ? [spec.command, ...(spec.args ?? [])] : [];
-      spawn('wsl.exe', ['bash', wslWrapperPath, ...args], detachedOptions).unref();
+      spawn(WSL_EXE, ['-e', 'bash', wslWrapperPath, ...args], detachedOptions).unref();
     } else {
       const wrapperPath = writeTempLauncher('ghostlink-auth', '.cmd', buildWindowsWrapper(spec));
       const args = spec.kind === 'argv' ? [spec.command, ...(spec.args ?? [])] : [];
