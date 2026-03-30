@@ -67,6 +67,7 @@ class MCPAgentProcess:
         # Otherwise start a fresh session with a new ID.
         self._resume_id = resume_session
         self.session_id = resume_session or str(uuid.uuid4())
+        self._codex_session_id: str | None = None  # Codex session ID for resume
 
         self._proc: subprocess.Popen | None = None
         self._alive = False
@@ -224,8 +225,20 @@ class MCPAgentProcess:
             self._alive = False
 
     def _codex_exec(self, content: str) -> dict | None:
-        """Run a single Codex exec invocation (exec-per-trigger model)."""
-        cmd = self._build_cmd(prompt=content)
+        """Run a Codex exec invocation with session resume for context continuity.
+
+        First call: `codex exec --json "prompt"` (creates new session)
+        Subsequent calls: `codex exec resume <session_id> --json "prompt"` (resumes context)
+        """
+        if self._codex_session_id:
+            # Resume existing session for context continuity
+            cmd = [self.command, "exec", "resume", self._codex_session_id, "--json"]
+            for arg in self.extra_args:
+                if arg not in ("--headless",):
+                    cmd.append(arg)
+            cmd.append(content)
+        else:
+            cmd = self._build_cmd(prompt=content)
         start_time = time.time()
         try:
             result = subprocess.run(
@@ -238,7 +251,12 @@ class MCPAgentProcess:
                 line = line.strip()
                 if line:
                     try:
-                        last_event = json.loads(line)
+                        evt = json.loads(line)
+                        last_event = evt
+                        # Extract session ID from thread.started for resume
+                        if evt.get("type") == "thread.started" and evt.get("session_id"):
+                            self._codex_session_id = evt["session_id"]
+                            log.info("Codex session ID captured: %s", self._codex_session_id)
                     except json.JSONDecodeError:
                         pass
             entry = {
