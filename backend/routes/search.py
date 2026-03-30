@@ -39,8 +39,10 @@ async def search_messages(q: str = "", channel: str = "", sender: str = "", limi
     except Exception as fts_err:
         # FTS5 not available or query syntax error — fall back to LIKE
         log.warning("FTS5 search failed, falling back to LIKE: %s", fts_err)
-        query = "SELECT * FROM messages WHERE text LIKE ? COLLATE NOCASE"
-        params: list = [f"%{q}%"]
+        # Escape SQL LIKE wildcards in user input
+        escaped_q = q.replace("%", "\\%").replace("_", "\\_")
+        query = "SELECT * FROM messages WHERE text LIKE ? ESCAPE '\\' COLLATE NOCASE"
+        params: list = [f"%{escaped_q}%"]
         if channel:
             query += " AND channel = ?"
             params.append(channel)
