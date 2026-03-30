@@ -136,14 +136,25 @@ export function useWebSocket() {
             setAgents(status.agents);
           }
 
+          // Fetch missed messages across ALL channels, not just active one
           const lastMsg = state.messages[state.messages.length - 1];
           const sinceId = lastMsg?.id || 0;
           if (sinceId > 0) {
-            const resp = await api.getMessages(state.activeChannel, sinceId);
-            const msgs = resp.messages || [];
-            for (const msg of msgs) {
-              state.addMessage(msg);
+            const channelNames = state.channels.map((c) => c.name);
+            if (!channelNames.includes(state.activeChannel)) {
+              channelNames.push(state.activeChannel);
             }
+            await Promise.all(
+              channelNames.map(async (ch) => {
+                try {
+                  const resp = await api.getMessages(ch, sinceId);
+                  const msgs = resp.messages || [];
+                  for (const msg of msgs) {
+                    state.addMessage(msg);
+                  }
+                } catch { /* channel may not exist yet */ }
+              }),
+            );
           }
 
           const agentsToRefresh = (status?.agents || state.agents || []).map((agent) => agent.name);
