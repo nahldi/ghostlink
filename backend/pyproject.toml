@@ -10,7 +10,8 @@ dependencies = [
 ]
 
 [project.scripts]
-ghostlink-mcp = "ghostlink_mcp:main"
+ghostlink-mcp = "ghostlink_mcp_server:main"
+ghostlink-server = "ghostlink_server:main"
 
 [tool.ruff]
 target-version = "py310"

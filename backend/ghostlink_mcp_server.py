@@ -3,7 +3,7 @@
 
 Boots the core GhostLink backend (SQLite, message store, registry, MCP tools)
 and exposes it as an MCP server. Any MCP client (Claude Code, Codex, Gemini CLI,
-Cursor, etc.) can connect and use GhostLink's 37+ tools.
+Cursor, etc.) can connect and use GhostLink's 29 tools.
 
 Usage:
     # stdio mode (for MCP client config):

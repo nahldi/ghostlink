@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""GhostLink MCP Server — standalone entry point.
+"""GhostLink server — standalone headless backend entry point.
 
-Run GhostLink as an MCP server that any AI agent can connect to.
-No Electron app needed — just the backend + MCP bridge.
+Run the full GhostLink backend without Electron.
+This starts the API, WebSocket hub, and embedded MCP bridge.
 
 Usage:
-    python ghostlink_mcp.py                      # Start with defaults
-    python ghostlink_mcp.py --port 8300          # Custom web port
-    python ghostlink_mcp.py --mcp-port 8200      # Custom MCP port
-    ghostlink-mcp                                 # If installed via npm/pip
+    python ghostlink_server.py                   # Start with defaults
+    python ghostlink_server.py --port 8300       # Custom web port
+    python ghostlink_server.py --mcp-port 8200   # Custom MCP port
+    ghostlink-server                             # If installed via pip
 
 This starts:
     1. The FastAPI backend (message store, registry, routing)
-    2. The MCP bridge server (37 tools for chat, memory, web, etc.)
+    2. The MCP bridge server (29 tools for chat, memory, web, etc.)
     3. WebSocket hub for real-time communication
 
 AI agents connect by adding to their MCP config:
@@ -41,7 +41,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="GhostLink MCP Server — multi-agent AI chat hub",
+        description="GhostLink server — full backend + MCP bridge",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -70,8 +70,8 @@ Connect from Claude Code:
     if not args.quiet:
         print(f"""
 ╔══════════════════════════════════════════╗
-║         GhostLink MCP Server             ║
-║   Multi-Agent AI Chat Hub                ║
+║         GhostLink Server                 ║
+║   Full Backend + MCP Bridge              ║
 ╠══════════════════════════════════════════╣
 ║  API:     http://{args.host}:{args.port}         ║
 ║  MCP:     http://{args.host}:{args.mcp_port}/mcp      ║
