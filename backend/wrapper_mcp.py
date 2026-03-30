@@ -573,7 +573,7 @@ class MCPAgentProcess:
 
     @property
     def is_alive(self) -> bool:
-        if self._is_codex():
+        if self._is_exec_mode():
             return self._alive  # No persistent process to check
         if not self._proc:
             return False
@@ -702,7 +702,8 @@ def run_agent_mcp(
 
         print(f"  MCP agent active: {session_name}")
         print(f"  Session: {agent_proc.session_id}")
-        print(f"  Mode: persistent pipe (stream-json)")
+        mode_label = "exec-per-trigger" if agent_proc._is_exec_mode() else "persistent pipe (stream-json)"
+        print(f"  Mode: {mode_label}")
 
         # Start queue watcher once — inject_fn uses proc_ref so it
         # automatically picks up restarted processes
