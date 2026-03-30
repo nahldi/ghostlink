@@ -190,6 +190,7 @@ function getFileIcon(name: string): string {
 function CockpitFiles({ agent }: { agent: Agent }) {
   const setFileDiff = useChatStore((s) => s.setFileDiff);
   const [files, setFiles] = useState<FileEntry[]>([]);
+  const [filter, setFilter] = useState('');
   const [currentPath, setCurrentPath] = useState('.');
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string | null>(null);
@@ -390,7 +391,6 @@ function CockpitFiles({ agent }: { agent: Agent }) {
     );
   }
 
-  const [filter, setFilter] = useState('');
   const filteredFiles = filter
     ? files.filter(f => f.name.toLowerCase().includes(filter.toLowerCase()))
     : files;
