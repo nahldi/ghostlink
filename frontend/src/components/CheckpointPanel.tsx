@@ -51,6 +51,8 @@ export function CheckpointPanel({ agent }: { agent: Agent }) {
   }, [agent.name]);
 
   useEffect(() => {
+    // Intentional initialization sync: clear stale checkpoint state before fetching fresh data.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setCheckpoints([]);
     fetchCheckpoints();

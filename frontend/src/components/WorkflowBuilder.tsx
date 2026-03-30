@@ -75,6 +75,8 @@ export function WorkflowBuilder() {
     setLoading(false);
   }, []);
 
+  // Intentional initialization effect: populate workflows from the current backend state on mount.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchWorkflows(); }, [fetchWorkflows]);
 
   const createWorkflow = async () => {

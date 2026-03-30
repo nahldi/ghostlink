@@ -53,6 +53,8 @@ export function CustomizationPanel() {
   const [newCategory, setNewCategory] = useState('behavior');
 
   useEffect(() => {
+    // Intentional initialization sync: show immediate loading state before the first backend response.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetch('/api/custom-rules')
       .then(r => r.ok ? r.json() : { rules: [] })

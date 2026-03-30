@@ -24,7 +24,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
   const [runner, setRunner] = useState<'tmux' | 'mcp'>(agent.runner || 'tmux');
   const [autoScroll, setAutoScroll] = useState(true);
   const [mcpLog, setMcpLog] = useState<import('../types').McpInvocationEntry[]>([]);
-  const preRef = useRef<HTMLPreElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,8 +68,8 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
   }, [storeMcpLog]);
 
   useEffect(() => {
-    if (autoScroll && preRef.current) {
-      preRef.current.scrollTop = preRef.current.scrollHeight;
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [output, autoScroll, mcpLog]);
 
@@ -105,7 +105,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
 
       {runner === 'mcp' && mcpLog.length > 0 ? (
         /* MCP invocation log view */
-        <div ref={preRef as React.RefObject<HTMLDivElement>} className="flex-1 overflow-auto" style={{ background: '#06060c' }}>
+        <div ref={scrollRef} className="flex-1 overflow-auto" style={{ background: '#06060c' }}>
           {mcpLog.map((entry, i) => (
             <div key={i} className="border-b border-outline-variant/5 px-3 py-2">
               <div className="flex items-center gap-2 mb-1">
@@ -152,13 +152,15 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
         </div>
       ) : (
         /* Traditional tmux terminal view */
-        <pre
-          ref={preRef}
-          className="flex-1 overflow-auto p-3 font-mono text-[11px] leading-relaxed text-green-300/80 whitespace-pre-wrap"
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-auto"
           style={{ background: '#06060c' }}
         >
-          {output || (active ? 'Waiting for output...' : `No active session for ${agent.name}`)}
-        </pre>
+          <pre className="p-3 font-mono text-[11px] leading-relaxed text-green-300/80 whitespace-pre-wrap">
+            {output || (active ? 'Waiting for output...' : `No active session for ${agent.name}`)}
+          </pre>
+        </div>
       )}
     </div>
   );

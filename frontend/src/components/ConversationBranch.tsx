@@ -135,6 +135,8 @@ export function BranchList({ channel, onClose }: { channel: string; onClose: () 
     setLoading(false);
   }, [channel]);
 
+  // Intentional initialization effect: fetch current branches when the memoized loader changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchBranches(); }, [fetchBranches]);
 
   const deleteBranch = async (id: string) => {

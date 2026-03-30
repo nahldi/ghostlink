@@ -70,6 +70,8 @@ export function TaskQueue({ agent }: { agent: Agent }) {
   }, [agent.name]);
 
   useEffect(() => {
+    // Intentional initialization sync: reset the visible queue before the first refresh and poll loop.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setTasks([]);
     fetchTasks();
