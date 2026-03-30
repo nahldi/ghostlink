@@ -75,7 +75,11 @@ class AgentRegistry:
             slot += 1
         return slot
 
+    MAX_AGENTS = 20  # Prevent resource exhaustion from unbounded spawning
+
     def register(self, base: str, label: str = "", color: str = "") -> AgentInstance:
+        if len(self._instances) >= self.MAX_AGENTS:
+            raise ValueError(f"Maximum agent limit reached ({self.MAX_AGENTS})")
         if not label:
             label = base.capitalize()
         if not color:

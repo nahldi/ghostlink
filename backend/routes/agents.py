@@ -513,18 +513,21 @@ async def register_agent(request: Request):
     if not base:
         return JSONResponse({"error": "base required"}, 400)
     runner = body.get("runner", "tmux")
-    inst = deps.registry.register(base, label, color)
-    if role:
-        inst.role = role
-    if runner in ("mcp", "tmux"):
-        inst.runner = runner
-    if wrapper_pid is not None:
+    async with deps._agent_lock:
         try:
-            pid_int = int(wrapper_pid)
-        except (TypeError, ValueError):
-            pid_int = None
-        if pid_int is not None:
-            async with deps._agent_lock:
+            inst = deps.registry.register(base, label, color)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 429)
+        if role:
+            inst.role = role
+        if runner in ("mcp", "tmux"):
+            inst.runner = runner
+        if wrapper_pid is not None:
+            try:
+                pid_int = int(wrapper_pid)
+            except (TypeError, ValueError):
+                pid_int = None
+            if pid_int is not None:
                 proc = deps._pending_spawns.pop(pid_int, None)
                 if proc is not None:
                     deps._agent_processes[inst.name] = proc

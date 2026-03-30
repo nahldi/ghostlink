@@ -37,6 +37,16 @@ _EMOJI_ALLOWED_SINGLETONS = {
 _KEYCAP_BASES = set("0123456789#*")
 
 
+async def _parse_json_body(request: Request) -> tuple[dict, JSONResponse | None]:
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        return {}, JSONResponse({"error": "Invalid JSON"}, 400)
+    if not isinstance(body, dict):
+        return {}, JSONResponse({"error": "JSON body must be an object"}, 400)
+    return body, None
+
+
 async def _message_exists(message_id: int) -> bool:
     if deps.store is None or deps.store._db is None:
         raise RuntimeError("Message store not initialized")
@@ -96,10 +106,12 @@ async def send_message(request: Request):
     if client_host not in ("127.0.0.1", "::1"):
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="External access denied")
-    body = await request.json()
-    sender = (body.get("sender", "You") or "").strip()
-    text = (body.get("text", "") or "")
-    channel = (body.get("channel", "general") or "").strip()
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
+    sender = str(body.get("sender", "") or "").strip()
+    text = str(body.get("text", "") or "")
+    channel = str(body.get("channel", "general") or "").strip()
     reply_to = body.get("reply_to")
     if reply_to is not None:
         try:
@@ -111,7 +123,7 @@ async def send_message(request: Request):
         if not await _message_exists(reply_to):
             return JSONResponse({"error": "reply_to message not found"}, 400)
     attachments = body.get("attachments", [])
-    msg_type = (body.get("type", "chat") or "chat").strip()
+    msg_type = str(body.get("type", "chat") or "chat").strip()
     raw_metadata = body.get("metadata", "{}")
 
     # Validate msg_type — whitelist allowed values
@@ -186,10 +198,9 @@ async def send_message(request: Request):
 
 @router.post("/api/messages/{msg_id}/pin")
 async def pin_message(msg_id: int, request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
     pinned = body.get("pinned", True)
     result = await deps.store.pin(msg_id, pinned)
     if result:
@@ -200,7 +211,9 @@ async def pin_message(msg_id: int, request: Request):
 
 @router.post("/api/messages/{msg_id}/react")
 async def react_message(msg_id: int, request: Request):
-    body = await request.json()
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
     emoji = body.get("emoji", "")
     sender = body.get("sender", "You")
     if not emoji:
@@ -216,7 +229,9 @@ async def react_message(msg_id: int, request: Request):
 
 @router.patch("/api/messages/{msg_id}")
 async def edit_message(msg_id: int, request: Request):
-    body = await request.json()
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
     new_text = (body.get("text", "") or "").strip()
     if not new_text:
         return JSONResponse({"error": "text required"}, 400)
@@ -231,7 +246,9 @@ async def edit_message(msg_id: int, request: Request):
 
 @router.post("/api/messages/{msg_id}/bookmark")
 async def bookmark_message(msg_id: int, request: Request):
-    body = await request.json()
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
     bookmarked = body.get("bookmarked", True)
     # Bookmarks are stored client-side — this endpoint just acknowledges
     # and broadcasts so other clients can sync
@@ -242,7 +259,9 @@ async def bookmark_message(msg_id: int, request: Request):
 @router.post("/api/messages/{msg_id}/progress-update")
 async def progress_update(msg_id: int, request: Request):
     """Internal: broadcast a progress metadata update to all WebSocket clients."""
-    body = await request.json()
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
     metadata = body.get("metadata", "{}")
     await deps.broadcast("message_edit", {"message_id": msg_id, "metadata": metadata})
     return {"ok": True}
@@ -270,7 +289,9 @@ async def delete_message(msg_id: int):
 
 @router.post("/api/messages/bulk-delete")
 async def bulk_delete_messages(request: Request):
-    body = await request.json()
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
     ids = body.get("ids", [])
     if not ids or not isinstance(ids, list):
         return JSONResponse({"error": "ids must be a non-empty list"}, 400)
@@ -310,7 +331,9 @@ async def bulk_delete_messages(request: Request):
 async def stream_token(request: Request):
     """Broadcast a token stream event to all WebSocket clients.
     Used by MCP bridge chat_stream_token to enable real-time token streaming."""
-    body = await request.json()
+    body, error = await _parse_json_body(request)
+    if error:
+        return error
     message_id = body.get("message_id")
     token = body.get("token", "")
     done = body.get("done", False)

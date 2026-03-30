@@ -183,6 +183,9 @@ function useVoiceInput(onTranscript: (text: string) => void, lang?: string) {
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
     };
   }, []);
 
