@@ -1,5 +1,20 @@
 # GhostLink Changelog
 
+## v5.2.0 — 2026-03-30
+### MCP-Native Persistent Agent Architecture
+- **Persistent MCP Claude runner** — long-lived subprocess with stdin/stdout JSON pipes, no tmux dependency
+- **Stream-json protocol** — structured message delivery, approval events, turn completion with cost/usage data
+- **Multi-turn continuity** — session context preserved across conversation turns
+- **Crash recovery** — auto-restart with fresh session + chat_read context catchup
+- **Permission handling** — preset-based (full bypass / selective allowlist), denial surfacing to chat UI
+- **MCP mode toggle** — experimental toggle in Add Agent modal for Claude agents
+- **Cockpit MCP view** — invocation log with status, duration, cost per turn (replaces terminal pane)
+- **Runner badge** — blue "MCP" / grey "TMUX" indicator in cockpit header
+- **Cross-channel approval buttons** — Telegram inline keyboard (fully interactive), Discord visual buttons
+- **Agent descriptions** — one-line beginner-friendly description for every agent in launcher
+- **Quick Start guide** — 5-step README section from download to first chat
+- **Two-tier restart** — resume first, fresh session fallback, 5s cooldown, full process reaping
+
 ## v5.1.5 — 2026-03-29
 ### In-App Auth + Experience Modes
 - **In-app API key auth** — paste API keys directly in the launcher, no terminal needed

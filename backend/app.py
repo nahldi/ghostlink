@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "5.1.5"
+__version__ = "5.2.0"
 
 import json
 import importlib
@@ -301,6 +301,8 @@ async def lifespan(_app: FastAPI):
 
     db = await aiosqlite.connect(str(db_path))
     db.row_factory = aiosqlite.Row
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=5000")  # 5s retry on lock
     job_store = JobStore(db)
     await job_store.init()
     rule_store = RuleStore(db)

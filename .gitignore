@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 .venv/
+.audit-venv/
 __pycache__/
 *.pyc
 
@@ -34,6 +35,11 @@ memory/
 .DS_Store
 *.log
 .openclaw/
+
+# Local screenshots/artifacts (personal, never distribute)
+ghostlink-*.png
+ghostlink-*.docx
+*-audit.docx
 
 # Build artifacts
 *.tsbuildinfo

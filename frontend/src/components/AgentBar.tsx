@@ -4,6 +4,7 @@ import { AgentIcon } from './AgentIcon';
 import { AgentInfoPanel } from './AgentInfoPanel';
 import { AddAgentModal } from './AddAgentModal';
 import { api } from '../lib/api';
+import { toast } from './Toast';
 import type { Agent } from '../types';
 
 function AgentChip({ agent }: { agent: Agent }) {
@@ -33,7 +34,7 @@ function AgentChip({ agent }: { agent: Agent }) {
       const r = await api.getStatus();
       setAgents(r.agents);
     } catch (err) {
-      console.warn('Agent action failed:', err instanceof Error ? err.message : String(err));
+      toast(err instanceof Error ? err.message : 'Agent action failed', 'error');
     }
     setBusy(false);
   };
@@ -142,6 +143,15 @@ export function AgentBar() {
     <>
       {showAdd && <AddAgentModal onClose={() => setShowAdd(false)} />}
       <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+        {agents.length === 0 && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-on-surface-variant/30 hover:text-primary/60 hover:bg-primary/5 transition-all"
+          >
+            <span className="material-symbols-outlined text-[18px]">smart_toy</span>
+            <span className="text-[11px]">Launch an agent to get started</span>
+          </button>
+        )}
         {agents.map((agent) => (
           <AgentChip key={agent.name} agent={agent} />
         ))}
@@ -149,6 +159,7 @@ export function AgentBar() {
           onClick={() => setShowAdd(true)}
           className="w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant/20 hover:text-primary hover:bg-primary/8 transition-all shrink-0"
           title="Launch new agent"
+          aria-label="Launch new agent"
         >
           <span className="material-symbols-outlined text-lg">add</span>
         </button>

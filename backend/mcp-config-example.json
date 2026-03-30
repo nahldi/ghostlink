@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ghostlink": {
+      "command": "python",
+      "args": ["ghostlink_mcp_server.py"],
+      "cwd": "/path/to/ghostlink/backend"
+    }
+  }
+}

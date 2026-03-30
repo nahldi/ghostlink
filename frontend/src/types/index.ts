@@ -38,6 +38,7 @@ export interface Agent {
   command?: string;
   args?: string[];
   registered_at?: number;
+  runner?: 'tmux' | 'mcp';
 }
 
 export interface Channel {
@@ -239,6 +240,21 @@ export interface FileDiffPayload {
   timestamp: number;
 }
 
+export interface McpInvocationEntry {
+  timestamp: number;
+  duration_ms: number;
+  prompt: string;
+  session_id?: string;
+  agent?: string;
+  status: 'success' | 'timeout' | 'error' | 'parse_error' | 'no_result';
+  result_type?: string;
+  result_text?: string;
+  cost_usd?: number;
+  num_turns?: number;
+  usage?: { input_tokens: number; output_tokens: number };
+  error?: string;
+}
+
 export interface Schedule {
   id: string;
   name: string;
@@ -401,4 +417,5 @@ export type WSEvent =
   | { type: 'agent_replay'; data: AgentReplayEvent }
   | { type: 'file_diff'; data: { agent: string; path: string; action: string; diff: string; timestamp: number } }
   | { type: 'token_stream'; data: { message_id: number; token: string; done: boolean } }
+  | { type: 'mcp_invocation'; data: { agent: string; entry: McpInvocationEntry } }
   | { type: 'system'; data: Record<string, unknown> };

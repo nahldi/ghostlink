@@ -118,7 +118,10 @@ async def get_settings():
 
 @router.post("/api/settings")
 async def save_settings(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, 400)
     _ALLOWED_SETTINGS = {
         "username", "title", "theme", "fontSize", "loopGuard", "notificationSounds",
         "channels", "persistentAgents", "autoRoute", "connectedAgents",
@@ -742,7 +745,10 @@ async def tunnel_status():
 @router.post("/api/trigger")
 async def inbound_trigger(request: Request):
     """External services can POST here to trigger agents or send messages."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, 400)
     text = body.get("text", "").strip()
     if not text:
         return JSONResponse({"error": "text is required"}, 400)
@@ -770,7 +776,10 @@ async def inbound_trigger(request: Request):
 @router.post("/api/trigger/{agent_name}")
 async def trigger_agent(agent_name: str, request: Request):
     """Directly trigger a specific agent with a message."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, 400)
     text = body.get("text", "").strip()
     channel = body.get("channel", "general").strip()
 

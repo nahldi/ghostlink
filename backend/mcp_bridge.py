@@ -1699,7 +1699,11 @@ def _wrap_tool_with_hooks(func):
             return mode_error
 
         # Execute the actual tool
-        result = func(*args, **kwargs)
+        try:
+            result = func(*args, **kwargs)
+        except Exception as e:
+            log.error("MCP tool %s failed for agent %s: %s", tool_name, agent, e)
+            return f"Error: tool '{tool_name}' failed: {e}"
 
         # Fire post_tool_use hook + audit trail
         try:

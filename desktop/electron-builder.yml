@@ -5,9 +5,9 @@ directories:
   buildResources: assets
 files:
   - main/**/*.js
-  - main/**/*.js.map
   - renderer/**
   - "!**/*.ts"
+  - "!**/*.js.map"
 extraResources:
   - from: ../backend
     to: backend
@@ -16,7 +16,11 @@ extraResources:
       - "!__pycache__/**"
       - "!data/**"
       - "!uploads/**"
+      - "!tests/**"
+      - "!.audit-venv/**"
       - "!*.pyc"
+      - "!*.log"
+      - "!logs/**"
   - from: ../frontend/dist
     to: frontend
   - from: assets

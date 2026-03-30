@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-03-26
 **Current version:** v4.7.3
-**Owner:** Finn (nahldi)
+**Owner:** nahldi
 
 ---
 

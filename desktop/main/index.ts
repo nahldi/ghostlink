@@ -221,7 +221,7 @@ function createWizardWindow(): BrowserWindow {
 
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: true,
+      nodeIntegration: false,
       contextIsolation: false,
       sandbox: false,
       webSecurity: true,

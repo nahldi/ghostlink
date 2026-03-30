@@ -132,6 +132,7 @@ _server_logs: collections.deque[dict] = collections.deque(maxlen=500)
 _agent_presence: dict[str, dict] = {}
 _agent_browser_state: dict[str, dict] = {}
 _terminal_streams: dict[str, dict] = {}
+_mcp_invocation_logs: dict[str, collections.deque] = {}  # per-agent MCP invocation logs
 _workspace_changes: collections.deque[dict] = collections.deque(maxlen=500)
 _agent_replay_log: collections.deque[dict] = collections.deque(maxlen=2000)
 _file_diff_cache: dict[str, dict[str, dict]] = {}

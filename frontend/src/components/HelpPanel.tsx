@@ -32,7 +32,7 @@ const FAQ: FAQItem[] = [
   },
   {
     q: 'Where are my files stored?',
-    a: 'App: C:\\Users\\[you]\\AppData\\Local\\Programs\\GhostLink\nData: C:\\Users\\[you]\\AppData\\Local\\Programs\\GhostLink\\resources\\backend\\data\\\nSettings: C:\\Users\\[you]\\.ghostlink\\settings.json',
+    a: 'Settings: ~/.ghostlink/settings.json\nChat history: [install dir]/resources/backend/data/\nOn Windows: C:\\Users\\[you]\\AppData\\Local\\Programs\\GhostLink\nOn macOS: /Applications/GhostLink.app',
   },
   {
     q: 'How do updates work?',

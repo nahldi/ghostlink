@@ -338,7 +338,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   <ChatWidget html={metadata.html as string} title={metadata.widgetTitle as string} />
                 ) : (
                   <div className="prose">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={{ code: MdCode, p: MdParagraph }}>{displayText}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={{ code: MdCode, p: MdParagraph, a: MdLink }}>{displayText}</ReactMarkdown>
                   </div>
                 )}
                 {message.text.length > COLLAPSE_THRESHOLD && (
@@ -413,7 +413,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 />
               </p>
             ) : (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={{ code: MdCode, p: MdParagraph }}>{displayText}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={{ code: MdCode, p: MdParagraph, a: MdLink }}>{displayText}</ReactMarkdown>
             )}
           </div>
           {message.text.length > COLLAPSE_THRESHOLD && (
@@ -568,6 +568,21 @@ function MdParagraph({ children }: any) {
     })}</p>;
   }
   return <p>{children}</p>;
+}
+
+// External links open in new tab / system browser — prevents navigating away from the app
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function MdLink({ href, children }: any) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary hover:underline break-all"
+    >
+      {children}
+    </a>
+  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-markdown component override

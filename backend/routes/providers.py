@@ -74,6 +74,10 @@ async def test_provider_key(provider_id: str):
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
             return JSONResponse({"error": "Invalid API key — authentication failed"}, 401)
+        if e.code == 429:
+            return {"ok": True, "message": "Key valid (rate limited — try again later)"}
+        if e.code >= 500:
+            return {"ok": True, "message": f"Key accepted (provider returned {e.code} — may be temporary)"}
         return {"ok": True, "message": f"Key accepted (status {e.code})"}
     except Exception as e:
         import logging

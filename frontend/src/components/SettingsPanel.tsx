@@ -1437,6 +1437,25 @@ function CleanupSection() {
         Kills orphaned tmux sessions and dead processes to free up resources
       </p>
 
+      {/* Re-run Wizard */}
+      <div className="mt-3">
+        <button
+          onClick={() => {
+            localStorage.removeItem('ghostlink_setup_complete');
+            useChatStore.getState().updateSettings({ setupComplete: false });
+            api.saveSettings({ setupComplete: false }).catch(() => {});
+            window.location.reload();
+          }}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container/40 border border-outline-variant/8 text-xs font-medium text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container/60 transition-all"
+        >
+          <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+          Re-run Setup Wizard
+        </button>
+        <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
+          Re-opens the first-run wizard to update platform, shell, and workspace settings
+        </p>
+      </div>
+
       {/* Stop Server */}
       <div className="mt-3">
         {serverStopped ? (

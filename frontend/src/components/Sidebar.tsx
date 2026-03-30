@@ -65,14 +65,22 @@ export function Sidebar() {
     } catch { /* ignored */ }
   };
 
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
   const handleDelete = async (name: string) => {
     if (name === 'general') return;
+    if (confirmDelete !== name) {
+      setConfirmDelete(name);
+      setTimeout(() => setConfirmDelete(null), 4000);
+      return;
+    }
     try {
       const r = await api.deleteChannel(name) as { channels: string[] };
       setChannels(mergeChannels(r.channels));
       if (activeChannel === name) setActiveChannel('general');
     } catch { /* ignored */ }
     setContextMenu(null);
+    setConfirmDelete(null);
   };
 
   const handleRename = async (oldName: string) => {
@@ -109,8 +117,13 @@ export function Sidebar() {
               <span className="material-symbols-outlined text-[14px]">edit</span> Rename
             </button>
             <button onClick={() => handleDelete(contextMenu.name)}
-              className="w-full text-left px-3 py-2 text-xs text-red-400/70 hover:bg-red-400/10 rounded-lg flex items-center gap-2">
-              <span className="material-symbols-outlined text-[14px]">delete</span> Delete
+              className={`w-full text-left px-3 py-2 text-xs rounded-lg flex items-center gap-2 ${
+                confirmDelete === contextMenu.name
+                  ? 'text-red-400 bg-red-400/15 font-medium'
+                  : 'text-red-400/70 hover:bg-red-400/10'
+              }`}>
+              <span className="material-symbols-outlined text-[14px]">delete</span>
+              {confirmDelete === contextMenu.name ? 'Click again to confirm' : 'Delete'}
             </button>
           </div>
         </div>

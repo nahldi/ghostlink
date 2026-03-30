@@ -18,28 +18,37 @@ import { TaskQueue } from './TaskQueue';
 
 function CockpitTerminal({ agent }: { agent: Agent }) {
   const stream = useChatStore((s) => s.terminalStreams[agent.name]);
+  const storeMcpLog = useChatStore((s) => s.mcpLogs[agent.name]);
   const [output, setOutput] = useState('');
   const [active, setActive] = useState(false);
+  const [runner, setRunner] = useState<'tmux' | 'mcp'>(agent.runner || 'tmux');
   const [autoScroll, setAutoScroll] = useState(true);
+  const [mcpLog, setMcpLog] = useState<import('../types').McpInvocationEntry[]>([]);
   const preRef = useRef<HTMLPreElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     setOutput('');
     setActive(false);
+    setRunner('tmux');
     api.getAgentTerminalLive(agent.name)
       .then((data) => {
         if (!cancelled) {
           setOutput(data.output || '');
           setActive(data.active ?? false);
+          if ((data as any).runner === 'mcp') setRunner('mcp');
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setOutput('');
-          setActive(false);
-        }
+        if (!cancelled) { setOutput(''); setActive(false); }
       });
+    // Also fetch MCP log in parallel
+    api.getMcpLog(agent.name, 30).then((data) => {
+      if (!cancelled && data.entries.length > 0) {
+        setMcpLog(data.entries);
+        setRunner('mcp');
+      }
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [agent.name]);
 
@@ -47,13 +56,22 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
     if (!stream) return;
     setOutput(stream.output || '');
     setActive(stream.active ?? false);
+    if ((stream as any).runner === 'mcp') setRunner('mcp');
   }, [stream]);
+
+  // Merge real-time WS MCP logs with initial API fetch
+  useEffect(() => {
+    if (storeMcpLog && storeMcpLog.length > 0) {
+      setMcpLog(storeMcpLog);
+      setRunner('mcp');
+    }
+  }, [storeMcpLog]);
 
   useEffect(() => {
     if (autoScroll && preRef.current) {
       preRef.current.scrollTop = preRef.current.scrollHeight;
     }
-  }, [output, autoScroll]);
+  }, [output, autoScroll, mcpLog]);
 
   return (
     <div className="flex flex-col h-full">
@@ -63,6 +81,13 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
             active ? 'bg-green-500/15 text-green-400' : 'bg-surface-container-highest text-on-surface-variant/30'
           }`}>
             {active ? 'LIVE' : 'INACTIVE'}
+          </span>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+            runner === 'mcp'
+              ? 'bg-blue-500/15 text-blue-400'
+              : 'bg-surface-container-highest text-on-surface-variant/30'
+          }`}>
+            {runner === 'mcp' ? 'MCP' : 'TMUX'}
           </span>
           <span className="text-[10px] font-mono text-on-surface-variant/40">
             ghostlink-{agent.name}
@@ -77,13 +102,64 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
           {autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
         </button>
       </div>
-      <pre
-        ref={preRef}
-        className="flex-1 overflow-auto p-3 font-mono text-[11px] leading-relaxed text-green-300/80 whitespace-pre-wrap"
-        style={{ background: '#06060c' }}
-      >
-        {output || (active ? 'Waiting for output...' : `No active session for ${agent.name}`)}
-      </pre>
+
+      {runner === 'mcp' && mcpLog.length > 0 ? (
+        /* MCP invocation log view */
+        <div ref={preRef as any} className="flex-1 overflow-auto" style={{ background: '#06060c' }}>
+          {mcpLog.map((entry, i) => (
+            <div key={i} className="border-b border-outline-variant/5 px-3 py-2">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-[9px] px-1 py-0.5 rounded font-mono ${
+                  entry.status === 'success' ? 'bg-green-500/15 text-green-400'
+                    : entry.status === 'timeout' ? 'bg-amber-500/15 text-amber-400'
+                    : 'bg-red-500/15 text-red-400'
+                }`}>
+                  {entry.status}
+                </span>
+                <span className="text-[9px] text-on-surface-variant/30 font-mono">
+                  {new Date(entry.timestamp * 1000).toLocaleTimeString()}
+                </span>
+                <span className="text-[9px] text-on-surface-variant/20 font-mono">
+                  {entry.duration_ms}ms
+                </span>
+                {entry.cost_usd != null && (
+                  <span className="text-[9px] text-emerald-400/50 font-mono">
+                    ${entry.cost_usd.toFixed(4)}
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-on-surface-variant/40 font-mono truncate mb-1">
+                {entry.prompt}
+              </div>
+              {entry.result_text && (
+                <div className="text-[10px] text-green-300/60 font-mono whitespace-pre-wrap line-clamp-3">
+                  {entry.result_text}
+                </div>
+              )}
+              {entry.error && (
+                <div className="text-[10px] text-red-400/60 font-mono">
+                  {entry.error}
+                </div>
+              )}
+            </div>
+          ))}
+          {/* Also show live output below the log */}
+          {output && (
+            <pre className="p-3 font-mono text-[11px] leading-relaxed text-green-300/80 whitespace-pre-wrap">
+              {output}
+            </pre>
+          )}
+        </div>
+      ) : (
+        /* Traditional tmux terminal view */
+        <pre
+          ref={preRef}
+          className="flex-1 overflow-auto p-3 font-mono text-[11px] leading-relaxed text-green-300/80 whitespace-pre-wrap"
+          style={{ background: '#06060c' }}
+        >
+          {output || (active ? 'Waiting for output...' : `No active session for ${agent.name}`)}
+        </pre>
+      )}
     </div>
   );
 }

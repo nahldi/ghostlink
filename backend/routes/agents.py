@@ -501,7 +501,10 @@ async def _post_register_setup(agent_name: str) -> None:
 
 @router.post("/api/register")
 async def register_agent(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, 400)
     base = body.get("base", body.get("name", ""))
     label = body.get("label", "")
     color = body.get("color", "")
@@ -509,9 +512,12 @@ async def register_agent(request: Request):
     wrapper_pid = body.get("pid")
     if not base:
         return JSONResponse({"error": "base required"}, 400)
+    runner = body.get("runner", "tmux")
     inst = deps.registry.register(base, label, color)
     if role:
         inst.role = role
+    if runner in ("mcp", "tmux"):
+        inst.runner = runner
     if wrapper_pid is not None:
         try:
             pid_int = int(wrapper_pid)
@@ -674,12 +680,16 @@ async def agent_templates(connected: str = ""):
 @router.post("/api/spawn-agent")
 async def spawn_agent(request: Request):
     """Spawn a new agent wrapper process."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, 400)
     base = body.get("base", "").strip()
     label = body.get("label", "").strip()
     cwd = body.get("cwd", "").strip()
     extra_args = body.get("args", [])
     role_description = body.get("roleDescription", "").strip()
+    mcp_mode = bool(body.get("mcpMode", False))
     spawn_warning: str | None = None
 
     if not base:
@@ -812,6 +822,8 @@ async def spawn_agent(request: Request):
             spawn_env["GHOSTLINK_AGENT_ROLE"] = role_description
         if label:
             spawn_env["GHOSTLINK_AGENT_LABEL"] = label
+        if mcp_mode:
+            spawn_env["GHOSTLINK_MCP_MODE"] = "1"
         proc = subprocess.Popen(
             spawn_args,
             cwd=str(deps.BASE_DIR),
@@ -1035,7 +1047,10 @@ async def heartbeat(agent_name: str, request: Request):
 @router.post("/api/agents/{agent_name}/thinking")
 async def update_thinking(agent_name: str, request: Request):
     """Update an agent's thinking buffer."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, 400)
     text = body.get("text", "")
     active = body.get("active", True)
 
@@ -1082,7 +1097,10 @@ async def get_thinking(agent_name: str):
 @router.post("/api/approval/respond")
 async def respond_approval(request: Request):
     """Respond to an agent's permission prompt."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, 400)
     agent_name = (body.get("agent", "") or "").strip()
     response = (body.get("response", "") or "").strip()
     message_id = body.get("message_id", 0)
@@ -1478,6 +1496,57 @@ async def get_terminal_live(name: str):
     if not payload:
         return {"agent": name, "output": "", "active": False, "updated_at": 0}
     return payload
+
+
+@router.post("/api/agents/{name}/terminal/stream")
+async def post_terminal_stream(name: str, request: Request):
+    """Accept terminal output from MCP-mode agents (replaces tmux capture-pane)."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, 400)
+    payload = {
+        "agent": name,
+        "output": str(body.get("output", ""))[-12000:],
+        "active": bool(body.get("active", False)),
+        "updated_at": time.time(),
+        "runner": body.get("runner", "mcp"),
+    }
+    with deps._agent_state_lock:
+        deps._terminal_streams[name] = payload
+    await deps.broadcast("terminal_stream", payload)
+    return payload
+
+
+@router.post("/api/agents/{name}/mcp/log")
+async def post_mcp_invocation_log(name: str, request: Request):
+    """Accept an invocation log entry from an MCP-mode agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    try:
+        entry = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, 400)
+    import collections
+    with deps._agent_state_lock:
+        if name not in deps._mcp_invocation_logs:
+            deps._mcp_invocation_logs[name] = collections.deque(maxlen=100)
+        deps._mcp_invocation_logs[name].append(entry)
+    await deps.broadcast("mcp_invocation", {"agent": name, "entry": entry})
+    return {"ok": True}
+
+
+@router.get("/api/agents/{name}/mcp/log")
+async def get_mcp_invocation_log(name: str, limit: int = 50):
+    """Return recent MCP invocation log entries for an agent."""
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    with deps._agent_state_lock:
+        log_deque = deps._mcp_invocation_logs.get(name)
+        entries = list(log_deque)[-limit:] if log_deque else []
+    return {"agent": name, "entries": entries}
 
 
 @router.get("/api/agents/{name}/presence")

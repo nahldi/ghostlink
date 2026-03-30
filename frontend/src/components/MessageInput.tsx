@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useChatStore } from '../stores/chatStore';
 import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
 import { api } from '../lib/api';
+import { toast } from './Toast';
 import { VoiceCall } from './VoiceCall';
 
 // ── Voice Input (Web Speech API) ───────────────────────────────────
@@ -740,7 +741,7 @@ export function MessageInput() {
         textareaRef.current.style.height = 'auto';
       }
     } catch (e: unknown) {
-      console.error('Send failed:', getErrorMessage(e));
+      toast('Failed to send message', 'error');
     }
   }, [text, activeChannel, settings.username, replyTo, setReplyTo, slashCommands, pendingAttachments, addMessage, agents]);
 
@@ -848,7 +849,7 @@ export function MessageInput() {
             setPendingAttachments((prev) => [...prev, { name: result.name || 'image', url: result.url, type: 'image' }]);
           }
         } catch (err) {
-          console.error('Upload failed:', err);
+          toast('File upload failed', 'error');
         }
         return;
       }
@@ -878,7 +879,7 @@ export function MessageInput() {
           setPendingAttachments((prev) => [...prev, { name: result.name || file.name, url: result.url, type: 'image' }]);
         }
       } catch (err) {
-        console.error('Upload failed:', err);
+        toast('File upload failed', 'error');
       }
     };
     input.click();
@@ -896,7 +897,7 @@ export function MessageInput() {
             setText((prev) => prev + `![${file.name}](${result.url})`);
           }
         } catch (err) {
-          console.error('Upload failed:', err);
+          toast('File upload failed', 'error');
         }
       }
     }
@@ -994,6 +995,29 @@ export function MessageInput() {
         >
           <span className="material-symbols-outlined text-xl">attachment</span>
         </button>
+        {/* Pending attachment previews */}
+        {pendingAttachments.length > 0 && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {pendingAttachments.map((att, i) => (
+              <div key={i} className="relative group">
+                {att.type.startsWith('image/') ? (
+                  <img src={att.url} alt={att.name} className="w-8 h-8 rounded-lg object-cover border border-outline-variant/15" />
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center border border-outline-variant/15">
+                    <span className="material-symbols-outlined text-[14px] text-on-surface-variant/40">description</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-error/90 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`Remove ${att.name}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           value={text}

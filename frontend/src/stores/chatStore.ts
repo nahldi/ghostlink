@@ -107,8 +107,10 @@ interface ChatState {
   setAgentPresence: (presence: AgentPresence) => void;
   browserStates: Record<string, AgentBrowserState>;
   setBrowserState: (state: AgentBrowserState) => void;
-  terminalStreams: Record<string, { output: string; active: boolean; updated_at: number }>;
-  setTerminalStream: (stream: { agent: string; output: string; active: boolean; updated_at: number }) => void;
+  terminalStreams: Record<string, { output: string; active: boolean; updated_at: number; runner?: string }>;
+  setTerminalStream: (stream: { agent: string; output: string; active: boolean; updated_at: number; runner?: string }) => void;
+  mcpLogs: Record<string, import('../types').McpInvocationEntry[]>;
+  addMcpInvocation: (agent: string, entry: import('../types').McpInvocationEntry) => void;
   workspaceChanges: Record<string, WorkspaceChange[]>;
   addWorkspaceChange: (change: WorkspaceChange) => void;
   setWorkspaceChanges: (agent: string, changes: WorkspaceChange[]) => void;
@@ -375,6 +377,14 @@ export const useChatStore = create<ChatState>((set) => ({
   setTerminalStream: (stream) =>
     set((s) => ({
       terminalStreams: { ...s.terminalStreams, [stream.agent]: stream },
+    })),
+  mcpLogs: {},
+  addMcpInvocation: (agent, entry) =>
+    set((s) => ({
+      mcpLogs: {
+        ...s.mcpLogs,
+        [agent]: [...(s.mcpLogs[agent] || []), entry].slice(-100),
+      },
     })),
   workspaceChanges: {},
   addWorkspaceChange: (change) =>

@@ -84,7 +84,7 @@ def test_workspace_spawn_warning_flags_wsl_onedrive_paths():
     """WSL-mounted OneDrive workspaces should emit a spawn warning."""
     from routes.agents import _workspace_spawn_warning
 
-    warning = _workspace_spawn_warning("/mnt/c/Users/skull/OneDrive/Desktop/project")
+    warning = _workspace_spawn_warning("/mnt/c/Users/testuser/OneDrive/Desktop/project")
 
     assert warning is not None
     assert "OneDrive" in warning
@@ -94,7 +94,7 @@ def test_workspace_spawn_warning_ignores_normal_linux_paths():
     """Normal Linux workspaces should not emit a spawn warning."""
     from routes.agents import _workspace_spawn_warning
 
-    assert _workspace_spawn_warning("/home/skull/project") is None
+    assert _workspace_spawn_warning("/home/testuser/project") is None
 
 
 def test_shared_auth_spawn_warning_detects_external_codex(monkeypatch: pytest.MonkeyPatch):

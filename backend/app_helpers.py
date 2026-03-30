@@ -19,8 +19,12 @@ log = logging.getLogger(__name__)
 def save_settings():
     """Persist the in-memory settings dict to disk. Shared across all route modules."""
     settings_path = deps.DATA_DIR / "settings.json"
-    with open(settings_path, "w") as f:
-        json.dump(deps._settings, f, indent=2)
+    try:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(settings_path, "w") as f:
+            json.dump(deps._settings, f, indent=2)
+    except Exception as e:
+        log.error("Failed to save settings to %s: %s", settings_path, e)
 
 
 def get_full_agent_list() -> list[dict]:

@@ -52,9 +52,19 @@ export function MobileHeader() {
               </div>
             );
           })}
+          {agents.length > 4 && (
+            <span className="text-[10px] text-on-surface-variant/40 font-medium ml-0.5">
+              +{agents.length - 4}
+            </span>
+          )}
           {onlineAgents.length > 0 && (
             <span className="text-[10px] text-green-400/60 font-medium ml-1">
-              {onlineAgents.length}
+              {onlineAgents.length} online
+            </span>
+          )}
+          {onlineAgents.length === 0 && agents.length > 0 && (
+            <span className="text-[10px] text-on-surface-variant/25 font-medium ml-1">
+              0 online
             </span>
           )}
         </div>

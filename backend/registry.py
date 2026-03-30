@@ -29,6 +29,7 @@ class AgentInstance:
     model: str = ""  # model override for this agent
     failoverModel: str = ""  # fallback model if primary fails
     autoApprove: bool = False  # auto-approve all permission prompts
+    runner: str = "tmux"  # "tmux" or "mcp" — which agent runner is active
 
     def to_dict(self) -> dict:
         return asdict(self)

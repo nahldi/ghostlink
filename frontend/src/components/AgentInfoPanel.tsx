@@ -4,6 +4,7 @@ import { AgentIcon } from './AgentIcon';
 import { api } from '../lib/api';
 import { useChatStore } from '../stores/chatStore';
 import { timeAgo } from '../lib/timeago';
+import { toast } from './Toast';
 
 interface AgentInfoPanelProps {
   agent: Agent;
@@ -42,7 +43,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
     try {
       await api.toggleAgentSkill(agent.name, skillId, enabled);
       setSkills(prev => prev.map(s => s.id === skillId ? { ...s, enabled } : s));
-    } catch (e) { console.warn('Toggle skill:', e instanceof Error ? e.message : String(e)); }
+    } catch (e) { toast('Failed to toggle skill', 'error'); }
   };
 
   const handleLaunch = async () => {
@@ -53,7 +54,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
         try { const r = await api.getStatus(); setAgents(r.agents); } catch (e) { console.warn('Status fetch after launch:', e instanceof Error ? e.message : String(e)); }
         onClose();
       }, 3000);
-    } catch (e) { console.warn('Agent launch:', e instanceof Error ? e.message : String(e)); setLaunching(false); }
+    } catch (e) { toast(e instanceof Error ? e.message : 'Failed to launch agent', 'error'); setLaunching(false); }
   };
 
   const handleKill = async () => {
@@ -63,7 +64,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
       const r = await api.getStatus();
       setAgents(r.agents);
       onClose();
-    } catch (e) { console.warn('Agent kill:', e instanceof Error ? e.message : String(e)); setKilling(false); }
+    } catch (e) { toast(e instanceof Error ? e.message : 'Failed to stop agent', 'error'); setKilling(false); }
   };
 
   const filteredSkills = skills.filter(s => {

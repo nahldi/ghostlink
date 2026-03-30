@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AgentIcon } from './AgentIcon';
 import { api } from '../lib/api';
+import { toast } from './Toast';
 
 interface ApprovalCardProps {
   messageId: number;
@@ -28,7 +29,7 @@ export function ApprovalCard({ messageId, agent, agentColor, agentBase, prompt, 
       await api.respondApproval(agent, response, messageId);
       setLocalResponse(response);
     } catch (err) {
-      console.error('Approval response failed:', err);
+      toast('Approval response failed', 'error');
     } finally {
       setSending(false);
     }

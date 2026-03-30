@@ -117,6 +117,14 @@ export function MobileSidebar() {
               </button>
             </div>
             <div className="space-y-0.5">
+              {agents.length === 0 && (
+                <button
+                  onClick={() => setShowAddAgent(true)}
+                  className="w-full text-left px-3 py-2 rounded-lg text-on-surface-variant/25 text-[11px] hover:bg-primary/5 transition-colors"
+                >
+                  No agents running — tap + to launch one
+                </button>
+              )}
               {agents.map((agent) => (
                 <AgentStatusPill key={agent.name} agent={agent} />
               ))}

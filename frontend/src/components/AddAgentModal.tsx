@@ -104,6 +104,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
   const [error, setError] = useState('');
   const [pickingFolder, setPickingFolder] = useState(false);
   const [persistent, setPersistent] = useState(true);
+  const [mcpMode, setMcpMode] = useState(false);
   const [bridgePlatform, setBridgePlatform] = useState('');
   const [bridgeToken, setBridgeToken] = useState('');
   const agents = useChatStore((s) => s.agents);
@@ -179,7 +180,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
         }
       }
 
-      const spawnResult = await api.spawnAgent(selected, finalLabel, finalCwd, finalArgs, roleDescription);
+      const spawnResult = await api.spawnAgent(selected, finalLabel, finalCwd, finalArgs, roleDescription, mcpMode);
       // Show any spawn warnings (e.g. OneDrive workspace)
       if (spawnResult && typeof spawnResult === 'object' && 'warning' in spawnResult) {
         toast(String((spawnResult as { warning: string }).warning), 'warning');
@@ -191,7 +192,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
           await api.configureBridge(bridgePlatform, { token: bridgeToken });
           await api.startBridge(bridgePlatform);
         } catch (e) {
-          console.warn('Bridge config after spawn:', e instanceof Error ? e.message : String(e));
+          toast(`Bridge setup failed: ${e instanceof Error ? e.message : 'unknown error'}`, 'warning');
         }
       }
 
@@ -481,13 +482,40 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
             </button>
           </div>
 
+          {/* MCP mode toggle — Claude only, advanced mode */}
+          {selected === 'claude' && isAdvanced && (
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <div className="text-[11px] font-semibold text-on-surface flex items-center gap-1.5">
+                  MCP Mode
+                  <span className="text-[8px] px-1 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">EXPERIMENTAL</span>
+                </div>
+                <div className="text-[10px] text-on-surface-variant/30">Persistent pipe — no tmux, structured JSON I/O</div>
+              </div>
+              <button
+                onClick={() => setMcpMode(!mcpMode)}
+                className={`w-10 h-5 rounded-full relative transition-all ${
+                  mcpMode ? 'bg-blue-500/80' : 'bg-outline-variant/30'
+                }`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${
+                  mcpMode ? 'right-0.5' : 'left-0.5'
+                }`} />
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="text-xs bg-error/5 border border-error/10 rounded-xl px-3 py-2.5 space-y-1">
               <div className="flex items-center gap-1.5 text-error font-medium">
                 <span className="material-symbols-outlined text-[14px]">error</span>
-                {error.includes('not found') ? `${selected} CLI not installed` : 'Launch failed'}
+                {error.includes('not installed') || error.includes('not found')
+                  ? `${selected} not installed`
+                  : error.includes('not authenticated') || error.includes('auth')
+                  ? `${selected} authentication required`
+                  : 'Launch failed'}
               </div>
-              <div className="text-on-surface-variant/50 text-[10px] leading-relaxed">{error}</div>
+              <div className="text-on-surface-variant/50 text-[10px] leading-relaxed select-text">{error}</div>
             </div>
           )}
 

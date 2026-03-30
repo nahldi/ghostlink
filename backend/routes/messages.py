@@ -165,8 +165,9 @@ async def send_message(request: Request):
             message_id=msg.get("id"),
             metadata=metadata_payload,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Bridge forwarding failed for %s: %s", channel, e)
 
     # Emit event for hooks
     event_bus.emit("on_message", {"sender": sender, "text": text, "channel": channel, "id": msg.get("id")})

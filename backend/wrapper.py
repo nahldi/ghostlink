@@ -269,11 +269,11 @@ def _apply_mcp_inject(
 
 # ── Registration ────────────────────────────────────────────────────
 
-def _register(server_port: int, base: str, label: str = "", role: str = "") -> dict:
+def _register(server_port: int, base: str, label: str = "", role: str = "", runner: str = "tmux") -> dict:
     import urllib.request
     # Include our own pid so the server can link this process to the registered name.
     # This fixes the {base}_{pid} keying race in process tracking.
-    payload = {"base": base, "label": label, "pid": os.getpid()}
+    payload = {"base": base, "label": label, "pid": os.getpid(), "runner": runner}
     if role:
         payload["role"] = role
     body = json.dumps(payload).encode()
@@ -725,9 +725,12 @@ def main():
     # Read role description from env (set by routes/agents.py spawn)
     agent_role_desc = os.environ.get("GHOSTLINK_AGENT_ROLE", "")
 
+    # Determine runner mode early — env var set by spawn endpoint
+    _runner_mode = "mcp" if os.environ.get("GHOSTLINK_MCP_MODE") == "1" and agent in ("claude",) else "tmux"
+
     # Register with server — include role so other agents can see it via chat_who
     try:
-        registration = _register(server_port, agent, label, role=agent_role_desc)
+        registration = _register(server_port, agent, label, role=agent_role_desc, runner=_runner_mode)
     except Exception as exc:
         print(f"  Registration failed: {exc}")
         print(f"  Is the GhostLink server running on port {server_port}?")
@@ -752,6 +755,71 @@ def main():
     def get_token():
         with _identity_lock:
             return _identity["token"]
+
+    def handle_mcp_approval_request(payload: dict) -> dict | None:
+        """Route an MCP control_request through GhostLink's existing approval flow."""
+        import urllib.request
+
+        current_name, _ = get_identity()
+        response_file = data_dir / f"{current_name}_approval.json"
+        response_file.unlink(missing_ok=True)
+
+        try:
+            auto_approve_url = f"http://127.0.0.1:{server_port}/api/agents/{current_name}/config"
+            req = urllib.request.Request(auto_approve_url, method="GET")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                agent_config = json.loads(resp.read())
+                if agent_config.get("autoApprove"):
+                    return {"behavior": "allow"}
+        except Exception:
+            pass
+
+        tool_name = payload.get("tool_name", "")
+        tool_input = payload.get("input", {})
+        request_id = payload.get("request_id", "")
+
+        try:
+            body = json.dumps({
+                "sender": current_name,
+                "text": f"Permission prompt from {current_name}",
+                "type": "approval_request",
+                "channel": _get_last_channel(),
+                "metadata": json.dumps({
+                    "agent": current_name,
+                    "request_id": request_id,
+                    "prompt": f"Tool: {tool_name}\nInput: {json.dumps(tool_input, ensure_ascii=True)}",
+                    "options": ["allow_once", "allow_session", "deny"],
+                }),
+            }).encode()
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{server_port}/api/send",
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=5)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug("Failed to post MCP approval request: %s", e)
+            return {"behavior": "deny", "message": "Failed to post approval request"}
+
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            if response_file.exists():
+                try:
+                    resp_data = json.loads(response_file.read_text("utf-8"))
+                except Exception:
+                    response_file.unlink(missing_ok=True)
+                    return {"behavior": "deny", "message": "Invalid approval response"}
+                response_file.unlink(missing_ok=True)
+                response = resp_data.get("response", "deny")
+                if response in ("allow_once", "allow_session"):
+                    return {"behavior": "allow"}
+                return {"behavior": "deny", "message": "User rejected"}
+            time.sleep(0.5)
+
+        response_file.unlink(missing_ok=True)
+        return {"behavior": "deny", "message": "Approval timed out"}
 
     proxy = None
     proxy_url = None
@@ -1094,12 +1162,46 @@ def main():
             daemon=True,
         ).start()
 
-    # Run agent
-    from wrapper_unix import get_activity_checker, run_agent
+    # Run agent — choose between MCP-native (--print) and tmux modes
+    use_mcp_mode = agent_cfg.get("mcp_mode", False) or os.environ.get("GHOSTLINK_MCP_MODE") == "1"
 
-    _activity_checker = get_activity_checker(session_name, trigger_flag=_trigger_flag)
+    if use_mcp_mode and agent in ("claude",):
+        # MCP-native mode: persistent pipe with stream-json I/O (no tmux)
+        from wrapper_mcp import run_agent_mcp
+        print(f"  Using MCP-native mode (persistent pipe, no tmux)")
+        mcp_cfg_path = next(
+            (launch_args[i + 1] for i, a in enumerate(launch_args)
+             if a == "--mcp-config" and i + 1 < len(launch_args)),
+            None,
+        )
+        try:
+            run_agent_mcp(
+                command=command,
+                extra_args=launch_args,
+                cwd=cwd,
+                env=env,
+                queue_file=queue_file,
+                agent=agent,
+                no_restart=args.no_restart,
+                start_watcher=start_watcher,
+                strip_env=list(strip_vars),
+                session_name=session_name,
+                inject_env=inject_env,
+                inject_delay=agent_cfg.get("inject_delay", 0.3),
+                headless=headless,
+                mcp_config=mcp_cfg_path,
+                server_port=server_port,
+                on_approval_request=handle_mcp_approval_request,
+            )
+        except Exception as e:
+            print(f"  MCP mode failed: {e} — falling back to tmux")
+            use_mcp_mode = False
 
-    try:
+    if not use_mcp_mode:
+        from wrapper_unix import get_activity_checker, run_agent
+
+        _activity_checker = get_activity_checker(session_name, trigger_flag=_trigger_flag)
+
         run_agent(
             command=command,
             extra_args=launch_args,
@@ -1115,13 +1217,14 @@ def main():
             inject_delay=agent_cfg.get("inject_delay", 0.3),
             headless=headless,
         )
-    finally:
-        current_name, _ = get_identity()
-        current_token = get_token()
-        _deregister(server_port, current_name, current_token)
-        print(f"  Deregistered {current_name}")
-        if proxy:
-            proxy.stop()
+
+    # Cleanup — deregister on exit regardless of mode
+    current_name, _ = get_identity()
+    current_token = get_token()
+    _deregister(server_port, current_name, current_token)
+    print(f"  Deregistered {current_name}")
+    if proxy:
+        proxy.stop()
     print("  Wrapper stopped.")
 
 

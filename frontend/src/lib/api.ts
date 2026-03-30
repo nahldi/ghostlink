@@ -4,6 +4,7 @@ type SessionState = import('../types').Session | null;
 type Provider = import('../types').Provider;
 type ProviderCapability = import('../types').ProviderCapability;
 type FreeOption = import('../types').FreeOption;
+type McpInvocationEntry = import('../types').McpInvocationEntry;
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -112,10 +113,10 @@ export const api = {
     return request<{ templates: import('../types').AgentTemplate[] }>(`/api/agent-templates${params}`);
   },
 
-  spawnAgent: (base: string, label: string, cwd: string, args: string[], roleDescription?: string) =>
+  spawnAgent: (base: string, label: string, cwd: string, args: string[], roleDescription?: string, mcpMode?: boolean) =>
     request<{ ok: boolean; pid: number; base: string; message: string }>('/api/spawn-agent', {
       method: 'POST',
-      body: JSON.stringify({ base, label, cwd, args, ...(roleDescription ? { roleDescription } : {}) }),
+      body: JSON.stringify({ base, label, cwd, args, ...(roleDescription ? { roleDescription } : {}), ...(mcpMode ? { mcpMode: true } : {}) }),
     }),
 
   killAgent: (name: string) =>
@@ -310,6 +311,12 @@ export const api = {
     request<{ ok: boolean; method: string }>(`/api/agents/${encodeURIComponent(agentName)}/terminal/open`, {
       method: 'POST',
     }),
+
+  // MCP invocation logs
+  getMcpLog: (agentName: string, limit = 50) =>
+    request<{ agent: string; entries: McpInvocationEntry[] }>(
+      `/api/agents/${encodeURIComponent(agentName)}/mcp/log?limit=${limit}`
+    ),
 
   // Schedules
   getSchedules: () =>

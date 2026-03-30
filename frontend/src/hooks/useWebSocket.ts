@@ -72,6 +72,7 @@ export function useWebSocket() {
     setFileDiff,
     setCollaborators,
     setWorkspaceInvites,
+    addMcpInvocation,
   } = useChatStore();
   const activeChannel = useChatStore((s) => s.activeChannel);
   const sidebarPanel = useChatStore((s) => s.sidebarPanel);
@@ -255,6 +256,11 @@ export function useWebSocket() {
             break;
           case 'terminal_stream':
             setTerminalStream(parsed.data);
+            break;
+          case 'mcp_invocation':
+            if (parsed.data?.agent && parsed.data?.entry) {
+              addMcpInvocation(parsed.data.agent, parsed.data.entry);
+            }
             break;
           case 'workspace_change':
             addWorkspaceChange(parsed.data);

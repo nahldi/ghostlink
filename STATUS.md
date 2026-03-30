@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-03-28
 **Version:** v4.8.7
-**Owner:** Finn (FinnTheDogg / nahldi / nahlidify)
+**Owner:** nahldi
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
 
