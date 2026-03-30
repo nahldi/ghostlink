@@ -28,7 +28,7 @@ export function ApprovalCard({ messageId, agent, agentColor, agentBase, prompt, 
     try {
       await api.respondApproval(agent, response, messageId);
       setLocalResponse(response);
-    } catch (err) {
+    } catch {
       toast('Approval response failed', 'error');
     } finally {
       setSending(false);

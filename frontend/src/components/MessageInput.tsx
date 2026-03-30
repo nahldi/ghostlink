@@ -754,7 +754,7 @@ export function MessageInput() {
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
-    } catch (e: unknown) {
+    } catch {
       toast('Failed to send message', 'error');
     }
   }, [text, activeChannel, settings.username, replyTo, setReplyTo, slashCommands, pendingAttachments, addMessage, agents]);
@@ -862,7 +862,7 @@ export function MessageInput() {
             setText((prev) => prev + `![image](${result.url})`);
             setPendingAttachments((prev) => [...prev, { name: result.name || 'image', url: result.url, type: 'image' }]);
           }
-        } catch (err) {
+        } catch {
           toast('File upload failed', 'error');
         }
         return;
@@ -892,7 +892,7 @@ export function MessageInput() {
           setText((prev) => prev + `![image](${result.url})`);
           setPendingAttachments((prev) => [...prev, { name: result.name || file.name, url: result.url, type: 'image' }]);
         }
-      } catch (err) {
+      } catch {
         toast('File upload failed', 'error');
       }
     };
@@ -910,7 +910,7 @@ export function MessageInput() {
           if (result.url) {
             setText((prev) => prev + `![${file.name}](${result.url})`);
           }
-        } catch (err) {
+        } catch {
           toast('File upload failed', 'error');
         }
       }

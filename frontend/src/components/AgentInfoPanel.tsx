@@ -43,7 +43,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
     try {
       await api.toggleAgentSkill(agent.name, skillId, enabled);
       setSkills(prev => prev.map(s => s.id === skillId ? { ...s, enabled } : s));
-    } catch (e) { toast('Failed to toggle skill', 'error'); }
+    } catch { toast('Failed to toggle skill', 'error'); }
   };
 
   const handleLaunch = async () => {

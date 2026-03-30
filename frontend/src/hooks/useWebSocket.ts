@@ -352,7 +352,9 @@ export function useWebSocket() {
         client?.disconnect();
       } catch { /* ignored */ }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — Safe: runs once on mount, all store reads use getState() at handler time (not capture time)
+   
+  // Safe: runs once on mount, and store reads use getState() at handler time.
+  }, []);
 
   useEffect(() => {
     const client = wsRef.current;
