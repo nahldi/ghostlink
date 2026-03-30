@@ -88,7 +88,24 @@ class MCPAgentProcess:
         # Assistant message callback
         self.on_assistant_message: Callable[[dict], None] | None = None
 
-    def _build_cmd(self) -> list[str]:
+    def _is_codex(self) -> bool:
+        return self.command in ("codex",) or "codex" in self.agent_name
+
+    def _build_cmd(self, prompt: str | None = None) -> list[str]:
+        if self._is_codex():
+            # Codex: exec-per-trigger with JSONL output
+            cmd = [self.command, "exec", "--json"]
+            if self.mcp_config:
+                cmd.extend(["--mcp-config", self.mcp_config])
+            for arg in self.extra_args:
+                if arg in ("--headless",):
+                    continue
+                cmd.append(arg)
+            if prompt:
+                cmd.append(prompt)
+            return cmd
+
+        # Claude: persistent stdin/stdout pipe with stream-json
         cmd = [
             self.command, "-p",
             "--input-format", "stream-json",
@@ -103,12 +120,17 @@ class MCPAgentProcess:
             cmd.extend(["--mcp-config", self.mcp_config])
         for arg in self.extra_args:
             if arg in ("--headless", "--print", "--output-format", "--input-format"):
-                continue  # Skip flags we're already setting
+                continue
             cmd.append(arg)
         return cmd
 
     def start(self) -> bool:
-        """Start the persistent Claude subprocess."""
+        """Start the agent. Claude gets a persistent subprocess; Codex is exec-per-trigger."""
+        if self._is_codex():
+            # Codex doesn't need a persistent process — just mark as alive
+            self._alive = True
+            log.info("MCP agent %s ready (Codex exec-per-trigger mode)", self.agent_name)
+            return True
         cmd = self._build_cmd()
         log.info("Starting MCP agent %s: %s", self.agent_name, " ".join(cmd))
         log.info("  CWD: %s, Session: %s", self.cwd, self.session_id)
@@ -180,11 +202,51 @@ class MCPAgentProcess:
             log.warning("MCP agent %s stdin write failed: %s", self.agent_name, e)
             self._alive = False
 
+    def _codex_exec(self, content: str) -> dict | None:
+        """Run a single Codex exec invocation (exec-per-trigger model)."""
+        cmd = self._build_cmd(prompt=content)
+        start_time = time.time()
+        try:
+            result = subprocess.run(
+                cmd, cwd=self.cwd, env=self.env,
+                capture_output=True, text=True, timeout=TURN_TIMEOUT,
+            )
+            duration_ms = int((time.time() - start_time) * 1000)
+            last_event = None
+            for line in result.stdout.strip().split("\n"):
+                line = line.strip()
+                if line:
+                    try:
+                        last_event = json.loads(line)
+                    except json.JSONDecodeError:
+                        pass
+            entry = {
+                "timestamp": time.time(), "duration_ms": duration_ms,
+                "prompt": content[:200], "session_id": self.session_id,
+                "agent": self.agent_name,
+                "status": "success" if result.returncode == 0 else "error",
+            }
+            if last_event:
+                entry["result_type"] = last_event.get("type", "unknown")
+                entry["result_text"] = str(last_event.get("content", ""))[:500]
+            self._log_invocation(entry)
+            return last_event or {"subtype": "success", "total_cost_usd": 0}
+        except subprocess.TimeoutExpired:
+            log.warning("Codex exec timed out for %s", self.agent_name)
+            return None
+        except Exception as e:
+            log.error("Codex exec failed: %s", e)
+            return None
+
     def send_message(self, content: str) -> dict | None:
         """Send a user message and wait for the turn to complete.
 
-        Returns the result dict or None on timeout/error.
+        For Claude: writes to persistent stdin pipe.
+        For Codex: spawns a new exec subprocess per message.
         """
+        if self._is_codex():
+            return self._codex_exec(content)
+
         if not self._alive:
             log.warning("MCP agent %s is not alive, cannot send message", self.agent_name)
             return None
@@ -450,6 +512,8 @@ class MCPAgentProcess:
 
     @property
     def is_alive(self) -> bool:
+        if self._is_codex():
+            return self._alive  # No persistent process to check
         if not self._proc:
             return False
         if self._proc.poll() is not None:

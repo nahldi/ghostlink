@@ -726,7 +726,8 @@ def main():
     agent_role_desc = os.environ.get("GHOSTLINK_AGENT_ROLE", "")
 
     # Determine runner mode early — env var set by spawn endpoint
-    _runner_mode = "mcp" if os.environ.get("GHOSTLINK_MCP_MODE") == "1" and agent in ("claude",) else "tmux"
+    _mcp_agents = ("claude", "codex")  # Agents with proven headless/MCP support
+    _runner_mode = "mcp" if os.environ.get("GHOSTLINK_MCP_MODE") == "1" and agent in _mcp_agents else "tmux"
 
     # Register with server — include role so other agents can see it via chat_who
     try:
@@ -1165,10 +1166,13 @@ def main():
     # Run agent — choose between MCP-native (--print) and tmux modes
     use_mcp_mode = agent_cfg.get("mcp_mode", False) or os.environ.get("GHOSTLINK_MCP_MODE") == "1"
 
-    if use_mcp_mode and agent in ("claude",):
-        # MCP-native mode: persistent pipe with stream-json I/O (no tmux)
+    if use_mcp_mode and agent in ("claude", "codex"):
+        # MCP-native mode: no tmux dependency
+        # Claude: persistent stdin/stdout pipe with stream-json
+        # Codex: exec-per-trigger with JSONL output
         from wrapper_mcp import run_agent_mcp
-        print(f"  Using MCP-native mode (persistent pipe, no tmux)")
+        mode_desc = "persistent pipe" if agent == "claude" else "exec-per-trigger"
+        print(f"  Using MCP-native mode ({mode_desc}, no tmux)")
         mcp_cfg_path = next(
             (launch_args[i + 1] for i, a in enumerate(launch_args)
              if a == "--mcp-config" and i + 1 < len(launch_args)),
