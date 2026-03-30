@@ -274,10 +274,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       )
     : items;
 
-  // Keyboard navigation
-  useEffect(() => {
-    setSelectedIdx(0);
-  }, [query]);
+  // Reset selection when search query changes — intentional sync pattern
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setSelectedIdx(0); }, [query]);
 
   useEffect(() => {
     inputRef.current?.focus();
