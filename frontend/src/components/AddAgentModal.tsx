@@ -483,7 +483,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
           </div>
 
           {/* MCP mode toggle — Claude only, advanced mode */}
-          {(selected === 'claude' || selected === 'codex') && isAdvanced && (
+          {(selected === 'claude' || selected === 'codex' || selected === 'gemini') && isAdvanced && (
             <div className="flex items-center justify-between py-1">
               <div>
                 <div className="text-[11px] font-semibold text-on-surface flex items-center gap-1.5">

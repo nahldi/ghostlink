@@ -91,6 +91,13 @@ class MCPAgentProcess:
     def _is_codex(self) -> bool:
         return self.command in ("codex",) or "codex" in self.agent_name
 
+    def _is_gemini(self) -> bool:
+        return self.command in ("gemini",) or "gemini" in self.agent_name
+
+    def _is_exec_mode(self) -> bool:
+        """Agents that use exec-per-trigger instead of persistent pipe."""
+        return self._is_codex() or self._is_gemini()
+
     def _build_cmd(self, prompt: str | None = None) -> list[str]:
         if self._is_codex():
             # Codex: exec-per-trigger with JSONL output
@@ -101,6 +108,21 @@ class MCPAgentProcess:
                 if arg in ("--headless",):
                     continue
                 cmd.append(arg)
+            if prompt:
+                cmd.append(prompt)
+            return cmd
+
+        if self._is_gemini():
+            # Gemini: exec-per-trigger with JSON output
+            cmd = [self.command, "-p"]
+            if self.mcp_config:
+                # Gemini uses env var for MCP config, not --mcp-config flag
+                pass
+            for arg in self.extra_args:
+                if arg in ("--headless",):
+                    continue
+                cmd.append(arg)
+            cmd.extend(["--output-format", "json"])
             if prompt:
                 cmd.append(prompt)
             return cmd
@@ -125,11 +147,12 @@ class MCPAgentProcess:
         return cmd
 
     def start(self) -> bool:
-        """Start the agent. Claude gets a persistent subprocess; Codex is exec-per-trigger."""
-        if self._is_codex():
-            # Codex doesn't need a persistent process — just mark as alive
+        """Start the agent. Claude gets a persistent subprocess; Codex/Gemini are exec-per-trigger."""
+        if self._is_exec_mode():
+            # Exec-per-trigger agents don't need a persistent process
             self._alive = True
-            log.info("MCP agent %s ready (Codex exec-per-trigger mode)", self.agent_name)
+            mode = "Codex" if self._is_codex() else "Gemini"
+            log.info("MCP agent %s ready (%s exec-per-trigger mode)", self.agent_name, mode)
             return True
         cmd = self._build_cmd()
         log.info("Starting MCP agent %s: %s", self.agent_name, " ".join(cmd))
@@ -238,14 +261,52 @@ class MCPAgentProcess:
             log.error("Codex exec failed: %s", e)
             return None
 
+    def _gemini_exec(self, content: str) -> dict | None:
+        """Run a single Gemini exec invocation."""
+        cmd = self._build_cmd(content)
+        log.info("Gemini exec: %s", " ".join(cmd[:5]))
+        start = time.time()
+        try:
+            result = subprocess.run(
+                cmd, cwd=self.cwd, env=self._env,
+                capture_output=True, text=True, timeout=120,
+            )
+            duration_ms = int((time.time() - start) * 1000)
+            parsed = None
+            if result.returncode == 0 and result.stdout.strip():
+                try:
+                    parsed = json.loads(result.stdout.strip())
+                except json.JSONDecodeError:
+                    log.warning("Gemini non-JSON output: %s", result.stdout[:200])
+            entry = {
+                "timestamp": time.time(), "duration_ms": duration_ms,
+                "prompt": content[:200], "session_id": self.session_id,
+                "agent": self.agent_name,
+                "status": "success" if result.returncode == 0 else "error",
+            }
+            if parsed:
+                entry["result_type"] = "gemini_result"
+                entry["result_text"] = str(parsed.get("response", ""))[:500]
+                entry["cost_usd"] = 0  # Gemini free tier
+            self._log_invocation(entry)
+            return parsed or {"subtype": "success", "total_cost_usd": 0}
+        except subprocess.TimeoutExpired:
+            log.warning("Gemini exec timed out for %s", self.agent_name)
+            return None
+        except Exception as e:
+            log.error("Gemini exec failed: %s", e)
+            return None
+
     def send_message(self, content: str) -> dict | None:
         """Send a user message and wait for the turn to complete.
 
         For Claude: writes to persistent stdin pipe.
-        For Codex: spawns a new exec subprocess per message.
+        For Codex/Gemini: spawns a new exec subprocess per message.
         """
         if self._is_codex():
             return self._codex_exec(content)
+        if self._is_gemini():
+            return self._gemini_exec(content)
 
         if not self._alive:
             log.warning("MCP agent %s is not alive, cannot send message", self.agent_name)

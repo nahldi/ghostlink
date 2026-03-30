@@ -726,7 +726,7 @@ def main():
     agent_role_desc = os.environ.get("GHOSTLINK_AGENT_ROLE", "")
 
     # Determine runner mode early — env var set by spawn endpoint
-    _mcp_agents = ("claude", "codex")  # Agents with proven headless/MCP support
+    _mcp_agents = ("claude", "codex", "gemini")  # Agents with headless/MCP support
     _runner_mode = "mcp" if os.environ.get("GHOSTLINK_MCP_MODE") == "1" and agent in _mcp_agents else "tmux"
 
     # Register with server — include role so other agents can see it via chat_who
@@ -1166,7 +1166,7 @@ def main():
     # Run agent — choose between MCP-native (--print) and tmux modes
     use_mcp_mode = agent_cfg.get("mcp_mode", False) or os.environ.get("GHOSTLINK_MCP_MODE") == "1"
 
-    if use_mcp_mode and agent in ("claude", "codex"):
+    if use_mcp_mode and agent in ("claude", "codex", "gemini"):
         # MCP-native mode: no tmux dependency
         # Claude: persistent stdin/stdout pipe with stream-json
         # Codex: exec-per-trigger with JSONL output
