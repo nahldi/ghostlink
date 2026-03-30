@@ -36,7 +36,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
         if (!cancelled) {
           setOutput(data.output || '');
           setActive(data.active ?? false);
-          if ((data as any).runner === 'mcp') setRunner('mcp');
+          if ((data as Record<string, unknown>).runner === 'mcp') setRunner('mcp');
         }
       })
       .catch(() => {
@@ -56,7 +56,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
     if (!stream) return;
     setOutput(stream.output || '');
     setActive(stream.active ?? false);
-    if ((stream as any).runner === 'mcp') setRunner('mcp');
+    if ((stream as Record<string, unknown>).runner === 'mcp') setRunner('mcp');
   }, [stream]);
 
   // Merge real-time WS MCP logs with initial API fetch
@@ -105,7 +105,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
 
       {runner === 'mcp' && mcpLog.length > 0 ? (
         /* MCP invocation log view */
-        <div ref={preRef as any} className="flex-1 overflow-auto" style={{ background: '#06060c' }}>
+        <div ref={preRef as React.RefObject<HTMLDivElement>} className="flex-1 overflow-auto" style={{ background: '#06060c' }}>
           {mcpLog.map((entry, i) => (
             <div key={i} className="border-b border-outline-variant/5 px-3 py-2">
               <div className="flex items-center gap-2 mb-1">
@@ -438,7 +438,7 @@ function CockpitFiles({ agent }: { agent: Agent }) {
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-1.5">
                 <div className="w-4 h-4 rounded skeleton-shimmer" />
-                <div className="h-2.5 rounded skeleton-shimmer" style={{ width: `${40 + Math.random() * 40}%` }} />
+                <div className="h-2.5 rounded skeleton-shimmer" style={{ width: `${40 + ((i * 37) % 40)}%` }} />
               </div>
             ))}
           </div>
@@ -947,8 +947,8 @@ function CockpitReplay({ agent, onFileReverted }: { agent: Agent; onFileReverted
                 <div key={i} className="flex items-start gap-2.5 px-3 py-2">
                   <div className="w-2 h-2 rounded-full skeleton-shimmer mt-1.5 shrink-0" />
                   <div className="flex-1 space-y-1">
-                    <div className="h-2.5 rounded skeleton-shimmer" style={{ width: `${50 + Math.random() * 30}%` }} />
-                    <div className="h-2 rounded skeleton-shimmer" style={{ width: `${30 + Math.random() * 40}%` }} />
+                    <div className="h-2.5 rounded skeleton-shimmer" style={{ width: `${50 + ((i * 31) % 30)}%` }} />
+                    <div className="h-2 rounded skeleton-shimmer" style={{ width: `${30 + ((i * 43) % 40)}%` }} />
                   </div>
                 </div>
               ))}
