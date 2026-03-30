@@ -114,17 +114,15 @@ class MCPAgentProcess:
 
         if self._is_gemini():
             # Gemini: exec-per-trigger with JSON output
-            cmd = [self.command, "-p"]
-            if self.mcp_config:
-                # Gemini uses env var for MCP config, not --mcp-config flag
-                pass
+            # Note: -p/--prompt takes the prompt text as its value
+            cmd = [self.command]
             for arg in self.extra_args:
                 if arg in ("--headless",):
                     continue
                 cmd.append(arg)
             cmd.extend(["--output-format", "json"])
             if prompt:
-                cmd.append(prompt)
+                cmd.extend(["--prompt", prompt])
             return cmd
 
         # Claude: persistent stdin/stdout pipe with stream-json
@@ -268,7 +266,7 @@ class MCPAgentProcess:
         start = time.time()
         try:
             result = subprocess.run(
-                cmd, cwd=self.cwd, env=self._env,
+                cmd, cwd=self.cwd, env=self.env,
                 capture_output=True, text=True, timeout=120,
             )
             duration_ms = int((time.time() - start) * 1000)
