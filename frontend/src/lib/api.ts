@@ -15,6 +15,10 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
   return res.json();
 }
 
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 export const api = {
   getMessages: (channel: string, sinceId = 0, limit = 50) =>
     request<{ messages: import('../types').Message[] }>(
@@ -41,8 +45,10 @@ export const api = {
       body: JSON.stringify({ pinned }),
     }),
 
-  getStatus: () =>
-    request<{ agents: import('../types').Agent[] }>('/api/status'),
+  getStatus: async () => {
+    const res = await request<{ agents?: import('../types').Agent[] }>('/api/status');
+    return { agents: asArray<import('../types').Agent>(res?.agents) };
+  },
 
   getSettings: () =>
     request<import('../types').Settings>('/api/settings'),
@@ -50,8 +56,10 @@ export const api = {
   saveSettings: (settings: Partial<import('../types').Settings>) =>
     request('/api/settings', { method: 'POST', body: JSON.stringify(settings) }),
 
-  getChannels: () =>
-    request<{ channels: string[] }>('/api/channels'),
+  getChannels: async () => {
+    const res = await request<{ channels?: string[] }>('/api/channels');
+    return { channels: asArray<string>(res?.channels) };
+  },
 
   createChannel: (name: string) =>
     request('/api/channels', { method: 'POST', body: JSON.stringify({ name }) }),
@@ -62,11 +70,12 @@ export const api = {
   renameChannel: (name: string, newName: string) =>
     request('/api/channels/' + name, { method: 'PATCH', body: JSON.stringify({ name: newName }) }),
 
-  getJobs: (channel?: string, status?: string) => {
+  getJobs: async (channel?: string, status?: string) => {
     const params = new URLSearchParams();
     if (channel) params.set('channel', channel);
     if (status) params.set('status', status);
-    return request<{ jobs: import('../types').Job[] }>('/api/jobs?' + params);
+    const res = await request<{ jobs?: import('../types').Job[] }>('/api/jobs?' + params);
+    return { jobs: asArray<import('../types').Job>(res?.jobs) };
   },
 
   createJob: (title: string, channel: string, createdBy: string, assignee?: string, body?: string) =>
@@ -78,8 +87,10 @@ export const api = {
   updateJob: (jobId: number, updates: Partial<import('../types').Job>) =>
     request('/api/jobs/' + jobId, { method: 'PATCH', body: JSON.stringify(updates) }),
 
-  getRules: () =>
-    request<{ rules: import('../types').Rule[] }>('/api/rules'),
+  getRules: async () => {
+    const res = await request<{ rules?: import('../types').Rule[] }>('/api/rules');
+    return { rules: asArray<import('../types').Rule>(res?.rules) };
+  },
 
   proposeRule: (text: string, author: string, reason: string) =>
     request('/api/rules', {
