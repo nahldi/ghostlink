@@ -1,6 +1,6 @@
 [project]
 name = "ghostlink-mcp"
-version = "5.5.4"
+version = "5.5.5"
 description = "GhostLink MCP Server — multi-agent AI chat hub"
 requires-python = ">=3.10"
 dependencies = [
