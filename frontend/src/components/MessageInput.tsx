@@ -597,6 +597,10 @@ export function MessageInput() {
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    if (trimmed.length > 100000) {
+      toast('Message too long (max 100KB)', 'error');
+      return;
+    }
 
     // Check for slash command
     if (trimmed.startsWith('/')) {
