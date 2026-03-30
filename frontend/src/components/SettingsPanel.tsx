@@ -1612,8 +1612,8 @@ function PersistentAgentsSection() {
     const updated = [...persistent, agent];
     updateSettings({ persistentAgents: updated });
     api.saveSettings({ persistentAgents: updated }).then(() => {
-      api.getStatus().then(r => setAgents(r.agents)).catch((e) => console.warn('Status fetch:', e.message || e));
-    }).catch((e) => console.warn('Settings save:', e.message || e));
+      api.getStatus().then(r => setAgents(r.agents)).catch(() => {});
+    }).catch(() => {});
     setAdding(false);
     setNewCwd('');
   };
