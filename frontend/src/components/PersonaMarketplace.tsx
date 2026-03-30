@@ -16,7 +16,19 @@ interface Persona {
   color: string;
   instructions: string;
   skills: string[];
-  category: 'developer' | 'reviewer' | 'architect' | 'writer' | 'researcher' | 'devops' | 'security' | 'custom';
+  category:
+    | 'developer'
+    | 'reviewer'
+    | 'architect'
+    | 'writer'
+    | 'researcher'
+    | 'devops'
+    | 'security'
+    | 'analyst'
+    | 'manager'
+    | 'designer'
+    | 'educator'
+    | 'custom';
   author: string;
   installs: number;
   rating?: number;
@@ -31,6 +43,10 @@ const CATEGORIES = [
   { value: 'researcher', label: 'Researcher', icon: 'search' },
   { value: 'devops', label: 'DevOps', icon: 'cloud' },
   { value: 'security', label: 'Security', icon: 'security' },
+  { value: 'analyst', label: 'Analyst', icon: 'analytics' },
+  { value: 'manager', label: 'Manager', icon: 'assignment' },
+  { value: 'designer', label: 'Designer', icon: 'palette' },
+  { value: 'educator', label: 'Educator', icon: 'school' },
 ];
 
 // Built-in personas
