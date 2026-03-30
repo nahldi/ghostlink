@@ -492,7 +492,7 @@ class TelegramBridge(BaseBridge):
                 result = self._tg_request("getUpdates", {
                     "offset": self._offset,
                     "timeout": 30,
-                    "allowed_updates": ["message"],
+                    "allowed_updates": ["message", "callback_query"],
                 })
                 if result and result.get("result"):
                     for update in result["result"]:
@@ -503,7 +503,33 @@ class TelegramBridge(BaseBridge):
                 self._stop_event.wait(5)
 
     def _handle_update(self, update: dict):
-        """Process a Telegram update."""
+        """Process a Telegram update (message or callback_query)."""
+        # Handle inline keyboard button clicks
+        callback = update.get("callback_query")
+        if callback:
+            data = callback.get("data", "")
+            callback_id = callback.get("id", "")
+            # Parse: approve_123, approve-session_123, deny_123
+            parts = data.rsplit("_", 1)
+            if len(parts) == 2:
+                cmd, raw_id = parts
+                response_map = {"approve": "allow_once", "approve-session": "allow_session", "deny": "deny"}
+                response = response_map.get(cmd)
+                if response:
+                    try:
+                        mid = int(raw_id)
+                        success = self._submit_approval_response(mid, response)
+                        answer = f"{'Done' if success else 'Failed'}: {cmd} #{mid}"
+                    except ValueError:
+                        answer = "Invalid approval ID"
+                else:
+                    answer = "Unknown action"
+            else:
+                answer = "Unknown callback"
+            # Answer the callback to dismiss the loading state
+            self._tg_request("answerCallbackQuery", {"callback_query_id": callback_id, "text": answer})
+            return
+
         msg = update.get("message")
         if not msg:
             return
@@ -537,11 +563,23 @@ class TelegramBridge(BaseBridge):
         if len(content) > 4096:
             content = content[:4093] + "..."
 
-        self._tg_request("sendMessage", {
+        payload: dict[str, Any] = {
             "chat_id": ext_channel,
             "text": content,
             "parse_mode": "Markdown",
-        })
+        }
+
+        # Native Telegram inline keyboard for approval requests
+        if msg_type == "approval_request" and message_id:
+            payload["reply_markup"] = json.dumps({
+                "inline_keyboard": [[
+                    {"text": "Allow Once", "callback_data": f"approve_{message_id}"},
+                    {"text": "Allow Session", "callback_data": f"approve-session_{message_id}"},
+                    {"text": "Deny", "callback_data": f"deny_{message_id}"},
+                ]],
+            })
+
+        self._tg_request("sendMessage", payload)
 
 
 # ── Slack Bridge ────────────────────────────────────────────────────
