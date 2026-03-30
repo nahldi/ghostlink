@@ -4,7 +4,7 @@
 > **For any AI picking this up: follow the phases IN ORDER within each track. Each item has acceptance criteria, files to change, smoke tests, and fail tests.**
 
 **Last updated:** 2026-03-30
-**Current version:** v5.5.1
+**Current version:** v5.5.2
 **Owner:** nahldi
 
 ---

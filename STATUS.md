@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
 **Last updated:** 2026-03-30
-**Version:** v5.5.1
+**Version:** v5.5.2
 **Owner:** nahldi
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
