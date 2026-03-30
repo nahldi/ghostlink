@@ -548,11 +548,11 @@ function AppInner() {
   }, [theme]);
 
   useEffect(() => {
-    api.getStatus().then((r) => setAgents(r.agents)).catch((e) => console.warn('Status fetch:', e.message || e));
-    api.getJobs().then((r) => setJobs(r.jobs)).catch((e) => console.warn('Jobs fetch:', e.message || e));
-    api.getRules().then((r) => setRules(r.rules)).catch((e) => console.warn('Rules fetch:', e.message || e));
+    api.getStatus().then((r) => setAgents(r.agents || [])).catch((e) => console.warn('Status fetch:', e.message || e));
+    api.getJobs().then((r) => setJobs(r.jobs || [])).catch((e) => console.warn('Jobs fetch:', e.message || e));
+    api.getRules().then((r) => setRules(r.rules || [])).catch((e) => console.warn('Rules fetch:', e.message || e));
     api.getChannels().then((r) =>
-      setChannels(r.channels.map((name) => ({ name, unread: 0 })))
+      setChannels((r.channels || ['general']).map((name: string) => ({ name, unread: 0 })))
     ).catch((e) => console.warn('Channels fetch:', e.message || e));
     api.getSettings().then((s) => {
       updateSettings(s);
