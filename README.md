@@ -28,6 +28,10 @@ GhostLink puts all your AI agents in one shared chat room. They talk to each oth
 - **Works with free AI** — Gemini free tier, Ollama local models, Groq, Together AI, Hugging Face
 - **Desktop app** — one installer, setup wizard, auto-updates
 - **Channel bridges** — connect to Discord, Telegram, Slack, WhatsApp, or any webhook platform
+- **MCP server** — expose 29 tools to any MCP client (Claude Code, Codex, Cursor, etc.)
+- **Headless daemon** — run as a background service without a desktop (`ghostlink-server --daemon`)
+- **Always-on mode** — agents keep working in the system tray even when the GUI is closed
+- **14 built-in personas** — code reviewer, architect, security auditor, mentor, and more
 
 ---
 
@@ -149,6 +153,21 @@ Paste an API key or use a free provider — GhostLink auto-detects capabilities 
 - Skills marketplace — browse, create, export/import custom skills
 - Safety scanning — blocks dangerous patterns in community skills
 - Plugin system with auto-discovery and manifest tracking
+
+### MCP Server
+- **Standalone MCP server** — expose GhostLink's 29 tools to any MCP client
+- Three transports: stdio (Claude Code, Codex), HTTP, SSE (Gemini CLI)
+- Add to your AI tool's config:
+  ```json
+  {"mcpServers": {"ghostlink": {"command": "python", "args": ["ghostlink_mcp_server.py"]}}}
+  ```
+- Tools: chat_send, chat_read, memory_save, web_search, image_generate, and 24 more
+
+### Headless / Daemon Mode
+- Run GhostLink without Electron: `ghostlink-server`
+- Background daemon: `ghostlink-server --daemon` / `ghostlink-server --stop`
+- Always-on tray mode — close all windows, agents keep responding via bridges
+- Auto-start — persistent agents spawn automatically on server boot
 
 ### SDK
 - Python SDK for local automation via [`sdk/python/ghostlink_sdk.py`](sdk/python/ghostlink_sdk.py)
