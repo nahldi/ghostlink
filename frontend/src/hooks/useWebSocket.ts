@@ -80,8 +80,6 @@ export function useWebSocket() {
   const replyTo = useChatStore((s) => s.replyTo);
   const username = useChatStore((s) => s.settings.username);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // Safe: runs once on mount, and store reads use getState() at handler time.
   useEffect(() => {
     let client: WebSocketClient | null = null;
     let unsub: (() => void) | null = null;
@@ -354,7 +352,7 @@ export function useWebSocket() {
         client?.disconnect();
       } catch { /* ignored */ }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- Safe: runs once on mount; store reads use getState() at handler time.
 
   useEffect(() => {
     const client = wsRef.current;

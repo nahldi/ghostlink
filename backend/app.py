@@ -1071,6 +1071,18 @@ app.include_router(_r_phase4_7.router)
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
+# ── Serve known frontend root-level static files ───────────────────
+
+def _register_static_file(filename: str):
+    fpath = STATIC_DIR / filename
+    if fpath.exists():
+        @app.get(f"/{filename}", include_in_schema=False)
+        async def handler(_fpath=str(fpath)):
+            return FileResponse(_fpath)
+
+for _sf in ("manifest.json", "sw.js", "robots.txt", "favicon.ico", "favicon.svg", "ghostlink.png", "icons.svg"):
+    _register_static_file(_sf)
+
 # ── Serve frontend (SPA fallback) ──────────────────────────────────
 
 @app.middleware("http")
