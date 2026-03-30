@@ -68,6 +68,7 @@ class MCPAgentProcess:
         self._resume_id = resume_session
         self.session_id = resume_session or str(uuid.uuid4())
         self._codex_session_id: str | None = None  # Codex session ID for resume
+        self._gemini_session_id: str | None = None  # Gemini session ID for resume
 
         self._proc: subprocess.Popen | None = None
         self._alive = False
@@ -278,8 +279,19 @@ class MCPAgentProcess:
             return None
 
     def _gemini_exec(self, content: str) -> dict | None:
-        """Run a single Gemini exec invocation."""
-        cmd = self._build_cmd(content)
+        """Run a Gemini exec invocation with session resume for context continuity.
+
+        First call: `gemini --prompt "text" --output-format json`
+        Subsequent calls: `gemini --resume <session_id> --prompt "text" --output-format json`
+        """
+        if self._gemini_session_id:
+            cmd = [self.command, "--resume", self._gemini_session_id]
+            for arg in self.extra_args:
+                if arg not in ("--headless",):
+                    cmd.append(arg)
+            cmd.extend(["--output-format", "json", "--prompt", content])
+        else:
+            cmd = self._build_cmd(content)
         log.info("Gemini exec: %s", " ".join(cmd[:5]))
         start = time.time()
         try:
@@ -304,6 +316,11 @@ class MCPAgentProcess:
                 entry["result_type"] = "gemini_result"
                 entry["result_text"] = str(parsed.get("response", ""))[:500]
                 entry["cost_usd"] = 0  # Gemini free tier
+                # Extract session ID for resume on next call
+                sid = parsed.get("session_id") or parsed.get("sessionId")
+                if sid and not self._gemini_session_id:
+                    self._gemini_session_id = str(sid)
+                    log.info("Gemini session ID captured: %s", self._gemini_session_id)
             self._log_invocation(entry)
             return parsed or {"subtype": "success", "total_cost_usd": 0}
         except subprocess.TimeoutExpired:
