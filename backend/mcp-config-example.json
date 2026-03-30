@@ -1,9 +1,34 @@
 {
-  "mcpServers": {
-    "ghostlink": {
-      "command": "python",
-      "args": ["ghostlink_mcp_server.py"],
-      "cwd": "/path/to/ghostlink/backend"
+  "_comment": "Add ONE of these to your AI tool's MCP config to connect to GhostLink",
+
+  "_option_1_stdio": {
+    "_comment": "For Claude Code, Codex — stdio transport (recommended)",
+    "mcpServers": {
+      "ghostlink": {
+        "command": "python",
+        "args": ["ghostlink_mcp_server.py"],
+        "cwd": "/path/to/ghostlink/backend"
+      }
+    }
+  },
+
+  "_option_2_http": {
+    "_comment": "For any MCP client — connect to running GhostLink server",
+    "mcpServers": {
+      "ghostlink": {
+        "type": "http",
+        "url": "http://127.0.0.1:8200/mcp"
+      }
+    }
+  },
+
+  "_option_3_sse": {
+    "_comment": "For Gemini CLI — SSE transport",
+    "mcpServers": {
+      "ghostlink": {
+        "type": "sse",
+        "url": "http://127.0.0.1:8201/sse"
+      }
     }
   }
 }
