@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "5.2.3"
+__version__ = "5.3.0"
 
 import json
 import importlib
@@ -268,6 +268,46 @@ _ui_handler.setLevel(logging.DEBUG)
 _ui_handler.setFormatter(logging.Formatter("%(message)s"))
 logging.getLogger().addHandler(_ui_handler)
 logging.getLogger("uvicorn.access").addHandler(_ui_handler)
+
+
+async def _auto_spawn_agent(pa: dict):
+    """Auto-spawn a persistent agent on server startup."""
+    import subprocess as _sp
+    base = pa.get("base", "")
+    label = pa.get("label", base.capitalize())
+    cwd = pa.get("cwd", ".")
+    args = pa.get("args", [])
+    command = pa.get("command", base)
+    try:
+        spawn_path = os.environ.get("PATH", "")
+        for extra in [os.path.expanduser("~/.npm-global/bin"), os.path.expanduser("~/.local/bin"), "/usr/local/bin"]:
+            if extra not in spawn_path:
+                spawn_path = f"{extra}:{spawn_path}"
+        spawn_args = [sys.executable, "wrapper.py", base, "--headless"]
+        if label:
+            spawn_args.extend(["--label", label])
+        if args:
+            spawn_args.append("--")
+            spawn_args.extend(args)
+        spawn_env = os.environ.copy()
+        spawn_env["PATH"] = spawn_path
+        if cwd:
+            spawn_env["GHOSTLINK_AGENT_CWD"] = cwd
+        if label:
+            spawn_env["GHOSTLINK_AGENT_LABEL"] = label
+        proc = _sp.Popen(
+            spawn_args,
+            cwd=str(BASE_DIR),
+            env=spawn_env,
+            stdin=_sp.DEVNULL,
+            stdout=_sp.PIPE,
+            stderr=_sp.PIPE,
+        )
+        async with deps._agent_lock:
+            deps._pending_spawns[proc.pid] = proc
+        log.info("Auto-spawned %s (pid %d)", base, proc.pid)
+    except Exception as e:
+        log.warning("Auto-spawn failed for %s: %s", base, e)
 
 
 # ── Lifespan ────────────────────────────────────────────────────────
@@ -839,6 +879,17 @@ async def lifespan(_app: FastAPI):
         )
         deps._http_session = _http_session
         print("  HTTP connection pool started (100 connections)")
+
+    # Auto-spawn persistent agents if autoStart is enabled
+    if deps._settings.get("autoStart"):
+        persistent_agents = deps._settings.get("persistentAgents", [])
+        if persistent_agents:
+            print(f"  Auto-starting {len(persistent_agents)} persistent agent(s)...")
+            for pa in persistent_agents:
+                base = pa.get("base", "")
+                if not base:
+                    continue
+                asyncio.create_task(_auto_spawn_agent(pa))
 
     yield
 

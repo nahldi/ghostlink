@@ -892,9 +892,16 @@ app.whenReady().then(async () => {
   }
 });
 
-// Quit the app when all windows close — unless we're transitioning from wizard to launcher
+// When all windows close: if server is running, stay in tray (daemon mode).
+// Otherwise quit normally.
 app.on('window-all-closed', () => {
-  if (!isTransitioning) {
+  if (isTransitioning) return;
+  const status = serverManager.getStatus();
+  if (status.running) {
+    // Server is running — keep the app alive in the system tray
+    // User can quit from the tray menu or reopen from the tray icon
+    log.info('All windows closed but server is running — staying in tray (daemon mode)');
+  } else {
     app.quit();
   }
 });
