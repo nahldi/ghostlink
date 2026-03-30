@@ -37,11 +37,18 @@ const CustomizationPanel = lazy(() => import('./components/CustomizationPanel').
 const CollaborativeWorkspace = lazy(() => import('./components/CollaborativeWorkspace').then(m => ({ default: m.CollaborativeWorkspace })));
 const BranchList = lazy(() => import('./components/ConversationBranch').then(m => ({ default: m.BranchList })));
 
-const CONVERSATION_STARTERS = [
-  { text: 'Ask @claude to review your code', icon: 'code' },
+// Agent-specific starters — shown only when that agent is online
+const AGENT_STARTERS: { agent: string; text: string; icon: string }[] = [
+  { agent: 'claude', text: 'Ask @claude to review your code', icon: 'code' },
+  { agent: 'codex', text: 'Start a new task with @codex', icon: 'task_alt' },
+  { agent: 'gemini', text: 'Research a topic with @gemini', icon: 'search' },
+  { agent: 'grok', text: 'Ask @grok for a quick analysis', icon: 'bolt' },
+  { agent: 'aider', text: 'Pair program with @aider', icon: 'group' },
+  { agent: 'copilot', text: 'Get suggestions from @copilot', icon: 'lightbulb' },
+];
+// Always-available starters (no agent dependency)
+const GENERIC_STARTERS = [
   { text: 'Brainstorm with @all agents', icon: 'psychology' },
-  { text: 'Start a new task with @codex', icon: 'task_alt' },
-  { text: 'Research a topic with @gemini', icon: 'search' },
   { text: 'Check /status of all agents', icon: 'monitoring' },
   { text: 'Type /help for commands', icon: 'help' },
 ];
@@ -93,9 +100,21 @@ function ThinkingBubbles() {
 
 function ConversationStarters({ channel }: { channel: string }) {
   const settings = useChatStore((s) => s.settings);
+  const agents = useChatStore((s) => s.agents);
+  const onlineNames = new Set(
+    agents.filter(a => a.state === 'active' || a.state === 'idle' || a.state === 'thinking').map(a => a.base)
+  );
+
+  // Build dynamic starters: online agents first, then generic
+  const starters = [
+    ...AGENT_STARTERS.filter(s => onlineNames.has(s.agent)).map(s => ({ text: s.text, icon: s.icon })),
+    ...GENERIC_STARTERS,
+  ].slice(0, 6); // Max 6 to keep it clean
+
   const sendMessage = (text: string) => {
-    api.sendMessage(settings.username, text, channel).catch((e) => console.warn('Send message:', e.message || e));
+    api.sendMessage(settings.username, text, channel).catch(() => {});
   };
+
   return (
     <div className="flex flex-col items-center justify-center h-full text-center py-12">
       <img src="/ghostlink.png" alt="GhostLink" className="w-14 h-14 mb-4 opacity-40" style={{ filter: 'invert(1)' }} />
@@ -103,10 +122,12 @@ function ConversationStarters({ channel }: { channel: string }) {
         #{channel}
       </div>
       <div className="text-xs text-on-surface-variant/30 mb-6">
-        Start a conversation or try one of these:
+        {onlineNames.size > 0
+          ? `${onlineNames.size} agent${onlineNames.size > 1 ? 's' : ''} online — try one of these:`
+          : 'Start a conversation or launch an agent:'}
       </div>
       <div className="flex flex-wrap justify-center gap-2 max-w-md">
-        {CONVERSATION_STARTERS.map((s) => (
+        {starters.map((s) => (
           <button
             key={s.text}
             onClick={() => sendMessage(s.text)}
