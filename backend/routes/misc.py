@@ -124,7 +124,7 @@ async def save_settings(request: Request):
         return JSONResponse({"error": "invalid JSON body"}, 400)
     _ALLOWED_SETTINGS = {
         "username", "title", "theme", "fontSize", "loopGuard", "notificationSounds",
-        "channels", "persistentAgents", "autoRoute", "connectedAgents",
+        "channels", "persistentAgents", "autoRoute", "autoStart", "connectedAgents",
         "quietHoursStart", "quietHoursEnd", "soundEnabled", "soundVolume",
         "soundPerAgent", "timezone", "timeFormat", "voiceLanguage",
     }

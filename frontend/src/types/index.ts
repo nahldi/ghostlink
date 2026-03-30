@@ -140,6 +140,7 @@ export interface Settings {
   showStatsPanel: boolean;
   statsSections: StatsSections;
   autoRoute?: boolean;
+  autoStart?: boolean;
   channels?: string[];
   persistentAgents?: PersistentAgent[];
   timezone?: string;

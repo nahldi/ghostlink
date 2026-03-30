@@ -430,6 +430,8 @@ function AgentsTab({
       <Section title="Routing" icon="route" defaultOpen>
         <Toggle label="Auto-Route Messages" description="Agents receive ALL messages, not just @mentions"
           checked={!!(display.autoRoute)} onChange={() => applyInstant({ autoRoute: !(display.autoRoute ?? false) })} />
+        <Toggle label="Auto-Start Agents" description="Persistent agents launch automatically when the server starts"
+          checked={!!(display.autoStart)} onChange={() => applyInstant({ autoStart: !(display.autoStart ?? false) })} />
         <SettingField label={`Loop Guard: ${display.loopGuard} hops`}>
           <input type="range" min={1} max={200} value={display.loopGuard} onChange={(e) => updateDraft({ loopGuard: Number(e.target.value) })} className="w-full accent-primary" />
           <div className="flex justify-between text-[9px] text-on-surface-variant/45 mt-1"><span>1</span><span>200</span></div>
