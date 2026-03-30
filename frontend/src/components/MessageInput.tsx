@@ -183,9 +183,6 @@ function useVoiceInput(onTranscript: (text: string) => void, lang?: string) {
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-      }
     };
   }, []);
 
@@ -231,6 +228,14 @@ export function MessageInput() {
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Clean up recording timer on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
+
   const activeChannel = useChatStore((s) => s.activeChannel);
   const settings = useChatStore((s) => s.settings);
   const pendingInput = useChatStore((s) => s.pendingInput);
