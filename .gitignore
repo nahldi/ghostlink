@@ -56,3 +56,4 @@ backend/.codex/
 backend/.ghostlink-context.md
 backend/.ghostlink-worktrees/
 backend/config.toml.bak
+backend/INSTRUCTIONS.md
