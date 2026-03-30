@@ -143,6 +143,32 @@ function _markStreamed(id: number) {
   }
 }
 
+function ReplyPreview({ messageId }: { messageId: number }) {
+  const messages = useChatStore((s) => s.messages);
+  const parent = messages.find((m) => m.id === messageId);
+  if (!parent) {
+    return (
+      <div className="text-[10px] text-on-surface-variant/30 border-l-2 border-outline-variant/15 pl-2 mb-1 italic">
+        replying to message #{messageId}
+      </div>
+    );
+  }
+  return (
+    <button
+      onClick={() => {
+        const el = document.querySelector(`[data-msg-id="${messageId}"]`);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('ring-2', 'ring-primary/30'); setTimeout(() => el.classList.remove('ring-2', 'ring-primary/30'), 2000); }
+      }}
+      className="flex items-center gap-1.5 text-[10px] text-on-surface-variant/40 border-l-2 border-outline-variant/20 pl-2 mb-1 hover:text-on-surface-variant/60 transition-colors text-left w-full"
+    >
+      <span className="font-semibold" style={{ color: parent.sender === 'system' ? undefined : 'var(--primary)' }}>
+        {parent.sender}
+      </span>
+      <span className="truncate opacity-70">{parent.text.slice(0, 80)}{parent.text.length > 80 ? '...' : ''}</span>
+    </button>
+  );
+}
+
 export function ChatMessage({ message }: ChatMessageProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [collapsed, setCollapsed] = useState(message.text.length > COLLAPSE_THRESHOLD);
@@ -256,6 +282,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
     // ── USER MESSAGE (right side) ──
     return (
       <div
+        data-msg-id={message.id}
         className={`group flex justify-end gap-2 py-1.5 ${selectMode ? 'pl-2' : ''} ${isSelected ? 'bg-red-500/5' : ''}`}>
         {selectMode && (
           <button onClick={() => toggleSelected(message.id)} className="shrink-0 self-center">
@@ -366,6 +393,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   // ── AGENT MESSAGE (left side) ──
   return (
     <div
+      data-msg-id={message.id}
       className={`group flex gap-3 py-1.5 ${isSelected ? 'bg-red-500/5' : ''}`}
       {...longPress}
     >
@@ -391,9 +419,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
 
         {message.reply_to != null && (
-          <div className="text-[10px] text-on-surface-variant/40 border-l-2 border-outline-variant/20 pl-2 mb-1 italic">
-            replying to #{message.reply_to}
-          </div>
+          <ReplyPreview messageId={message.reply_to} />
         )}
 
         <div
