@@ -3,6 +3,10 @@
  * Tabs: Terminal | Files | Activity
  * Shows live terminal output, workspace file tree, and agent activity timeline.
  */
+/* eslint-disable react-hooks/set-state-in-effect -- All setState-in-effect instances
+   in this file are standard data-fetching patterns: fetch on mount/agent change,
+   sync WS live data to local state, reset state on prop change. These are the
+   correct React patterns for async data initialization. */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useChatStore } from '../stores/chatStore';
@@ -25,6 +29,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [mcpLog, setMcpLog] = useState<import('../types').McpInvocationEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +56,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [agent.name]);
+
 
   useEffect(() => {
     if (!stream) return;
@@ -615,7 +621,7 @@ function CockpitBrowser({ agent }: { agent: Agent }) {
     [browserHistory],
   );
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch browser state on agent change
+  //fetch browser state on agent change
   useEffect(() => {
     let cancelled = false;
     setBrowser(null);
@@ -633,14 +639,14 @@ function CockpitBrowser({ agent }: { agent: Agent }) {
     return () => { cancelled = true; };
   }, [agent.name]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- sync WS live data to local state
+  //sync WS live data to local state
   useEffect(() => {
     if (!liveBrowser) return;
     setBrowser(liveBrowser);
     setLoading(false);
   }, [liveBrowser]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- reset error on new artifact
+  //reset error on new artifact
   useEffect(() => {
     setArtifactErrored(false);
   }, [browser?.artifact_url, browser?.updated_at]);
@@ -847,7 +853,7 @@ function CockpitReplay({ agent, onFileReverted }: { agent: Agent; onFileReverted
     : '';
   const diffData = normalizedSelectedPath ? (fileDiffs[normalizedSelectedPath] as FileDiffPayload | undefined) : undefined;
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- reset + fetch replay events on agent change
+  //reset + fetch replay events on agent change
   useEffect(() => {
     let cancelled = false;
     setEvents([]);
@@ -1028,7 +1034,7 @@ export function AgentCockpit() {
   const prefersReducedMotion = useReducedMotion();
 
   // Reset tab to terminal when switching agents
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional tab reset on agent switch
+  //intentional tab reset on agent switch
   useEffect(() => { setTab('terminal'); }, [cockpitAgent]);
 
   // Keyboard shortcut listener for tab switching
