@@ -762,11 +762,15 @@ def run_agent_mcp(
                  agent, restart_count, max_restarts)
         time.sleep(5)  # Give session file time to release after process death
         old_session = agent_proc.session_id
-        if restart_count <= 2:
-            # First 2 retries: try to resume the existing session for context continuity
+        if agent_proc._is_exec_mode() and restart_count <= 2:
+            # Codex/Gemini use session-resuming exec as their best available continuity model.
             log.info("MCP agent %s: attempting resume of session %s", agent, old_session)
             agent_proc = _make_proc(resume_session=old_session)
         else:
-            # After 2 failed resumes: start fresh — agent catches up via chat_read
-            log.info("MCP agent %s: resume failed, starting fresh session", agent)
+            # Claude: avoid --resume because the current Claude Code path can force a full cache miss.
+            # Start fresh and let the agent catch up via chat_read instead.
+            if agent_proc._is_exec_mode():
+                log.info("MCP agent %s: resume failed, starting fresh session", agent)
+            else:
+                log.info("MCP agent %s: starting fresh session after restart to avoid Claude --resume cache miss", agent)
             agent_proc = _make_proc()

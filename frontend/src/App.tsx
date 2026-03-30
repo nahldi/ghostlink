@@ -298,7 +298,7 @@ function RightPanel() {
     document.addEventListener('mouseup', handleUp);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-  }, [panelWidth]);
+  }, [panel, cockpitWidth, setCockpitWidth]);
 
   return (
     <AnimatePresence>
