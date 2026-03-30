@@ -482,7 +482,7 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
             </button>
           </div>
 
-          {/* MCP mode toggle — Claude only, advanced mode */}
+          {/* MCP mode toggle — agent-specific execution model, advanced mode */}
           {(selected === 'claude' || selected === 'codex' || selected === 'gemini') && isAdvanced && (
             <div className="flex items-center justify-between py-1">
               <div>
@@ -490,7 +490,11 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
                   MCP Mode
                   <span className="text-[8px] px-1 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">EXPERIMENTAL</span>
                 </div>
-                <div className="text-[10px] text-on-surface-variant/30">Persistent pipe — no tmux, structured JSON I/O</div>
+                <div className="text-[10px] text-on-surface-variant/30">
+                  {selected === 'claude'
+                    ? 'Persistent pipe — no tmux, structured JSON I/O'
+                    : 'Exec-per-trigger — no tmux, structured JSON output'}
+                </div>
               </div>
               <button
                 onClick={() => setMcpMode(!mcpMode)}
