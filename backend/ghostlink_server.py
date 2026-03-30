@@ -91,26 +91,59 @@ def _stop_daemon(pid_file: Path) -> bool:
     return True
 
 
-def _daemonize():
-    """Fork into a background daemon process (Unix only)."""
+def _daemonize(pid_file: Path):
+    """Fork into a background daemon process (Unix only).
+
+    Uses a pipe so the parent can report the real daemon PID after
+    the double-fork completes. The parent waits for the grandchild
+    to write its PID, then exits with the correct message.
+    """
     if sys.platform == "win32":
         print("Daemon mode is not supported on Windows. Use a service manager instead.", file=sys.stderr)
         sys.exit(1)
 
+    # Create a pipe for the grandchild to report its PID
+    read_fd, write_fd = os.pipe()
+
     # First fork
     pid = os.fork()
     if pid > 0:
-        # Parent exits
-        print(f"GhostLink daemon started (pid {pid})")
+        # Parent: wait for grandchild PID via pipe
+        os.close(write_fd)
+        import time
+        data = b""
+        for _ in range(20):  # Wait up to 10s
+            chunk = os.read(read_fd, 32)
+            if chunk:
+                data += chunk
+                break
+            time.sleep(0.5)
+        os.close(read_fd)
+        if data:
+            daemon_pid = data.decode().strip()
+            print(f"GhostLink daemon started (pid {daemon_pid})")
+        else:
+            print("GhostLink daemon may have failed to start. Check logs.")
         sys.exit(0)
 
-    # Create new session
+    # First child: create new session
+    os.close(read_fd)
     os.setsid()
 
     # Second fork (prevent terminal reattachment)
     pid = os.fork()
     if pid > 0:
+        os.close(write_fd)
         sys.exit(0)
+
+    # Grandchild (actual daemon): report PID to parent via pipe
+    real_pid = str(os.getpid())
+    os.write(write_fd, real_pid.encode())
+    os.close(write_fd)
+
+    # Write PID file immediately
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+    pid_file.write_text(real_pid)
 
     # Redirect stdio to /dev/null
     sys.stdin = open(os.devnull, "r")
@@ -165,15 +198,15 @@ Connect from Claude Code:
     os.environ["PORT"] = str(args.port)
     os.environ["PYTHONUNBUFFERED"] = "1"
 
-    # Handle --daemon
+    # Handle --daemon (PID file written inside _daemonize by the grandchild)
     if args.daemon:
         if not args.quiet:
             print(f"Starting GhostLink daemon on port {args.port}...")
-        _daemonize()
+        _daemonize(pid_file)
         args.quiet = True  # No banner in daemon mode
-
-    # Write PID file
-    _write_pid(pid_file)
+    else:
+        # Foreground mode: write PID file here
+        _write_pid(pid_file)
 
     # Cleanup PID file on exit
     def _cleanup(*_):
