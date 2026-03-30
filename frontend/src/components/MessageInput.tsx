@@ -520,6 +520,8 @@ export function MessageInput() {
           '/jobs — open jobs panel',
           '/rules — open rules panel',
           '/settings — open settings panel',
+          '/consensus [question] — ask all agents to answer',
+          '/debate [agent1] [agent2] [topic] — start a structured debate',
           '/debug — toggle debug mode',
           '/notify — test desktop notification',
           '/help — show this help',
