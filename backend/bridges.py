@@ -411,9 +411,35 @@ class DiscordBridge(BaseBridge):
         if len(content) > 2000:
             content = content[:1997] + "..."
 
-        self._discord_request("POST", f"/channels/{ext_channel}/messages", {
-            "content": content,
-        })
+        payload: dict[str, Any] = {"content": content}
+
+        # Native Discord buttons for approval requests
+        if msg_type == "approval_request" and message_id:
+            payload["components"] = [{
+                "type": 1,  # ACTION_ROW
+                "components": [
+                    {
+                        "type": 2,  # BUTTON
+                        "style": 3,  # SUCCESS (green)
+                        "label": "Allow Once",
+                        "custom_id": f"approve_{message_id}",
+                    },
+                    {
+                        "type": 2,
+                        "style": 1,  # PRIMARY (blue)
+                        "label": "Allow Session",
+                        "custom_id": f"approve-session_{message_id}",
+                    },
+                    {
+                        "type": 2,
+                        "style": 4,  # DANGER (red)
+                        "label": "Deny",
+                        "custom_id": f"deny_{message_id}",
+                    },
+                ],
+            }]
+
+        self._discord_request("POST", f"/channels/{ext_channel}/messages", payload)
 
 
 # ── Telegram Bridge ─────────────────────────────────────────────────
