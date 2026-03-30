@@ -264,7 +264,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     );
 
     return results;
-  }, [agents, channels, onClose, setActiveChannel, clearUnread, setSidebarPanel, setCockpitAgent]);
+  }, [agents, channels, isBeginner, onClose, setActiveChannel, clearUnread, setSidebarPanel, setCockpitAgent]);
 
   // Filter items
   const filtered = query.trim()
