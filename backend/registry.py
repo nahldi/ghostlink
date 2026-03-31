@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import secrets
 import threading
 import time
-import secrets
-from dataclasses import dataclass, field, asdict
-
+from dataclasses import asdict, dataclass, field
 
 TOKEN_TTL = 3600  # 1 hour default
 

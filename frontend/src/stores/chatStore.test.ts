@@ -174,4 +174,72 @@ describe('chatStore', () => {
     const keys = Object.keys(diffs);
     expect(keys.every(k => !k.startsWith('./') && !k.includes('/./'))).toBe(true);
   });
+
+  // Channel management
+  it('sets channels list', () => {
+    useChatStore.getState().setChannels([
+      { name: 'general', unread: 0 },
+      { name: 'dev', unread: 3 },
+    ]);
+    expect(useChatStore.getState().channels).toHaveLength(2);
+    expect(useChatStore.getState().channels[1].name).toBe('dev');
+  });
+
+  it('clears unread count for a channel', () => {
+    useChatStore.getState().setChannels([{ name: 'general', unread: 5 }]);
+    useChatStore.getState().clearUnread('general');
+    const ch = useChatStore.getState().channels.find(c => c.name === 'general');
+    expect(ch?.unread).toBe(0);
+  });
+
+  // Settings management
+  it('updates settings partially', () => {
+    useChatStore.getState().updateSettings({ theme: 'cyberpunk' });
+    expect(useChatStore.getState().settings.theme).toBe('cyberpunk');
+    // Other settings should remain unchanged
+    expect(useChatStore.getState().settings.username).toBeDefined();
+  });
+
+  // Bookmark toggle
+  it('bookmarks and unbookmarks a message', () => {
+    const msg = { id: 1, uid: 't', sender: 'user', text: 'test', type: 'chat' as const, timestamp: 1, time: '1', channel: 'general' };
+    useChatStore.getState().addMessage(msg);
+    useChatStore.getState().bookmarkMessage(1, true);
+    expect(useChatStore.getState().messages[0].bookmarked).toBe(true);
+    useChatStore.getState().bookmarkMessage(1, false);
+    expect(useChatStore.getState().messages[0].bookmarked).toBe(false);
+  });
+
+  // Sidebar panel management
+  it('sets and clears sidebar panel', () => {
+    useChatStore.getState().setSidebarPanel('settings');
+    expect(useChatStore.getState().sidebarPanel).toBe('settings');
+    useChatStore.getState().setSidebarPanel(null);
+    expect(useChatStore.getState().sidebarPanel).toBeNull();
+  });
+
+  // Reply management
+  it('sets and clears reply target', () => {
+    const msg = { id: 1, uid: 't', sender: 'user', text: 'test', type: 'chat' as const, timestamp: 1, time: '1', channel: 'general' };
+    useChatStore.getState().setReplyTo(msg);
+    expect(useChatStore.getState().replyTo?.id).toBe(1);
+    useChatStore.getState().setReplyTo(null);
+    expect(useChatStore.getState().replyTo).toBeNull();
+  });
+
+  // Chat scroll state
+  it('tracks chat at bottom state', () => {
+    useChatStore.getState().setChatAtBottom(false);
+    expect(useChatStore.getState().chatAtBottom).toBe(false);
+    useChatStore.getState().setChatAtBottom(true);
+    expect(useChatStore.getState().chatAtBottom).toBe(true);
+  });
+
+  // New message count
+  it('tracks new message count', () => {
+    useChatStore.getState().setNewMsgCount(5);
+    expect(useChatStore.getState().newMsgCount).toBe(5);
+    useChatStore.getState().setNewMsgCount(0);
+    expect(useChatStore.getState().newMsgCount).toBe(0);
+  });
 });

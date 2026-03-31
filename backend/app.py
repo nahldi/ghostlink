@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-__version__ = "5.6.0"
+__version__ = "5.6.1"
 
-import json
+import collections
+import functools
 import importlib
+import json
 import os
 import subprocess
 import sys
 import time
-import collections
-import functools
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -25,7 +25,6 @@ except ModuleNotFoundError:
 import asyncio
 import logging
 import secrets
-
 from datetime import datetime
 
 try:
@@ -34,29 +33,29 @@ try:
 except ImportError:
     HAS_AIOHTTP = False
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import deps
 
 log = logging.getLogger(__name__)
 
-from store import MessageStore
-from registry import AgentRegistry
-from router import MessageRouter
-from jobs import JobStore
-from rules import RuleStore
-from skills import SkillsRegistry
-from schedules import ScheduleStore, cron_matches
-from sessions import SessionManager
-from branches import BranchManager
-from providers import ProviderRegistry
-from bridges import BridgeManager
-from plugin_sdk import Marketplace, HookManager, event_bus, EVENTS, SKILL_PACKS, SafetyScanner
-from security import SecretsManager, ExecPolicy, AuditLog, DataManager
 import mcp_bridge
 import plugin_loader
+from branches import BranchManager
+from bridges import BridgeManager
+from jobs import JobStore
+from plugin_sdk import EVENTS, SKILL_PACKS, HookManager, Marketplace, SafetyScanner, event_bus
+from providers import ProviderRegistry
+from registry import AgentRegistry
+from router import MessageRouter
+from rules import RuleStore
+from schedules import ScheduleStore, cron_matches
+from security import AuditLog, DataManager, ExecPolicy, SecretsManager
+from sessions import SessionManager
+from skills import SkillsRegistry
+from store import MessageStore
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -191,7 +190,7 @@ SETTINGS_PATH = DATA_DIR / "settings.json"
 # deps._settings is already initialised with defaults in deps.py — sync MAX_HOPS
 deps._settings["loopGuard"] = MAX_HOPS
 
-_http_session: "aiohttp.ClientSession | None" = None
+_http_session: aiohttp.ClientSession | None = None
 
 
 def _load_settings():
@@ -440,8 +439,8 @@ async def lifespan(_app: FastAPI):
     from routes.agents import (
         _get_agent_workspace_path,
         _read_text_file_for_diff,
-        add_workspace_change,
         add_replay_event,
+        add_workspace_change,
         cache_file_diff,
         set_agent_browser_state,
         set_agent_presence,
@@ -1035,20 +1034,20 @@ async def ws_endpoint(ws: WebSocket):
 
 # ── Include route modules ───────────────────────────────────────────
 
-from routes import jobs as _r_jobs
-from routes import rules as _r_rules
-from routes import schedules as _r_schedules
-from routes import sessions as _r_sessions
-from routes import security as _r_security
-from routes import bridges as _r_bridges
-from routes import messages as _r_messages
-from routes import channels as _r_channels
 from routes import agents as _r_agents
-from routes import search as _r_search
-from routes import plugins as _r_plugins
-from routes import providers as _r_providers
+from routes import bridges as _r_bridges
+from routes import channels as _r_channels
+from routes import jobs as _r_jobs
+from routes import messages as _r_messages
 from routes import misc as _r_misc
 from routes import phase4_7 as _r_phase4_7
+from routes import plugins as _r_plugins
+from routes import providers as _r_providers
+from routes import rules as _r_rules
+from routes import schedules as _r_schedules
+from routes import search as _r_search
+from routes import security as _r_security
+from routes import sessions as _r_sessions
 
 app.include_router(_r_jobs.router)
 app.include_router(_r_rules.router)

@@ -10,7 +10,6 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-
 # ── MessageStore ──────────────────────────────────────────────────────
 
 @pytest_asyncio.fixture
@@ -224,8 +223,8 @@ def test_plugin_safety_scanner_blocks_non_allowlisted_imports():
 
 def test_router_mention_extraction():
     """@mention is extracted from message text."""
-    from router import MessageRouter
     from registry import AgentRegistry
+    from router import MessageRouter
     reg = AgentRegistry()
     inst = reg.register("claude")
     router = MessageRouter()
@@ -236,8 +235,8 @@ def test_router_mention_extraction():
 
 def test_router_all_mention():
     """@all targets all registered agents except the sender."""
-    from router import MessageRouter
     from registry import AgentRegistry
+    from router import MessageRouter
     reg = AgentRegistry()
     a1 = reg.register("claude")
     a2 = reg.register("gemini")
@@ -250,8 +249,8 @@ def test_router_all_mention():
 
 def test_router_no_mention():
     """A message with no @mention returns no targets (with no autorouting)."""
-    from router import MessageRouter
     from registry import AgentRegistry
+    from router import MessageRouter
     reg = AgentRegistry()
     router = MessageRouter()
     targets = router.get_targets("You", "just a plain message", "general", [])
@@ -305,6 +304,7 @@ def test_session_end(tmp_path: Path):
 @pytest_asyncio.fixture
 async def rules_store(tmp_path: Path):
     import aiosqlite
+
     from rules import RuleStore
     conn = await aiosqlite.connect(str(tmp_path / "rules.db"))
     conn.row_factory = aiosqlite.Row
@@ -341,6 +341,7 @@ async def test_rules_delete(rules_store):
 @pytest_asyncio.fixture
 async def jobs_store(tmp_path: Path):
     import aiosqlite
+
     from jobs import JobStore
     conn = await aiosqlite.connect(str(tmp_path / "jobs.db"))
     conn.row_factory = aiosqlite.Row
@@ -387,6 +388,7 @@ async def test_jobs_generated_uid_is_full_uuid_hex(jobs_store):
 @pytest_asyncio.fixture
 async def sched_store(tmp_path: Path):
     import aiosqlite
+
     from schedules import ScheduleStore
     conn = await aiosqlite.connect(str(tmp_path / "sched.db"))
     conn.row_factory = aiosqlite.Row

@@ -1,9 +1,10 @@
 """Security routes — secrets, exec policy, audit log, GDPR."""
 from __future__ import annotations
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
+
+import deps
 
 router = APIRouter()
 

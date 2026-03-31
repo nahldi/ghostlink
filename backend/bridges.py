@@ -14,6 +14,8 @@ import logging
 import re
 import threading
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -165,6 +167,8 @@ class BaseBridge:
         self._data_dir = data_dir
         self._connected = False
         self._thread: threading.Thread | None = None
+        self._outbound_rate_lock = threading.Lock()
+        self._last_outbound_at: dict[str, float] = {}
 
     def is_connected(self) -> bool:
         return self._connected
@@ -190,6 +194,78 @@ class BaseBridge:
         """Send a GhostLink message to the external platform."""
         raise NotImplementedError
 
+    def _transient_attempts(self) -> int:
+        options = self._config.get("options", {})
+        raw = options.get("retry_attempts", 3)
+        try:
+            attempts = int(raw)
+        except (TypeError, ValueError):
+            attempts = 3
+        return max(1, min(attempts, 5))
+
+    def _minimum_outbound_interval(self) -> float:
+        options = self._config.get("options", {})
+        raw = options.get("min_send_interval_s", 0.35)
+        try:
+            interval = float(raw)
+        except (TypeError, ValueError):
+            interval = 0.35
+        return max(0.0, min(interval, 5.0))
+
+    @staticmethod
+    def _is_retryable_error(exc: Exception) -> bool:
+        if isinstance(exc, urllib.error.HTTPError):
+            return exc.code == 429 or 500 <= exc.code <= 599
+        return isinstance(exc, (urllib.error.URLError, TimeoutError, OSError))
+
+    def _request_with_retry(
+        self,
+        req: urllib.request.Request,
+        *,
+        timeout: int,
+        operation: str,
+        retry_transient: bool = False,
+    ) -> bytes:
+        attempts = self._transient_attempts() if retry_transient else 1
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return resp.read()
+            except Exception as exc:
+                last_exc = exc
+                if not retry_transient or attempt >= attempts or not self._is_retryable_error(exc):
+                    raise
+                delay = min(0.5 * (2 ** (attempt - 1)), 2.0)
+                log.debug(
+                    "%s transient failure (%s/%s): %s; retrying in %.2fs",
+                    operation,
+                    attempt,
+                    attempts,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError(f"{operation} failed without exception")
+
+    def _respect_outbound_rate_limit(self, destination: str | None):
+        if not destination:
+            return
+        interval = self._minimum_outbound_interval()
+        if interval <= 0:
+            return
+        with self._outbound_rate_lock:
+            now = time.monotonic()
+            last = self._last_outbound_at.get(destination)
+            if last is not None:
+                remaining = interval - (now - last)
+                if remaining > 0:
+                    time.sleep(remaining)
+                    now = time.monotonic()
+            self._last_outbound_at[destination] = now
+
     def _parse_approval_command(self, text: str) -> tuple[int, str] | None:
         match = _APPROVAL_CMD_RE.match((text or "").strip())
         if not match:
@@ -203,8 +279,6 @@ class BaseBridge:
         return int(raw_id), response
 
     def _submit_approval_response(self, message_id: int, response: str) -> bool:
-        import urllib.request
-
         try:
             body = json.dumps({
                 "message_id": message_id,
@@ -216,7 +290,7 @@ class BaseBridge:
                 method="POST",
                 headers={"Content-Type": "application/json"},
             )
-            urllib.request.urlopen(req, timeout=5)
+            self._request_with_retry(req, timeout=5, operation="Approval response")
             return True
         except Exception as e:
             log.debug("Failed to submit approval response: %s", e)
@@ -269,7 +343,6 @@ class BaseBridge:
 
     def _post_to_ghostlink(self, sender: str, text: str, channel: str = "general"):
         """Post an inbound message from external platform to GhostLink."""
-        import urllib.request
         try:
             body = json.dumps({
                 "sender": sender,
@@ -282,7 +355,7 @@ class BaseBridge:
                 data=body, method="POST",
                 headers={"Content-Type": "application/json"},
             )
-            urllib.request.urlopen(req, timeout=5)
+            self._request_with_retry(req, timeout=5, operation="Inbound bridge post")
         except Exception as e:
             log.debug("Failed to post inbound message: %s", e)
 
@@ -316,7 +389,6 @@ class DiscordBridge(BaseBridge):
 
     def _discord_request(self, method: str, path: str, body: dict | None = None) -> dict | list | None:
         """Make an authenticated request to Discord API."""
-        import urllib.request, urllib.error
         url = f"{self.DISCORD_API}{path}"
         data = json.dumps(body).encode() if body else None
         req = urllib.request.Request(url, data=data, method=method, headers={
@@ -325,8 +397,13 @@ class DiscordBridge(BaseBridge):
             "User-Agent": "GhostLink/1.8 (Bot)",
         })
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return json.loads(resp.read())
+            raw = self._request_with_retry(
+                req,
+                timeout=10,
+                operation=f"Discord API {method} {path}",
+                retry_transient=method != "GET",
+            )
+            return json.loads(raw)
         except urllib.error.HTTPError as e:
             log.debug("Discord API %s %s: %s", method, path, e.code)
             return None
@@ -413,6 +490,7 @@ class DiscordBridge(BaseBridge):
         # Discord max message length is 2000
         if len(content) > 2000:
             content = content[:1997] + "..."
+        self._respect_outbound_rate_limit(f"discord:{ext_channel}")
 
         payload: dict[str, Any] = {"content": content}
 
@@ -474,16 +552,20 @@ class TelegramBridge(BaseBridge):
 
     def _tg_request(self, method: str, params: dict | None = None) -> dict | None:
         """Call Telegram Bot API."""
-        import urllib.request, urllib.error
         url = f"{self.TELEGRAM_API}/bot{self._token}/{method}"
         data = json.dumps(params or {}).encode()
         req = urllib.request.Request(url, data=data, method="POST", headers={
             "Content-Type": "application/json",
         })
         try:
-            with urllib.request.urlopen(req, timeout=35) as resp:
-                result = json.loads(resp.read())
-                return result if result.get("ok") else None
+            raw = self._request_with_retry(
+                req,
+                timeout=35,
+                operation=f"Telegram API {method}",
+                retry_transient=method != "getUpdates",
+            )
+            result = json.loads(raw)
+            return result if result.get("ok") else None
         except Exception as e:
             # Sanitize error to avoid leaking bot token from URL in stack traces
             err_msg = str(e).replace(self._token, "***") if self._token else str(e)
@@ -567,6 +649,7 @@ class TelegramBridge(BaseBridge):
         content = self._format_outbound(sender, text, msg_type=msg_type, message_id=message_id, metadata=metadata, markdown=True)
         if len(content) > 4096:
             content = content[:4093] + "..."
+        self._respect_outbound_rate_limit(f"telegram:{ext_channel}")
 
         payload: dict[str, Any] = {
             "chat_id": ext_channel,
@@ -610,8 +693,8 @@ class SlackBridge(BaseBridge):
         """Send to Slack via incoming webhook."""
         if sender.startswith("slack:"):
             return
-        import urllib.request
         try:
+            self._respect_outbound_rate_limit(f"slack:{self._webhook_url}")
             body = json.dumps({
                 "text": self._format_outbound(sender, text, msg_type=msg_type, message_id=message_id, metadata=metadata, markdown=True),
                 "username": f"GhostLink ({sender})",
@@ -621,7 +704,7 @@ class SlackBridge(BaseBridge):
                 self._webhook_url, data=body, method="POST",
                 headers={"Content-Type": "application/json"},
             )
-            urllib.request.urlopen(req, timeout=10)
+            self._request_with_retry(req, timeout=10, operation="Slack webhook", retry_transient=True)
         except Exception as e:
             log.debug("Slack webhook error: %s", e)
 
@@ -652,8 +735,8 @@ class WhatsAppBridge(BaseBridge):
         ext_channel = self._get_external_channel(channel)
         if not ext_channel:
             return
-        import urllib.request
         try:
+            self._respect_outbound_rate_limit(f"whatsapp:{ext_channel}")
             body = json.dumps({
                 "messaging_product": "whatsapp",
                 "to": ext_channel,
@@ -668,7 +751,7 @@ class WhatsAppBridge(BaseBridge):
                     "Content-Type": "application/json",
                 },
             )
-            urllib.request.urlopen(req, timeout=10)
+            self._request_with_retry(req, timeout=10, operation="WhatsApp send", retry_transient=True)
         except Exception as e:
             log.debug("WhatsApp send error: %s", e)
 
@@ -694,8 +777,8 @@ class WebhookBridge(BaseBridge):
         """POST to configured webhook URL."""
         if not self._outbound_url or sender.startswith("webhook:"):
             return
-        import urllib.request
         try:
+            self._respect_outbound_rate_limit(f"webhook:{self._outbound_url}")
             body = json.dumps({
                 "event": "approval_request" if msg_type == "approval_request" else "message",
                 "sender": sender,
@@ -714,7 +797,7 @@ class WebhookBridge(BaseBridge):
             req = urllib.request.Request(
                 self._outbound_url, data=body, method="POST", headers=headers,
             )
-            urllib.request.urlopen(req, timeout=10)
+            self._request_with_retry(req, timeout=10, operation="Webhook outbound", retry_transient=True)
         except Exception as e:
             log.debug("Webhook outbound error: %s", e)
 

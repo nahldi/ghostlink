@@ -146,7 +146,7 @@ def _daemonize(pid_file: Path):
     pid_file.write_text(real_pid)
 
     # Redirect stdio to /dev/null
-    sys.stdin = open(os.devnull, "r")
+    sys.stdin = open(os.devnull)
     sys.stdout = open(os.devnull, "w")
     sys.stderr = open(os.devnull, "w")
 
@@ -191,7 +191,7 @@ Connect from Claude Code:
     existing_pid = _read_pid(pid_file)
     if existing_pid and _is_pid_alive(existing_pid):
         print(f"GhostLink daemon is already running (pid {existing_pid}).")
-        print(f"Use --stop to shut it down first.")
+        print("Use --stop to shut it down first.")
         sys.exit(1)
 
     # Set port env vars before importing app

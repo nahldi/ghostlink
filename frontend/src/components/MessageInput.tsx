@@ -1045,7 +1045,7 @@ export function MessageInput() {
           placeholder={`Message #${activeChannel}...`}
           aria-label={`Message input for #${activeChannel}`}
           rows={1}
-          className="flex-1 bg-surface-container/60 rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/30 resize-none max-h-40 outline-none border border-outline-variant/8 focus:border-primary/25 focus:shadow-[0_0_16px_rgba(167,139,250,0.08)] transition-all"
+          className="flex-1 bg-surface-container/60 rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/30 resize-none max-h-40 outline-none border border-outline-variant/8 focus:border-primary/30 focus:shadow-[0_0_0_3px_rgba(124,58,237,0.1),0_0_20px_rgba(124,58,237,0.06)] transition-all duration-300"
         />
         {/* Voice Note Recording */}
         {isRecording ? (
@@ -1090,7 +1090,7 @@ export function MessageInput() {
           disabled={!text.trim()}
           whileTap={{ scale: 0.88 }}
           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-          className="p-2.5 rounded-xl bg-primary-container text-primary-fixed hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+          className="p-2.5 rounded-xl bg-primary-container text-primary-fixed hover:brightness-110 hover:shadow-[0_0_16px_rgba(124,58,237,0.25)] transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none shrink-0"
         >
           <span className="material-symbols-outlined text-xl">send</span>
         </motion.button>

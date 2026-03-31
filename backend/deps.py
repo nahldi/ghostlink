@@ -13,50 +13,59 @@ import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from store import MessageStore
-    from registry import AgentRegistry
-    from router import MessageRouter
+    from a2a_bridge import A2ABridge
+    from auth import UserManager
+    from automations import AutomationManager
+    from autonomous import AutonomousManager
+    from branches import BranchManager
+    from bridges import BridgeManager
     from jobs import JobStore
+    from memory_graph import MemoryGraph
+    from plugin_sdk import HookManager, Marketplace
+    from providers import ProviderRegistry
+    from rag import RAGPipeline
+    from registry import AgentRegistry
+    from remote_runner import RemoteRunner
+    from router import MessageRouter
     from rules import RuleStore
     from schedules import ScheduleStore
+    from security import AuditLog, DataManager, ExecPolicy, SecretsManager
     from sessions import SessionManager
-    from branches import BranchManager
     from skills import SkillsRegistry
-    from providers import ProviderRegistry
-    from bridges import BridgeManager
-    from plugin_sdk import Marketplace, HookManager
-    from security import SecretsManager, ExecPolicy, AuditLog, DataManager
+    from specialization import SpecializationEngine
+    from store import MessageStore
+    from worktree import WorktreeManager
 
 log = logging.getLogger(__name__)
 
 # ── Core stores (set by lifespan in app.py) ─────────────────────────
 
-store: "MessageStore | None" = None
-registry: "AgentRegistry | None" = None
-router_inst: "MessageRouter | None" = None
-job_store: "JobStore | None" = None
-rule_store: "RuleStore | None" = None
-schedule_store: "ScheduleStore | None" = None
-session_manager: "SessionManager | None" = None
-branch_manager: "BranchManager | None" = None
-skills_registry: "SkillsRegistry | None" = None
-provider_registry: "ProviderRegistry | None" = None
-bridge_manager: "BridgeManager | None" = None
-marketplace: "Marketplace | None" = None
-hook_manager: "HookManager | None" = None
-secrets_manager: "SecretsManager | None" = None
-exec_policy: "ExecPolicy | None" = None
-audit_log: "AuditLog | None" = None
-data_manager: "DataManager | None" = None
-worktree_manager: "WorktreeManager | None" = None  # v3.6.0
-automation_manager: "AutomationManager | None" = None  # v3.6.0
-remote_runner: "RemoteRunner | None" = None  # v4.4.0
-user_manager: "UserManager | None" = None  # v4.4.0
-a2a_bridge: "A2ABridge | None" = None  # v4.4.0
-autonomous_manager: "AutonomousManager | None" = None  # v4.5.0
-memory_graph: "MemoryGraph | None" = None  # v4.5.0
-specialization: "SpecializationEngine | None" = None  # v4.5.0
-rag_pipeline: "RAGPipeline | None" = None  # v4.5.0
+store: MessageStore | None = None
+registry: AgentRegistry | None = None
+router_inst: MessageRouter | None = None
+job_store: JobStore | None = None
+rule_store: RuleStore | None = None
+schedule_store: ScheduleStore | None = None
+session_manager: SessionManager | None = None
+branch_manager: BranchManager | None = None
+skills_registry: SkillsRegistry | None = None
+provider_registry: ProviderRegistry | None = None
+bridge_manager: BridgeManager | None = None
+marketplace: Marketplace | None = None
+hook_manager: HookManager | None = None
+secrets_manager: SecretsManager | None = None
+exec_policy: ExecPolicy | None = None
+audit_log: AuditLog | None = None
+data_manager: DataManager | None = None
+worktree_manager: WorktreeManager | None = None  # v3.6.0
+automation_manager: AutomationManager | None = None  # v3.6.0
+remote_runner: RemoteRunner | None = None  # v4.4.0
+user_manager: UserManager | None = None  # v4.4.0
+a2a_bridge: A2ABridge | None = None  # v4.4.0
+autonomous_manager: AutonomousManager | None = None  # v4.5.0
+memory_graph: MemoryGraph | None = None  # v4.5.0
+specialization: SpecializationEngine | None = None  # v4.5.0
+rag_pipeline: RAGPipeline | None = None  # v4.5.0
 
 # ── Process tracking (set by spawn/register routes) ──────────────────
 
@@ -143,6 +152,7 @@ _workspace_ws_users: dict[int, str] = {}
 # ── Agent name validation ────────────────────────────────────────────
 
 import re as _re
+
 _VALID_AGENT_NAME = _re.compile(r'^[a-zA-Z0-9_-]{1,50}$')
 
 
@@ -172,9 +182,9 @@ async def broadcast(event_type: str, data: dict):
 
 def _is_private_url(url: str) -> bool:
     """Block requests to private/internal IP ranges to prevent SSRF."""
-    from urllib.parse import urlparse
     import ipaddress
     import socket
+    from urllib.parse import urlparse
 
     def _is_blocked_address(host_or_ip: str) -> bool:
         candidate = host_or_ip.strip().rstrip(".")

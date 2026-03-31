@@ -5,9 +5,9 @@ for each capability, and falls back to free alternatives when possible.
 """
 
 import json
+import logging
 import os
 import time
-import logging
 from pathlib import Path
 
 log = logging.getLogger(__name__)

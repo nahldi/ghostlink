@@ -6,9 +6,10 @@ import re
 import secrets
 import time
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+import deps
 
 router = APIRouter()
 _CHANNEL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9_-]{0,19})$")

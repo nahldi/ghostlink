@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import logging
-import deps
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+
+import deps
 
 router = APIRouter()
 log = logging.getLogger(__name__)

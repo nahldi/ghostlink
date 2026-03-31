@@ -8,8 +8,8 @@ the main branch on deregister.
 from __future__ import annotations
 
 import logging
-import subprocess
 import shutil
+import subprocess
 from pathlib import Path
 
 log = logging.getLogger(__name__)

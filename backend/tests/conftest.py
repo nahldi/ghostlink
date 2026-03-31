@@ -7,8 +7,8 @@ import json
 import os
 import sys
 import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -47,7 +47,7 @@ async def test_client(tmp_data_dir: Path, tmp_config_toml: Path, monkeypatch):
 
     Patches CONFIG and DATA_DIR so no real filesystem side effects occur.
     """
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
 
     # Patch environment before importing app
     monkeypatch.chdir(tmp_config_toml.parent)
@@ -55,6 +55,7 @@ async def test_client(tmp_data_dir: Path, tmp_config_toml: Path, monkeypatch):
 
     # Lazy import after patching
     import importlib
+
     import app as _app_module
 
     # Override data dir and settings path so tests don't touch real data

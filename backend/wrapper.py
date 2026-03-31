@@ -632,7 +632,7 @@ def _queue_watcher(get_identity_fn, inject_fn, *, server_port: int = 8300,
                 except (OSError, FileNotFoundError):
                     time.sleep(1)
                     continue
-                with open(processing_file, "r", encoding="utf-8") as f:
+                with open(processing_file, encoding="utf-8") as f:
                     lines = f.readlines()
                 processing_file.unlink(missing_ok=True)
 
@@ -916,7 +916,7 @@ def main():
 
     # ── v2.5.0: Agent identity injection ──────────────────────────────
     # Write context files so agents know who they are and what GhostLink is
-    from agent_memory import set_soul, generate_agent_context
+    from agent_memory import generate_agent_context, set_soul
     try:
         # Use label and role from spawn (env vars set by routes/agents.py)
         agent_label = os.environ.get("GHOSTLINK_AGENT_LABEL", "") or label or assigned_name
@@ -967,7 +967,7 @@ def main():
                     settings = json.loads(mcp_settings_path.read_text("utf-8"))
                     settings["systemInstruction"] = context_content[:4000]
                     mcp_settings_path.write_text(json.dumps(settings, indent=2) + "\n", "utf-8")
-                    print(f"  Gemini system instruction injected")
+                    print("  Gemini system instruction injected")
                 except Exception as e:
                     print(f"  Warning: failed to inject Gemini system instruction: {e}")
 

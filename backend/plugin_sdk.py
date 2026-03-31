@@ -13,10 +13,11 @@ from __future__ import annotations
 import ast
 import json
 import logging
-import time
 import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 log = logging.getLogger(__name__)
 

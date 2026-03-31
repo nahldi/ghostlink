@@ -1164,10 +1164,10 @@ export function AgentCockpit() {
         <AnimatePresence mode="wait">
           <motion.div
             key={`${agent.name}-${tab}`}
-            initial={prefersReducedMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={prefersReducedMotion ? undefined : { opacity: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.12 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={prefersReducedMotion ? undefined : { opacity: 0, y: -4 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0 flex flex-col"
           >
             {tab === 'terminal' && <CockpitTerminal agent={agent} />}

@@ -14,9 +14,10 @@ import sys
 import time
 from pathlib import Path
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
+
+import deps
 from plugin_sdk import event_bus
 
 router = APIRouter()
@@ -1242,7 +1243,7 @@ async def toggle_agent_skill(agent_name: str, request: Request):
 
 # ── Agent soul, notes, health, config, memories ──────────────────────
 
-from agent_memory import get_agent_memory, get_soul, set_soul, get_notes, set_notes
+from agent_memory import get_agent_memory, get_notes, get_soul, set_notes, set_soul
 
 
 @router.get("/api/agents/{name}/soul")

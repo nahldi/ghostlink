@@ -1,5 +1,17 @@
 # GhostLink Changelog
 
+## v5.6.1 — 2026-03-31
+### Fluidity Pass, Bridge Reliability, Test Coverage
+- **Fluidity pass** — spring animations on message entrance, panels, modals, scroll-to-bottom button, agent bar chips, settings tabs, cockpit tabs, empty state cascade
+- **Bridge retry + rate limiting** — exponential backoff on transient 429/5xx/network failures, per-destination outbound throttling
+- **Frontend tests expanded** — 26 → 48 tests (timeago, chatStore channels/settings/bookmarks, API methods)
+- **Backend tests expanded** — 106 → 122 tests (bridge retry regression, provider route coverage)
+- **SDK version synced** — 0.1.0 → 5.6.0
+- **Python ruff linting** — 126 auto-fixes, F821 undefined names resolved, deps.py TYPE_CHECKING complete
+- **Sidebar fluidity** — nav button glow, channel button inner glow, press feedback
+- **Input polish** — focus ring glow expansion, send button hover glow
+- **Mobile perf** — reduced backdrop-filter blur at 768px breakpoint
+
 ## v5.6.0 — 2026-03-31
 ### Security Hardening, Liquid Glass Redesign, Runtime Fixes
 - **Electron security** — `contextIsolation: true` + `sandbox: true` on all windows (was disabled on wizard/launcher)

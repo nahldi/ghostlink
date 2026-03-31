@@ -151,8 +151,8 @@ export function Sidebar() {
           return (
             <button key={item.id} title={item.tip}
               onClick={() => setSidebarPanel(item.id === 'chat' ? null : item.id)}
-              className={`group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                isActive ? 'bg-white/10 text-white' : 'text-white/45 hover:text-white/50 hover:bg-white/5'
+              className={`group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                isActive ? 'bg-white/10 text-white shadow-[0_0_12px_rgba(124,58,237,0.15)]' : 'text-white/45 hover:text-white/60 hover:bg-white/5 active:scale-90'
               }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
@@ -242,10 +242,10 @@ export function Sidebar() {
                   ) : (
                     <button
                       onClick={() => { setActiveChannel(ch.name); clearUnread(ch.name); setSidebarPanel(null); setExpanded(false); }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] transition-all ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] transition-all duration-200 ${
                         activeChannel === ch.name
-                          ? 'bg-purple-500/15 text-purple-300 font-semibold'
-                          : 'text-white/45 hover:text-white/60 hover:bg-white/4'
+                          ? 'bg-purple-500/15 text-purple-300 font-semibold shadow-[inset_0_0_12px_rgba(124,58,237,0.08)]'
+                          : 'text-white/45 hover:text-white/60 hover:bg-white/5 active:scale-[0.97]'
                       }`}>
                       <span><span className="text-white/30 mr-1">#</span>{ch.name}</span>
                       {ch.unread > 0 && (

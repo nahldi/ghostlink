@@ -19,9 +19,10 @@ import secrets
 import time
 from pathlib import Path
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+import deps
 
 log = logging.getLogger(__name__)
 router = APIRouter()

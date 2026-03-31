@@ -1,9 +1,10 @@
 """Job management routes."""
 from __future__ import annotations
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+import deps
 
 router = APIRouter()
 

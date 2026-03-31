@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
 import { toast } from './Toast';
@@ -191,6 +192,15 @@ export function SettingsPanel() {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          className="space-y-5"
+        >
         {tab === 'general' && (<>
           <GeneralTab display={display} updateDraft={updateDraft} applyInstant={applyInstant} settings={settings} />
           <AppearanceTab display={display} updateDraft={updateDraft} applyInstant={applyInstant} settings={settings} />
@@ -206,6 +216,8 @@ export function SettingsPanel() {
           <SecurityTab />
           <AdvancedTab display={display} applyInstant={applyInstant} settings={settings} />
         </>)}
+        </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

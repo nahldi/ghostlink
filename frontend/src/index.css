@@ -235,33 +235,78 @@ body {
   animation: shimmer 1.8s ease-in-out infinite;
 }
 
-/* ── Message entrance ── */
+/* ── Message entrance — spring with subtle bounce ── */
 @keyframes msg-slide-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.97); filter: blur(4px); }
-  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  0%   { opacity: 0; transform: translateY(16px) scale(0.96); filter: blur(6px); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.005); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
-.msg-enter { animation: msg-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.msg-enter { animation: msg-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 /* ── Panel entrance ── */
 @keyframes panel-slide-in {
-  from { opacity: 0; transform: translateX(20px) scale(0.98); }
-  to { opacity: 1; transform: translateX(0) scale(1); }
+  0%   { opacity: 0; transform: translateX(24px) scale(0.97); }
+  60%  { opacity: 1; transform: translateX(-2px) scale(1.002); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 @keyframes panel-fade-in {
   from { opacity: 0; transform: scale(0.94); filter: blur(8px); }
   to { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 @keyframes float-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.94); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  0%   { opacity: 0; transform: translateY(20px) scale(0.93); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.005); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Modal entrance (scale + blur) ── */
+/* ── Modal entrance (scale + blur + bounce) ── */
 @keyframes modal-enter {
-  from { opacity: 0; transform: scale(0.92) translateY(8px); filter: blur(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+  0%   { opacity: 0; transform: scale(0.9) translateY(12px); filter: blur(10px); }
+  60%  { opacity: 1; transform: scale(1.01) translateY(-1px); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
 }
-.modal-enter { animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.modal-enter { animation: modal-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Button press — tactile feedback ── */
+.btn-press { transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
+.btn-press:hover { transform: translateY(-1px); }
+.btn-press:active { transform: scale(0.95) translateY(0); transition-duration: 0.08s; }
+
+/* ── Focus glow expansion ── */
+.focus-glow {
+  transition: box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+.focus-glow:focus-within {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12), 0 0 20px rgba(124, 58, 237, 0.06);
+  border-color: rgba(124, 58, 237, 0.3) !important;
+}
+
+/* ── Smooth crossfade for channel switching ── */
+.channel-crossfade {
+  transition: opacity 0.2s ease;
+}
+
+/* ── Elastic hover lift ── */
+.hover-lift {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Status pulse — for online/offline transitions ── */
+@keyframes status-appear {
+  0%   { opacity: 0; transform: scale(0.5); }
+  60%  { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.status-enter { animation: status-appear 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Smooth scroll ── */
+[data-chat-feed] {
+  scroll-behavior: smooth;
+}
 
 /* ── Stagger children entrance ── */
 @keyframes stagger-in {

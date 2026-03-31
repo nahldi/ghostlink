@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import unicodedata
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+import deps
 from plugin_sdk import event_bus
 
 router = APIRouter()

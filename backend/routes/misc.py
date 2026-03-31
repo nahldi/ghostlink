@@ -16,9 +16,10 @@ import urllib.request as _urllib_request
 import uuid as _uuid
 from pathlib import Path
 
-import deps
-from fastapi import APIRouter, Request, UploadFile, File
+from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import JSONResponse
+
+import deps
 
 router = APIRouter()
 
@@ -1127,8 +1128,9 @@ async def text_to_speech(request: Request):
 
     Returns audio as base64-encoded data URI or binary stream.
     """
-    import aiohttp
     import base64
+
+    import aiohttp
 
     body = await request.json()
     text = body.get("text", "")
@@ -1171,8 +1173,9 @@ async def analyze_image(request: Request):
     Routes to Claude (vision), Gemini (vision), or GPT-4 (vision) based
     on configured providers.
     """
-    import aiohttp
     import base64
+
+    import aiohttp
 
     form = await request.form()
     image = form.get("image")
@@ -1266,7 +1269,7 @@ async def parse_document(request: Request):
     if len(doc_bytes) > 50 * 1024 * 1024:  # 50MB limit
         return JSONResponse({"error": "Document too large (max 50MB)"}, 413)
 
-    from document_parser import extract_text, chunk_text, summarize_document
+    from document_parser import chunk_text, extract_text, summarize_document
 
     text = extract_text(doc_bytes, filename)
     chunks = chunk_text(text)

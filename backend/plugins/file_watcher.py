@@ -5,11 +5,11 @@ via WebSocket. Shows which files agents create, modify, or delete.
 """
 
 import json
+import logging
 import os
 import re
 import threading
 import time
-import logging
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -131,6 +131,7 @@ def _route_comment_to_agent(filepath: str, line_num: int, instruction: str):
         filename = os.path.basename(filepath)
         text = f"[Watch Mode] `{filename}:{line_num}` — {instruction}"
         import asyncio
+
         from mcp_bridge import _run_async
         _run_async(deps.store.add("system", text, "system", "general"))
         # Trigger routing via @mention if instruction contains @agent

@@ -135,7 +135,7 @@ def run_agent(
     print(f"  Using tmux session: {session_name}")
     print(f"  Command: {agent_cmd}")
     if not headless:
-        print(f"  Detach: Ctrl+B, D  (agent keeps running)")
+        print("  Detach: Ctrl+B, D  (agent keeps running)")
         print(f"  Reattach: tmux attach -t {session_name}\n")
 
     while True:

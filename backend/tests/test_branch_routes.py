@@ -21,13 +21,14 @@ class _DummyRequest:
 
 @pytest.fixture
 def branch_env(tmp_path: Path, tmp_data_dir: Path):
+    import aiosqlite
+
     from branches import BranchManager
     from jobs import JobStore
     from registry import AgentRegistry
     from router import MessageRouter
     from sessions import SessionManager
     from store import MessageStore
-    import aiosqlite
 
     async def _setup():
         store = MessageStore(tmp_path / "messages.db")

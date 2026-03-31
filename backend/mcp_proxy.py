@@ -8,14 +8,14 @@ Adapted from reference-agentchattr/mcp_proxy.py.
 """
 
 import json
-import re
-import threading
 import logging
+import re
 import sys
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 log = logging.getLogger(__name__)
 

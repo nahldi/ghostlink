@@ -54,4 +54,75 @@ describe('api', () => {
     });
     await expect(api.getStatus()).rejects.toThrow();
   });
+
+  it('saveSettings sends POST with settings body', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+    await api.saveSettings({ theme: 'cyberpunk' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/settings'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ theme: 'cyberpunk' }),
+      }),
+    );
+  });
+
+  it('createChannel sends POST with channel name', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ name: 'dev' }),
+    });
+    await api.createChannel('dev');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/channels'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'dev' }),
+      }),
+    );
+  });
+
+  it('deleteChannel sends DELETE', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+    await api.deleteChannel('dev');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/channels/dev'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('getMessages supports since_id parameter', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ messages: [] }),
+    });
+    await api.getMessages('general', 42);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('since_id=42'),
+      expect.anything(),
+    );
+  });
+
+  it('spawnAgent sends POST with agent config', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, pid: 1234, base: 'claude', message: 'spawned' }),
+    });
+    await api.spawnAgent('claude', 'Claude', '/project', ['--flag']);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/spawn-agent'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('handles network failure', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    await expect(api.getStatus()).rejects.toThrow('Network error');
+  });
 });

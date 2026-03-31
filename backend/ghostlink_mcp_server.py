@@ -46,13 +46,14 @@ log = logging.getLogger("ghostlink-mcp")
 async def init_core_services(data_dir: Path, port: int = 8300):
     """Boot the minimal set of core services needed for MCP tools."""
     import aiosqlite
+
     import deps
-    from store import MessageStore
     from jobs import JobStore
-    from rules import RuleStore
-    from schedules import ScheduleStore
     from registry import AgentRegistry
     from router import MessageRouter
+    from rules import RuleStore
+    from schedules import ScheduleStore
+    from store import MessageStore
 
     # Create data directory
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -186,7 +187,7 @@ def run_http(data_dir: Path, port: int, host: str):
         print(f"GhostLink MCP server running on http://{host}:{port}")
         print(f"  Tools: {len(mcp_bridge._ALL_TOOLS)}")
         print(f"  Data: {data_dir}")
-        print(f"  Transport: streamable-http")
+        print("  Transport: streamable-http")
         await mcp_bridge._mcp_http.run_streamable_http_async()
 
     asyncio.run(_main())
@@ -215,7 +216,7 @@ def run_sse(data_dir: Path, port: int, host: str):
         print(f"GhostLink MCP server running on http://{host}:{port}")
         print(f"  Tools: {len(mcp_bridge._ALL_TOOLS)}")
         print(f"  Data: {data_dir}")
-        print(f"  Transport: SSE")
+        print("  Transport: SSE")
         await mcp_bridge._mcp_sse.run_sse_async()
 
     asyncio.run(_main())

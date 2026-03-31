@@ -19,15 +19,14 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-
 # ── Message pipeline: store + registry + router ─────────────────────
 
 @pytest_asyncio.fixture
 async def pipeline(tmp_path: Path):
     """Full message pipeline: store + registry + router."""
-    from store import MessageStore
     from registry import AgentRegistry
     from router import MessageRouter
+    from store import MessageStore
 
     ms = MessageStore(tmp_path / "msgs.db")
     await ms.init()
@@ -161,6 +160,7 @@ def test_multiple_agents_same_base_independent():
 @pytest_asyncio.fixture
 async def job_store_inst(tmp_path: Path):
     import aiosqlite
+
     from jobs import JobStore
     conn = await aiosqlite.connect(str(tmp_path / "jobs.db"))
     conn.row_factory = aiosqlite.Row
@@ -279,6 +279,7 @@ def test_approval_atomic_write_and_read(tmp_path: Path):
 @pytest_asyncio.fixture
 async def rules_store_inst(tmp_path: Path):
     import aiosqlite
+
     from rules import RuleStore
     conn = await aiosqlite.connect(str(tmp_path / "rules.db"))
     conn.row_factory = aiosqlite.Row

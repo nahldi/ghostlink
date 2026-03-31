@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-import aiosqlite
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Callable, Awaitable
+from typing import Any
+
+import aiosqlite
 
 MsgCallback = Callable[[dict], Awaitable[None]]
 
@@ -138,8 +140,8 @@ class MessageStore:
 
     def _create_backup(self):
         """Create a .bak copy of the database for crash recovery."""
-        import shutil
         import logging as _log
+        import shutil
         db_file = Path(self.db_path)
         if db_file.exists() and db_file.stat().st_size > 0:
             bak = db_file.with_suffix(".db.bak")

@@ -6,10 +6,11 @@ routes that don't depend on lifespan state are here.
 """
 from __future__ import annotations
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from plugin_sdk import SafetyScanner, SKILL_PACKS, EVENTS
+
+import deps
+from plugin_sdk import EVENTS, SKILL_PACKS, SafetyScanner
 
 router = APIRouter()
 

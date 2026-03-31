@@ -33,8 +33,8 @@ def _get_version() -> str:
 
 try:
     from cryptography.fernet import Fernet
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 except ImportError:
     raise ImportError(
         "cryptography package is required for GhostLink secrets encryption. "
@@ -270,13 +270,13 @@ class ExecPolicy:
 
         for blocked in BLOCKED_COMMANDS:
             if blocked in cmd_lower:
-                return {"allowed": False, "reason": f"Blocked: dangerous command", "requires_approval": False}
+                return {"allowed": False, "reason": "Blocked: dangerous command", "requires_approval": False}
 
         policy = self.get_policy(agent_name)
 
         for pattern in policy.get("blocklist", []):
             if pattern.lower() in cmd_lower:
-                return {"allowed": False, "reason": f"Blocked by agent policy", "requires_approval": False}
+                return {"allowed": False, "reason": "Blocked by agent policy", "requires_approval": False}
 
         for pattern in policy.get("allowlist", []):
             if pattern.lower() in cmd_lower:
@@ -340,7 +340,7 @@ class AuditLog:
         # Only the last `limit` matching entries are kept at any time.
         entries: deque[dict] = deque(maxlen=limit)
         try:
-            with open(self._log_file, "r", encoding="utf-8") as f:
+            with open(self._log_file, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:

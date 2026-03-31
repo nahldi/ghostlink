@@ -11,33 +11,33 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-
 # ── Health & version ─────────────────────────────────────────────────
 
 def test_version():
     """Backend version string is set."""
-    import app
     import re
+
+    import app
     assert re.match(r"^\d+\.\d+\.\d+$", app.__version__), f"Bad version format: {app.__version__}"
 
 
 def test_imports_clean():
     """Backend imports without error."""
+    import agent_memory  # noqa: F401
     import app  # noqa: F401
     import bridges  # noqa: F401
+    import jobs  # noqa: F401
     import mcp_bridge  # noqa: F401
     import mcp_proxy  # noqa: F401
-    import schedules  # noqa: F401
-    import sessions  # noqa: F401
-    import store  # noqa: F401
+    import plugin_loader  # noqa: F401
     import registry  # noqa: F401
     import router  # noqa: F401
     import rules  # noqa: F401
-    import jobs  # noqa: F401
-    import skills  # noqa: F401
-    import agent_memory  # noqa: F401
-    import plugin_loader  # noqa: F401
+    import schedules  # noqa: F401
     import security  # noqa: F401
+    import sessions  # noqa: F401
+    import skills  # noqa: F401
+    import store  # noqa: F401
 
 
 # ── Rate limiter ─────────────────────────────────────────────────────
@@ -51,8 +51,9 @@ def test_rate_limit_localhost_exempt():
 
 def test_rate_limit_deque_per_ip():
     """Each IP gets its own deque — no cross-contamination."""
-    from app import _rate_limits
     import collections
+
+    from app import _rate_limits
     # Simulate two independent IPs
     _rate_limits.clear()
     ip_a = "1.2.3.4"
@@ -100,6 +101,7 @@ def test_workspace_spawn_warning_ignores_normal_linux_paths():
 def test_shared_auth_spawn_warning_detects_external_codex(monkeypatch: pytest.MonkeyPatch):
     """A non-GhostLink Codex process should emit a shared-auth warning."""
     import subprocess
+
     from routes.agents import _shared_auth_spawn_warning
 
     def fake_run(*_args, **_kwargs):
@@ -121,6 +123,7 @@ def test_shared_auth_spawn_warning_detects_external_codex(monkeypatch: pytest.Mo
 def test_shared_auth_spawn_warning_ignores_ghostlink_processes(monkeypatch: pytest.MonkeyPatch):
     """GhostLink-owned wrapper processes should not trigger the warning."""
     import subprocess
+
     from routes.agents import _shared_auth_spawn_warning
 
     def fake_run(*_args, **_kwargs):
@@ -149,6 +152,7 @@ def test_private_url_blocks_loopback_variants():
 def test_private_url_blocks_private_dns_resolution(monkeypatch: pytest.MonkeyPatch):
     """Any private address returned by DNS should block the URL."""
     import socket
+
     from deps import _is_private_url
 
     def fake_getaddrinfo(*_args, **_kwargs):
@@ -165,6 +169,7 @@ def test_private_url_blocks_private_dns_resolution(monkeypatch: pytest.MonkeyPat
 def test_private_url_allows_public_dns_resolution(monkeypatch: pytest.MonkeyPatch):
     """Public DNS-only results should remain allowed."""
     import socket
+
     from deps import _is_private_url
 
     def fake_getaddrinfo(*_args, **_kwargs):
@@ -183,6 +188,7 @@ def test_private_url_allows_public_dns_resolution(monkeypatch: pytest.MonkeyPatc
 def test_cron_matches_utc():
     """cron_matches uses UTC — verify by checking a known UTC minute."""
     import datetime
+
     from schedules import cron_matches
 
     # Build a timestamp where UTC minute == 30
@@ -195,8 +201,9 @@ def test_cron_matches_utc():
 
 def test_cron_step_values():
     """Cron step values (*/5) work correctly."""
-    from schedules import cron_matches
     import datetime
+
+    from schedules import cron_matches
 
     dt = datetime.datetime(2026, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
     ts = dt.timestamp()
@@ -234,8 +241,9 @@ def test_approval_write_atomic(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_settings_lock_exists():
     """_settings_lock is an asyncio.Lock and is used for channel mutations."""
-    from deps import _settings_lock
     import asyncio
+
+    from deps import _settings_lock
     assert isinstance(_settings_lock, asyncio.Lock)
 
 
@@ -335,6 +343,7 @@ def test_provider_registry_skips_unreachable_preferred_local_provider(
 
 def test_require_startup_attr_success(monkeypatch: pytest.MonkeyPatch):
     import importlib
+
     import app
 
     module_name = "ghostlink_test_startup_success"
@@ -354,6 +363,7 @@ def test_require_startup_attr_success(monkeypatch: pytest.MonkeyPatch):
 
 def test_require_startup_attr_missing_attr_raises(monkeypatch: pytest.MonkeyPatch):
     import importlib
+
     import app
 
     module_name = "ghostlink_test_startup_missing_attr"
@@ -389,8 +399,9 @@ def test_shlex_split_proxy_flag():
 
 def test_run_async_timeout_handling():
     """_run_async raises TimeoutError (not hangs) when coroutine is slow."""
-    import mcp_bridge
     import asyncio
+
+    import mcp_bridge
 
     async def _slow():
         await asyncio.sleep(10)  # Longer than 5s timeout

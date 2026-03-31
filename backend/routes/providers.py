@@ -1,9 +1,10 @@
 """Provider registry routes."""
 from __future__ import annotations
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+import deps
 
 router = APIRouter()
 
@@ -22,7 +23,7 @@ async def configure_provider(request: Request):
     if not pid:
         return JSONResponse({"error": "provider required"}, 400)
 
-    from providers import PROVIDERS, CAPABILITY_PRIORITY
+    from providers import CAPABILITY_PRIORITY, PROVIDERS
     if pid not in PROVIDERS:
         return JSONResponse({"error": f"unknown provider: {pid}"}, 400)
 
@@ -43,7 +44,9 @@ async def configure_provider(request: Request):
 @router.post("/api/providers/{provider_id}/test")
 async def test_provider_key(provider_id: str):
     """Test if the configured API key for a provider works."""
-    import urllib.request, urllib.error
+    import urllib.error
+    import urllib.request
+
     from providers import PROVIDERS
     pdef = PROVIDERS.get(provider_id)
     if not pdef:

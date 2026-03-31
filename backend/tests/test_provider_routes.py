@@ -149,6 +149,7 @@ async def test_test_provider_key_rejects_missing_key(monkeypatch: pytest.MonkeyP
 @pytest.mark.asyncio
 async def test_test_provider_key_maps_auth_errors_to_401(monkeypatch: pytest.MonkeyPatch):
     import urllib.error
+
     from routes import providers as provider_routes
 
     registry = _DummyProviderRegistry()

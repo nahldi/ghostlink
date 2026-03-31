@@ -240,8 +240,6 @@ function ScrollArrow() {
   const atBottom = useChatStore((s) => s.chatAtBottom);
   const newMsgCount = useChatStore((s) => s.newMsgCount);
 
-  if (atBottom) return null;
-
   const scrollDown = () => {
     const feed = document.querySelector('[data-chat-feed]') as HTMLElement;
     if (feed) {
@@ -252,19 +250,28 @@ function ScrollArrow() {
   };
 
   return (
-    <button
-      onClick={scrollDown}
-      className="absolute bottom-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-all hover:brightness-110 active:scale-95"
-      style={{
-        background: 'rgba(124, 58, 237, 0.95)',
-        boxShadow: '0 4px 24px rgba(124, 58, 237, 0.4), 0 2px 8px rgba(0,0,0,0.4)',
-      }}
-    >
-      <span className="material-symbols-outlined text-white text-[20px]">expand_more</span>
-      {newMsgCount > 0 && (
-        <span className="text-white text-[12px] font-bold">{newMsgCount} new</span>
+    <AnimatePresence>
+      {!atBottom && (
+        <motion.button
+          key="scroll-arrow"
+          onClick={scrollDown}
+          initial={{ opacity: 0, y: 16, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="absolute bottom-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-shadow hover:brightness-110 active:scale-95"
+          style={{
+            background: 'rgba(124, 58, 237, 0.95)',
+            boxShadow: '0 4px 24px rgba(124, 58, 237, 0.4), 0 2px 8px rgba(0,0,0,0.4)',
+          }}
+        >
+          <span className="material-symbols-outlined text-white text-[20px]">expand_more</span>
+          {newMsgCount > 0 && (
+            <span className="text-white text-[12px] font-bold">{newMsgCount} new</span>
+          )}
+        </motion.button>
       )}
-    </button>
+    </AnimatePresence>
   );
 }
 

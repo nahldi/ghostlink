@@ -9,12 +9,12 @@ try:
     import fcntl
 except ImportError:
     fcntl = None  # type: ignore  # Windows: no file locking
-import json
-import os
-import time
-import logging
-import threading
 import asyncio
+import json
+import logging
+import os
+import threading
+import time
 from pathlib import Path
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -136,8 +136,8 @@ def _check_execution_mode(channel: str, tool_name: str) -> str | None:
     if not _settings or tool_name not in _WRITE_TOOLS:
         return None
     try:
-        from sessions import SessionManager
         import deps as _deps
+        from sessions import SessionManager
         if _deps.session_manager:
             mode = _deps.session_manager.get_execution_mode(channel)
             if mode in ("plan", "review") and tool_name in _WRITE_TOOLS:
@@ -958,8 +958,8 @@ def web_fetch(url: str, extract: str = "text") -> str:
     Returns:
         The fetched content (truncated to 50KB for safety)
     """
-    import urllib.request
     import urllib.error
+    import urllib.request
     from html.parser import HTMLParser
 
     if not url.startswith(("http://", "https://")):
@@ -969,8 +969,9 @@ def web_fetch(url: str, extract: str = "text") -> str:
     # DNS rebinding attacks. We check hostname statically, resolve DNS to
     # validate the IP, then also verify the actual connected IP after the
     # socket is established (before reading response data).
+    import ipaddress
+    import socket
     from urllib.parse import urlparse
-    import ipaddress, socket
     try:
         parsed_url = urlparse(url)
         hostname = parsed_url.hostname or ""
@@ -1051,8 +1052,8 @@ def web_search(query: str, num_results: int = 5) -> str:
     Returns:
         JSON array of search results with title, url, and snippet
     """
-    import urllib.request
     import urllib.parse
+    import urllib.request
 
     num_results = min(max(num_results, 1), 10)
     encoded = urllib.parse.quote_plus(query)
@@ -1133,8 +1134,8 @@ def image_generate(prompt: str, style: str = "natural", provider: str = "auto") 
     Returns:
         Path to saved image or URL, or error with setup instructions
     """
-    import urllib.request
     import base64
+    import urllib.request
 
     save_dir = _data_dir / "generated" if _data_dir else Path("./data/generated")
     save_dir.mkdir(parents=True, exist_ok=True)
