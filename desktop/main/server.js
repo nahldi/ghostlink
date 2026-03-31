@@ -200,7 +200,6 @@ class ServerManager {
                     PYTHONUNBUFFERED: '1',
                 },
                 stdio: ['ignore', 'pipe', 'pipe'],
-                detached: process.platform !== 'win32',
             });
             this.attachProcessHandlers();
             await this.waitForReady();

@@ -202,8 +202,8 @@ function ChatFeed() {
   }, [activeChannel, scrollToBottom, channelMessages.length]);
 
   return (
-    <div ref={feedRef} onScroll={handleScroll} onWheel={handleScroll} data-chat-feed className="flex-1 overflow-y-auto overflow-x-hidden py-3 relative min-h-0">
-      <div className="px-4 lg:px-6">
+    <div ref={feedRef} onScroll={handleScroll} onWheel={handleScroll} data-chat-feed className="flex-1 overflow-y-auto overflow-x-hidden py-4 relative min-h-0">
+      <div className="px-4 lg:px-8">
       {channelMessages.length === 0 ? (
         <ConversationStarters channel={activeChannel} />
       ) : useVirtual ? (
@@ -255,14 +255,14 @@ function ScrollArrow() {
         <motion.button
           key="scroll-arrow"
           onClick={scrollDown}
-          initial={{ opacity: 0, y: 16, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="absolute bottom-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-5 py-2.5 rounded-full transition-shadow hover:brightness-110 active:scale-95"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 4 }}
+          transition={{ duration: 0.15 }}
+          className="absolute bottom-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-4 py-2 rounded-full hover:brightness-110 active:scale-[0.97] transition-all duration-150"
           style={{
-            background: 'rgba(124, 58, 237, 0.95)',
-            boxShadow: '0 4px 24px rgba(124, 58, 237, 0.4), 0 2px 8px rgba(0,0,0,0.4)',
+            background: 'rgba(124, 58, 237, 0.9)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
           }}
         >
           <span className="material-symbols-outlined text-white text-[20px]">expand_more</span>
@@ -620,7 +620,7 @@ function AppInner() {
         <header className="sticky top-0 z-20 glass max-lg:mt-14">
           {/* Agent bar — desktop only */}
           {showAgentBar && (
-            <div className="hidden lg:flex items-center px-6 py-2.5 border-b border-outline-variant/6 w-full min-w-0">
+            <div className="hidden lg:flex items-center px-8 py-2.5 border-b border-outline-variant/6 w-full min-w-0">
               <div className="flex-1 min-w-0 overflow-hidden">
                 <AgentBar />
               </div>
@@ -704,7 +704,7 @@ function AppInner() {
         {showWorkflows && (
           <motion.div key="workflows-modal" role="dialog" aria-modal="true" aria-label="Workflow Builder" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setShowWorkflows(false)}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.98, opacity: 0 }} transition={{ duration: 0.15 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" onClick={(e) => e.stopPropagation()}>
               <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><WorkflowBuilder /></Suspense>
             </motion.div>
           </motion.div>
@@ -714,7 +714,7 @@ function AppInner() {
         {showPersonas && (
           <motion.div key="personas-modal" role="dialog" aria-modal="true" aria-label="Persona Marketplace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setShowPersonas(false)}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.98, opacity: 0 }} transition={{ duration: 0.15 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" onClick={(e) => e.stopPropagation()}>
               <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><PersonaMarketplace /></Suspense>
             </motion.div>
           </motion.div>
@@ -724,7 +724,7 @@ function AppInner() {
         {showCustomization && (
           <motion.div key="customization-modal" role="dialog" aria-modal="true" aria-label="Customization" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setShowCustomization(false)}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.98, opacity: 0 }} transition={{ duration: 0.15 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" onClick={(e) => e.stopPropagation()}>
               <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><CustomizationPanel /></Suspense>
             </motion.div>
           </motion.div>
@@ -734,7 +734,7 @@ function AppInner() {
         {showWorkspace && (
           <motion.div key="workspace-modal" role="dialog" aria-modal="true" aria-label="Collaborative Workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setShowWorkspace(false)}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.98, opacity: 0 }} transition={{ duration: 0.15 }} className="relative w-[560px] max-w-[92vw] max-h-[80vh] rounded-2xl overflow-hidden glass-card" onClick={(e) => e.stopPropagation()}>
               <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><CollaborativeWorkspace /></Suspense>
             </motion.div>
           </motion.div>

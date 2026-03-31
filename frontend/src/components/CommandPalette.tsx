@@ -328,12 +328,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[15vh]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: -10 }}
+        initial={{ scale: 0.98, opacity: 0, y: -4 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: -10 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        exit={{ scale: 0.98, opacity: 0, y: -4 }}
+        transition={{ duration: 0.15 }}
         className="relative w-[480px] max-w-[92vw] rounded-2xl overflow-hidden glass-card"
-        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(124, 58, 237, 0.05)' }}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >

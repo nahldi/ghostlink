@@ -283,7 +283,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
     return (
       <div
         data-msg-id={message.id}
-        className={`group flex justify-end gap-2 py-1.5 ${selectMode ? 'pl-2' : ''} ${isSelected ? 'bg-red-500/5' : ''}`}>
+        className={`group flex justify-end gap-2 py-2.5 ${selectMode ? 'pl-2' : ''} ${isSelected ? 'bg-red-500/5' : ''}`}>
         {selectMode && (
           <button onClick={() => toggleSelected(message.id)} className="shrink-0 self-center">
             <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-red-500 border-red-500' : 'border-outline-variant/30 hover:border-red-400'}`}>
@@ -309,10 +309,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </div>
           )}
           <div
-            className="p-3 rounded-2xl rounded-tr-md text-sm text-on-surface leading-relaxed"
+            className="p-3.5 rounded-2xl rounded-tr-md text-sm text-on-surface/90 leading-relaxed"
             style={{
-              background: 'rgba(56, 189, 248, 0.08)',
-              border: '1px solid rgba(56, 189, 248, 0.12)',
+              background: 'rgba(124, 58, 237, 0.08)',
             }}
             onDoubleClick={handleDoubleClick}
           >
@@ -394,7 +393,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   return (
     <div
       data-msg-id={message.id}
-      className={`group flex gap-3 py-1.5 ${isSelected ? 'bg-red-500/5' : ''}`}
+      className={`group flex gap-3 py-2.5 ${isSelected ? 'bg-red-500/5' : ''}`}
       {...longPress}
     >
       {selectMode && (
@@ -410,7 +409,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div className="max-w-[80%] lg:max-w-[70%] min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           {settings.showSenderLabels !== false && (
-            <span className="text-[11px] font-bold" style={{ color: agentColor, textShadow: `0 0 10px ${agentColor}40` }}>
+            <span className="text-[12px] font-semibold" style={{ color: agentColor }}>
               {agent?.label || message.sender}
             </span>
           )}
@@ -423,10 +422,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
         )}
 
         <div
-          className="p-3 rounded-2xl rounded-tl-md text-sm text-on-surface leading-relaxed bubble-glow"
+          className="p-3.5 rounded-2xl rounded-tl-md text-sm text-on-surface/90 leading-relaxed"
           style={{
-            background: `color-mix(in srgb, ${agentColor} 5%, rgba(17,17,25,0.5))`,
-            border: `1px solid color-mix(in srgb, ${agentColor} 8%, transparent)`,
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderLeft: `2px solid ${agentColor}40`,
           }}
         >
           <div className="prose">

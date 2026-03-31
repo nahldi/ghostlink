@@ -224,9 +224,6 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
         className="relative w-[480px] max-w-[94vw] max-h-[85vh] overflow-y-auto rounded-2xl glass-card"
-        style={{
-          boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 60px rgba(124, 58, 237, 0.06)',
-        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -131,16 +131,14 @@ export function Sidebar() {
 
       {/* Thin icon rail — always visible */}
       <div className="sidebar-rail w-14 h-screen fixed left-0 top-0 z-30 max-lg:hidden flex flex-col items-center py-3 gap-1" style={{
-        background: 'rgba(8, 8, 14, 0.85)',
-        backdropFilter: 'blur(20px) saturate(1.3)',
-        WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+        background: '#0c0c14',
         borderRight: '1px solid rgba(255,255,255,0.04)',
       }}>
         {/* Logo — toggles channel/nav panel */}
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 cursor-pointer hover:scale-105 transition-transform"
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 cursor-pointer hover:bg-white/8 transition-colors"
           onClick={() => setExpanded(!expanded)}
           title="Channels & Navigation"
-          style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', boxShadow: '0 0 16px rgba(124,58,237,0.3)' }}
+          style={{ background: 'rgba(124, 58, 237, 0.15)' }}
         >
           <img src="/ghostlink.png" alt="GhostLink" className="w-6 h-6 object-contain" style={{ filter: 'invert(1)' }} />
         </div>
@@ -151,8 +149,8 @@ export function Sidebar() {
           return (
             <button key={item.id} title={item.tip}
               onClick={() => setSidebarPanel(item.id === 'chat' ? null : item.id)}
-              className={`group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
-                isActive ? 'bg-white/10 text-white shadow-[0_0_12px_rgba(124,58,237,0.15)]' : 'text-white/45 hover:text-white/60 hover:bg-white/5 active:scale-90'
+              className={`group relative w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-150 ${
+                isActive ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60 hover:bg-white/5'
               }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
@@ -197,11 +195,9 @@ export function Sidebar() {
         <motion.div className="fixed inset-0 z-[29]" onClick={() => setExpanded(false)}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
           <motion.div className="sidebar-panel fixed left-14 top-0 h-screen w-[200px] z-[31] py-3 overflow-y-auto" style={{
-            background: 'rgba(10, 10, 18, 0.88)',
-            backdropFilter: 'blur(24px) saturate(1.4)',
-            WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
-            borderRight: '1px solid rgba(255,255,255,0.05)',
-            boxShadow: '4px 0 24px rgba(0,0,0,0.35), inset 1px 0 0 rgba(255,255,255,0.03)',
+            background: '#0e0e16',
+            borderRight: '1px solid rgba(255,255,255,0.04)',
+            boxShadow: '4px 0 16px rgba(0,0,0,0.2)',
           }} onClick={e => e.stopPropagation()}
             initial={{ x: -200, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -242,10 +238,10 @@ export function Sidebar() {
                   ) : (
                     <button
                       onClick={() => { setActiveChannel(ch.name); clearUnread(ch.name); setSidebarPanel(null); setExpanded(false); }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] transition-all duration-200 ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${
                         activeChannel === ch.name
-                          ? 'bg-purple-500/15 text-purple-300 font-semibold shadow-[inset_0_0_12px_rgba(124,58,237,0.08)]'
-                          : 'text-white/45 hover:text-white/60 hover:bg-white/5 active:scale-[0.97]'
+                          ? 'bg-white/8 text-white font-medium'
+                          : 'text-white/40 hover:text-white/60 hover:bg-white/4'
                       }`}>
                       <span><span className="text-white/30 mr-1">#</span>{ch.name}</span>
                       {ch.unread > 0 && (

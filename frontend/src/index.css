@@ -90,22 +90,13 @@ body {
 
 #root { min-height: 100vh; display: flex; max-width: 100vw; overflow-x: hidden; }
 
-/* ── Ambient Background — animated gradient mesh ── */
+/* ── Ambient Background — subtle, static ── */
 .ambient-bg {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(124, 58, 237, 0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(251, 146, 60, 0.025) 0%, transparent 70%);
-  animation: ambient-drift 30s ease-in-out infinite alternate;
-}
-@keyframes ambient-drift {
-  0% { opacity: 0.7; transform: scale(1) rotate(0deg); }
-  50% { opacity: 1; transform: scale(1.05) rotate(0.5deg); }
-  100% { opacity: 0.8; transform: scale(0.98) rotate(-0.3deg); }
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124, 58, 237, 0.03) 0%, transparent 70%);
 }
 
 /* ── Scrollbar ── */
@@ -117,92 +108,62 @@ body {
 ::-webkit-scrollbar-thumb { background: #1a1a26; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #222230; }
 
-/* ── Agent Spinning Border ── */
-@property --agent-border-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
+/* ── Agent chip ── */
 
-/* ── Agent chip — theme-aware ── */
+/* ── Agent chip — clean, minimal ── */
 .agent-chip {
-  background: color-mix(in srgb, var(--agent-color, #a78bfa) 8%, rgba(18, 18, 28, 0.7));
-  border: 1px solid color-mix(in srgb, var(--agent-color, #a78bfa) 12%, transparent);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 .agent-chip:hover {
-  background: color-mix(in srgb, var(--agent-color, #a78bfa) 14%, rgba(18, 18, 28, 0.8));
-  border-color: color-mix(in srgb, var(--agent-color, #a78bfa) 22%, transparent);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="light"] .agent-chip {
-  background: color-mix(in srgb, var(--agent-color, #7c3aed) 18%, rgba(240, 240, 248, 0.98));
-  border: 1px solid color-mix(in srgb, var(--agent-color, #7c3aed) 35%, rgba(0, 0, 0, 0.12));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 [data-theme="light"] .agent-chip:hover {
-  background: color-mix(in srgb, var(--agent-color, #7c3aed) 25%, rgba(240, 240, 248, 1));
-  border-color: color-mix(in srgb, var(--agent-color, #7c3aed) 50%, rgba(0, 0, 0, 0.18));
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.06);
 }
 [data-theme="light"] .agent-chip .text-on-surface-variant {
   color: #4a4a60;
 }
-[data-theme="light"] .agent-chip-thinking {
-  box-shadow: 0 0 12px color-mix(in srgb, var(--agent-color) 30%, transparent);
-}
 
 .agent-pill-active {
   position: relative;
-  background: color-mix(in srgb, var(--agent-color, #a78bfa) 6%, transparent);
+  background: rgba(255, 255, 255, 0.04);
 }
 
+/* Thinking indicator — subtle border pulse, no spinning gradient */
 .agent-spin-border {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--agent-border-angle),
-    var(--agent-color, #4ade80),
-    transparent 30%,
-    transparent 70%,
-    var(--agent-color, #4ade80)
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: agent-spin 2s linear infinite;
+  border: 1.5px solid var(--agent-color, #a78bfa);
+  opacity: 0.3;
+  animation: thinking-border-pulse 2s ease-in-out infinite;
   pointer-events: none;
 }
 
-@keyframes agent-spin {
-  to { --agent-border-angle: 360deg; }
+@keyframes thinking-border-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.4; }
 }
 
-/* Fallback for Firefox/Safari: rotate the entire pseudo-element */
-@supports not (background: conic-gradient(from var(--agent-border-angle), red, blue)) {
-  .agent-spin-border {
-    background: linear-gradient(var(--agent-color, #4ade80), transparent) !important;
-    animation: agent-spin-fallback 2s linear infinite !important;
-  }
-  @keyframes agent-spin-fallback {
-    to { transform: rotate(360deg); }
-  }
-}
-
-/* Only spin on thinking chips */
+/* Only show on thinking chips */
 .agent-chip-thinking .agent-spin-border {
   display: block;
 }
 
-/* Thinking pulse glow */
+/* Thinking state — simple opacity pulse */
 .agent-chip-thinking {
   animation: thinking-pulse 2s ease-in-out infinite;
 }
 
 @keyframes thinking-pulse {
-  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--agent-color) 15%, transparent); }
-  50% { box-shadow: 0 0 20px color-mix(in srgb, var(--agent-color) 25%, transparent); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* ── Thinking dots animation ── */
@@ -235,64 +196,46 @@ body {
   animation: shimmer 1.8s ease-in-out infinite;
 }
 
-/* ── Message entrance — spring with subtle bounce ── */
+/* ── Message entrance — clean fade up ── */
 @keyframes msg-slide-in {
-  0%   { opacity: 0; transform: translateY(16px) scale(0.96); filter: blur(6px); }
-  60%  { opacity: 1; transform: translateY(-2px) scale(1.005); filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.msg-enter { animation: msg-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.msg-enter { animation: msg-slide-in 0.25s ease-out both; }
 
 /* ── Panel entrance ── */
 @keyframes panel-slide-in {
-  0%   { opacity: 0; transform: translateX(24px) scale(0.97); }
-  60%  { opacity: 1; transform: translateX(-2px) scale(1.002); }
-  100% { opacity: 1; transform: translateX(0) scale(1); }
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 @keyframes panel-fade-in {
-  from { opacity: 0; transform: scale(0.94); filter: blur(8px); }
-  to { opacity: 1; transform: scale(1); filter: blur(0); }
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes float-in {
-  0%   { opacity: 0; transform: translateY(20px) scale(0.93); }
-  60%  { opacity: 1; transform: translateY(-2px) scale(1.005); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Modal entrance (scale + blur + bounce) ── */
+/* ── Modal entrance ── */
 @keyframes modal-enter {
-  0%   { opacity: 0; transform: scale(0.9) translateY(12px); filter: blur(10px); }
-  60%  { opacity: 1; transform: scale(1.01) translateY(-1px); filter: blur(0); }
-  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+  from { opacity: 0; transform: scale(0.96) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
-.modal-enter { animation: modal-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.modal-enter { animation: modal-enter 0.2s ease-out both; }
 
-/* ── Button press — tactile feedback ── */
-.btn-press { transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
-.btn-press:hover { transform: translateY(-1px); }
-.btn-press:active { transform: scale(0.95) translateY(0); transition-duration: 0.08s; }
+/* ── Button press ── */
+.btn-press { transition: opacity 0.15s ease; }
+.btn-press:hover { opacity: 0.85; }
+.btn-press:active { opacity: 0.7; }
 
-/* ── Focus glow expansion ── */
+/* ── Focus ring ── */
 .focus-glow {
-  transition: box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 .focus-glow:focus-within {
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12), 0 0 20px rgba(124, 58, 237, 0.06);
-  border-color: rgba(124, 58, 237, 0.3) !important;
-}
-
-/* ── Smooth crossfade for channel switching ── */
-.channel-crossfade {
-  transition: opacity 0.2s ease;
-}
-
-/* ── Elastic hover lift ── */
-.hover-lift {
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.25) !important;
 }
 
 /* ── Status pulse — for online/offline transitions ── */
@@ -314,98 +257,59 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Glass surfaces — premium liquid glass effect ── */
+/* ── Surface utilities — clean, minimal ── */
 .glass {
-  background: linear-gradient(135deg, rgba(14, 14, 22, 0.92) 0%, rgba(18, 18, 30, 0.85) 100%);
-  backdrop-filter: blur(24px) saturate(1.4) brightness(1.02);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4) brightness(1.02);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 -1px 0 rgba(0, 0, 0, 0.1);
-  transition: background 0.3s ease, border-color 0.3s ease;
+  background: rgba(14, 14, 20, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.2s ease;
 }
 
 .glass-strong {
-  background: linear-gradient(135deg, rgba(12, 12, 18, 0.95) 0%, rgba(16, 16, 26, 0.92) 100%);
-  backdrop-filter: blur(32px) saturate(1.5) brightness(1.03);
-  -webkit-backdrop-filter: blur(32px) saturate(1.5) brightness(1.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.25),
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.02);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(14, 14, 20, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
 }
 
-/* ── Liquid glass card effect — premium interactive ── */
+/* ── Clean card surface ── */
 .liquid-glass {
-  background: linear-gradient(160deg, rgba(18, 18, 28, 0.6) 0%, rgba(22, 22, 36, 0.5) 50%, rgba(16, 16, 26, 0.65) 100%);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.15),
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 0 20px rgba(124, 58, 237, 0.02);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(16, 16, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 .liquid-glass:hover {
-  border-color: rgba(124, 58, 237, 0.2);
-  box-shadow:
-    0 12px 32px rgba(124, 58, 237, 0.1),
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 30px rgba(124, 58, 237, 0.04);
-  transform: translateY(-2px) scale(1.005);
-  background: linear-gradient(160deg, rgba(20, 20, 32, 0.65) 0%, rgba(26, 26, 42, 0.55) 50%, rgba(18, 18, 30, 0.7) 100%);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* ── Glass card for settings/modals ── */
+/* ── Card surface for modals/panels ── */
 .glass-card {
-  background: linear-gradient(145deg, rgba(16, 16, 26, 0.9) 0%, rgba(20, 20, 34, 0.85) 100%);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.3),
-    0 4px 16px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(14, 14, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
 }
 
-/* ── Chat bubble glow on hover ── */
+/* ── Chat bubble — subtle hover ── */
 .bubble-glow {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, box-shadow;
+  transition: background 0.15s ease;
 }
 .bubble-glow:hover {
-  box-shadow: 0 0 28px rgba(124, 58, 237, 0.12), 0 6px 20px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-/* ── Mobile performance — reduce glass blur on smaller screens ── */
-@media (max-width: 768px) {
-  .glass, .glass-card, .liquid-glass {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-  .glass-strong {
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-}
+/* ── Mobile — no blur needed since surfaces are now opaque ── */
 
-/* ── Smooth transitions for interactive elements ── */
+/* ── Interactive elements ── */
 button, a {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
 }
-button:active { transform: scale(0.97); }
 input, select, textarea {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.15s ease;
 }
 input:focus, select:focus, textarea:focus {
-  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.3);
 }
 
 /* ── Sidebar panel entrance animation ── */

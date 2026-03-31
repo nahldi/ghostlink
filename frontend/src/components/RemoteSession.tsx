@@ -35,7 +35,6 @@ function QRCode({ url, onClose }: { url: string; onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         className="relative rounded-2xl p-6 text-center max-w-xs glass-card"
-        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
         onClick={e => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-3 right-3 p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant/40 hover:text-on-surface-variant">
