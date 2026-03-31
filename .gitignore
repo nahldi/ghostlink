@@ -43,6 +43,8 @@ ghostlink-*.docx
 
 # Build artifacts
 *.tsbuildinfo
+*.egg-info/
+backend/data_test/
 
 # Claude Code
 .claude/

@@ -31,12 +31,37 @@ class AgentMemory:
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
 
+    @staticmethod
+    def _sanitize_key(key: str) -> str:
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in key)
+        return safe or "_unnamed"
+
     def _key_path(self, key: str) -> Path:
-        """Get the file path for a memory key (sanitized)."""
-        safe_key = "".join(c if c.isalnum() or c in "-_." else "_" for c in key)
-        if not safe_key:
-            safe_key = "_unnamed"
+        """Get the file path for a memory key (sanitized).
+
+        Uses a hash suffix when sanitization changes the key to avoid
+        collisions (e.g. 'foo/bar' vs 'foo_bar' map to different files).
+        """
+        safe_key = self._sanitize_key(key)
+        if safe_key != key:
+            import hashlib
+            suffix = hashlib.sha256(key.encode()).hexdigest()[:8]
+            safe_key = f"{safe_key}_{suffix}"
         return self.memory_dir / f"{safe_key}.json"
+
+    def _legacy_key_path(self, key: str) -> Path:
+        """Legacy path without hash suffix — for migration lookups."""
+        return self.memory_dir / f"{self._sanitize_key(key)}.json"
+
+    def _resolve_key_path(self, key: str) -> Path:
+        """Return the key file path, checking new path first then legacy."""
+        new_path = self._key_path(key)
+        if new_path.exists():
+            return new_path
+        legacy = self._legacy_key_path(key)
+        if legacy.exists():
+            return legacy
+        return new_path  # default to new path for creation
 
     def save(self, key: str, content: str) -> dict:
         """Save a memory entry. Returns metadata about the saved entry."""
@@ -49,20 +74,25 @@ class AgentMemory:
             "updated_at": time.time(),
         }
         with self._lock:
-            # Preserve created_at if updating
-            if path.exists():
+            # Migrate: if a legacy file exists, read created_at then remove it
+            legacy = self._legacy_key_path(key)
+            source = path if path.exists() else (legacy if legacy != path and legacy.exists() else None)
+            if source:
                 try:
-                    existing = json.loads(path.read_text("utf-8"))
+                    existing = json.loads(source.read_text("utf-8"))
                     entry["created_at"] = existing.get("created_at", entry["created_at"])
                 except Exception:
-                    pass  # Corrupt file — use new created_at
+                    pass
+                # Remove legacy file if migrating to new path
+                if source == legacy and legacy != path:
+                    legacy.unlink(missing_ok=True)
             path.write_text(json.dumps(entry, indent=2, ensure_ascii=False), "utf-8")
         return {"key": key, "status": "saved", "path": str(path)}
 
     def load(self, key: str) -> dict | None:
         """Load a memory entry by key. Returns None if not found."""
-        path = self._key_path(key)
         with self._lock:
+            path = self._resolve_key_path(key)
             if not path.exists():
                 return None
             try:
@@ -136,8 +166,8 @@ class AgentMemory:
 
     def delete(self, key: str) -> bool:
         """Delete a memory entry. Returns True if deleted."""
-        path = self._key_path(key)
         with self._lock:
+            path = self._resolve_key_path(key)
             if path.exists():
                 path.unlink()
                 return True

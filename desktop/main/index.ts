@@ -222,8 +222,8 @@ function createWizardWindow(): BrowserWindow {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: false,
-      sandbox: false,
+      contextIsolation: true,
+      sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
     },
@@ -917,23 +917,23 @@ app.on('before-quit', async (event) => {
     } catch (err) {
       log.error('Error stopping server during quit:', err);
     }
-    // Platform-specific cleanup
+    // Platform-specific cleanup — session names are quoted to prevent injection
+    const tmuxCleanup = "tmux list-sessions -F '#{session_name}' 2>/dev/null | while IFS= read -r s; do case \"$s\" in ghostlink-*) tmux kill-session -t \"$s\" 2>/dev/null;; esac; done; true";
     if (process.platform === 'win32') {
-      // WSL cleanup: kill tmux sessions and python, remove temp files
-      // These commands use only hardcoded safe strings — no user input
+      // WSL cleanup: kill tmux sessions and remove temp files
       try {
         const { execFileSync: efs } = require('child_process');
-        efs(WSL_EXE, ['-e', 'bash', '-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null || true"], { stdio: 'ignore', timeout: 5000 });
+        efs(WSL_EXE, ['-e', 'bash', '-c', tmuxCleanup], { stdio: 'ignore', timeout: 5000 });
       } catch { /* best-effort */ }
       try {
         const { execFileSync: efs } = require('child_process');
-        efs(WSL_EXE, ['-e', 'bash', '-c', 'rm -rf /tmp/ghostlink-backend /tmp/ghostlink-frontend'], { stdio: 'ignore', timeout: 5000 });
+        efs(WSL_EXE, ['-e', 'rm', '-rf', '/tmp/ghostlink-backend', '/tmp/ghostlink-frontend'], { stdio: 'ignore', timeout: 5000 });
       } catch { /* best-effort */ }
     } else {
       // macOS / Linux: kill tmux sessions directly
       try {
         const { execFileSync: efs } = require('child_process');
-        efs('bash', ['-c', "tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ghostlink-' | xargs -I{} tmux kill-session -t {} 2>/dev/null || true"], { stdio: 'ignore', timeout: 5000 });
+        efs('bash', ['-c', tmuxCleanup], { stdio: 'ignore', timeout: 5000 });
       } catch { /* tmux not installed or no sessions */ }
     }
     log.info('Cleanup complete — exiting');

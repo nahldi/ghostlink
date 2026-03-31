@@ -3,8 +3,8 @@
 > Single source of truth for all development. Supersedes GAB_ROADMAP, GAF_ROADMAP, V2.5_BUGFIX_ROADMAP, ROADMAP.md.
 > **For any AI picking this up: follow the phases IN ORDER within each track. Each item has acceptance criteria, files to change, smoke tests, and fail tests.**
 
-**Last updated:** 2026-03-30
-**Current version:** v5.5.2
+**Last updated:** 2026-03-31
+**Current version:** v5.6.0
 **Owner:** nahldi
 
 ---
@@ -26,7 +26,7 @@ Thinking bubbles redesign (compact dots, no SVG clutter). Message shake/glitch f
 ### Bug Fixes & Hardening (v3.9.5–v3.9.7)
 Agent identity: role now flows through registration to server registry (Code Reviewer knows it's a Code Reviewer). Thinking bubbles: subtle pulse glow, glass styling. StreamingText: batch token rendering prevents layout thrashing. Real scannable QR code for mobile (qrcode library, client-side only). WebSocket keepalive ping/pong every 25s (fixes cloudflared tunnel drops). Server stop on Windows uses os._exit (SIGTERM unreliable). Plan mode enforcement: `_check_execution_mode()` now wired into tool wrapper (was dead code). cleanup_agent() race condition fixed (single lock acquisition). Bare except:pass blocks replaced with debug logging across mcp_bridge and app.py. TTS play button on agent messages (OpenAI TTS via /api/tts). Electron wizard/launcher: webSecurity + allowRunningInsecureContent flags added. Rate limiter: 60s cleanup cycle, 10K IP hard cap.
 
-**Stats:** 80+ bugs fixed | 132+ API endpoints | 17 MCP tools | 13 agents | 13 providers | 51 React components | 57 tests | 9 themes
+**Stats:** 80+ bugs fixed | 132+ API endpoints | 29 MCP tools | 13 agents | 13 providers | 61 React components | 132 tests | 9 themes
 
 ---
 

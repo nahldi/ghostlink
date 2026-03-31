@@ -709,12 +709,8 @@ def chat_progress(
     })
 
     if message_id:
-        # Update existing progress message
-        _run_async(_store._db.execute(
-            "UPDATE messages SET metadata = ? WHERE id = ?",
-            (metadata, message_id),
-        ))
-        _run_async(_store._db.commit())
+        # Update existing progress message via store abstraction
+        _run_async(_store.update_metadata(message_id, metadata))
         # Broadcast the metadata update to all WebSocket clients
         try:
             import urllib.request
@@ -836,7 +832,7 @@ def chat_claim(sender: str, name: str = "", ctx: Context | None = None) -> str:
 
 # ── Memory tools ─────────────────────────────────────────────────────
 
-def memory_save(sender: str, key: str, content: str) -> str:
+def memory_save(sender: str, key: str, content: str, ctx: Context | None = None) -> str:
     """Save a memory entry. Use this to remember important information across sessions.
 
     Args:
@@ -847,7 +843,7 @@ def memory_save(sender: str, key: str, content: str) -> str:
     Returns:
         Confirmation of saved memory
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     from agent_memory import get_agent_memory
@@ -856,7 +852,7 @@ def memory_save(sender: str, key: str, content: str) -> str:
     return f"Saved memory '{key}' ({len(content)} chars)"
 
 
-def memory_search(sender: str, query: str) -> str:
+def memory_search(sender: str, query: str, ctx: Context | None = None) -> str:
     """Search your memory entries by keyword. Returns matching entries.
 
     Args:
@@ -866,7 +862,7 @@ def memory_search(sender: str, query: str) -> str:
     Returns:
         JSON array of matching memory entries with key, content preview, and timestamps
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     from agent_memory import get_agent_memory
@@ -884,7 +880,7 @@ def memory_search(sender: str, query: str) -> str:
     return json.dumps(entries, indent=2)
 
 
-def memory_get(sender: str, key: str) -> str:
+def memory_get(sender: str, key: str, ctx: Context | None = None) -> str:
     """Retrieve a specific memory entry by its key.
 
     Args:
@@ -894,7 +890,7 @@ def memory_get(sender: str, key: str) -> str:
     Returns:
         The full content of the memory entry, or error if not found
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     from agent_memory import get_agent_memory
@@ -905,7 +901,7 @@ def memory_get(sender: str, key: str) -> str:
     return entry["content"]
 
 
-def memory_list(sender: str) -> str:
+def memory_list(sender: str, ctx: Context | None = None) -> str:
     """List all your memory entries (keys and sizes, not full content).
 
     Args:
@@ -914,7 +910,7 @@ def memory_list(sender: str) -> str:
     Returns:
         JSON array of memory keys with sizes
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     from agent_memory import get_agent_memory
@@ -926,7 +922,7 @@ def memory_list(sender: str) -> str:
     return json.dumps(items, indent=2)
 
 
-def memory_search_all(sender: str, query: str) -> str:
+def memory_search_all(sender: str, query: str, ctx: Context | None = None) -> str:
     """Search memories across ALL agents (cross-session recall).
 
     Unlike memory_search which only searches your own memories, this searches
@@ -940,7 +936,7 @@ def memory_search_all(sender: str, query: str) -> str:
     Returns:
         JSON array of matching entries with agent name, key, preview, timestamp
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     from agent_memory import search_all_memories
@@ -969,7 +965,10 @@ def web_fetch(url: str, extract: str = "text") -> str:
     if not url.startswith(("http://", "https://")):
         return "Error: URL must start with http:// or https://"
 
-    # Block private/internal IPs (handles hex, octal, integer notations via DNS resolution)
+    # Block private/internal IPs with post-connect validation to prevent
+    # DNS rebinding attacks. We check hostname statically, resolve DNS to
+    # validate the IP, then also verify the actual connected IP after the
+    # socket is established (before reading response data).
     from urllib.parse import urlparse
     import ipaddress, socket
     try:
@@ -980,8 +979,8 @@ def web_fetch(url: str, extract: str = "text") -> str:
         if hostname.endswith(".local") or hostname.endswith(".internal"):
             return "Error: Cannot fetch private/local URLs"
         try:
-            ip = socket.gethostbyname(hostname)
-            addr = ipaddress.ip_address(ip)
+            resolved_ip = socket.gethostbyname(hostname)
+            addr = ipaddress.ip_address(resolved_ip)
             if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
                 return "Error: Cannot fetch private/local URLs"
         except (socket.gaierror, ValueError):
@@ -989,9 +988,26 @@ def web_fetch(url: str, extract: str = "text") -> str:
     except Exception:
         return "Error: Invalid URL"
 
+    def _validate_response_ip(resp):
+        """Check the actual connected IP after socket establishment."""
+        try:
+            sock = resp.fp.raw._sock if hasattr(resp.fp, 'raw') else None
+            if sock is None and hasattr(resp.fp, '_sock'):
+                sock = resp.fp._sock
+            if sock:
+                peer_ip = sock.getpeername()[0]
+                peer_addr = ipaddress.ip_address(peer_ip)
+                if peer_addr.is_private or peer_addr.is_loopback or peer_addr.is_link_local or peer_addr.is_reserved:
+                    return False
+        except Exception:
+            pass  # If we can't check, pre-connect validation is still in place
+        return True
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "GhostLink/1.3 (Bot)"})
         with urllib.request.urlopen(req, timeout=15) as resp:
+            if not _validate_response_ip(resp):
+                return "Error: Cannot fetch private/local URLs"
             raw = resp.read(51200).decode("utf-8", errors="replace")
 
         if extract == "json":
@@ -1213,7 +1229,7 @@ def image_generate(prompt: str, style: str = "natural", provider: str = "auto") 
 
 # ── Agent control tools ──────────────────────────────────────────────
 
-def set_thinking(sender: str, level: str = "medium") -> str:
+def set_thinking(sender: str, level: str = "medium", ctx: Context | None = None) -> str:
     """Set your thinking/reasoning level. Higher levels = deeper analysis but slower.
 
     Args:
@@ -1223,7 +1239,7 @@ def set_thinking(sender: str, level: str = "medium") -> str:
     Returns:
         Confirmation of the new thinking level
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     valid = ("off", "minimal", "low", "medium", "high")
@@ -1235,7 +1251,7 @@ def set_thinking(sender: str, level: str = "medium") -> str:
     return f"Thinking level set to: {level}"
 
 
-def sessions_list(sender: str) -> str:
+def sessions_list(sender: str, ctx: Context | None = None) -> str:
     """List all active agent sessions (other agents currently running).
 
     Args:
@@ -1244,7 +1260,7 @@ def sessions_list(sender: str) -> str:
     Returns:
         JSON array of active agents with name, base, state, and role
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     agents = _registry.get_all() if _registry else []
@@ -1260,7 +1276,7 @@ def sessions_list(sender: str) -> str:
     return json.dumps(items, indent=2) if items else "No agents online."
 
 
-def sessions_send(sender: str, target: str, message: str, channel: str = "general") -> str:
+def sessions_send(sender: str, target: str, message: str, channel: str = "general", ctx: Context | None = None) -> str:
     """Send a message to another agent's session directly. Use for agent-to-agent coordination.
 
     Args:
@@ -1272,7 +1288,7 @@ def sessions_send(sender: str, target: str, message: str, channel: str = "genera
     Returns:
         Confirmation that the message was routed
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
     if not _registry or not _registry.get(target):
@@ -1571,7 +1587,7 @@ def code_execute(code: str, language: str = "python") -> str:
 
 # ── Delegation ─────────────────────────────────────────────────────
 
-def delegate(sender: str, agent: str, task: str, channel: str = "general") -> str:
+def delegate(sender: str, agent: str, task: str, channel: str = "general", ctx: Context | None = None) -> str:
     """Delegate a task to another agent and trigger them to work on it.
 
     Creates a job proposal, posts the task as a message mentioning the target
@@ -1587,7 +1603,7 @@ def delegate(sender: str, agent: str, task: str, channel: str = "general") -> st
     Returns:
         Confirmation that the task was delegated
     """
-    identity, err = _resolve_identity(sender, None, field_name="sender", required=True)
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
 
@@ -1604,9 +1620,8 @@ def delegate(sender: str, agent: str, task: str, channel: str = "general") -> st
     msg_text = f"@{agent} [Delegated by {identity}]: {task}"
     msg = _run_async(_store.add(identity, msg_text, "chat", channel))
 
-    # Trigger the target agent's queue
-    from app_helpers import route_mentions
-    route_mentions(identity, msg_text, channel)
+    # Trigger the target agent's queue (uses local _trigger_mentions, no circular import)
+    _trigger_mentions(identity, msg_text, channel)
 
     # Create a job to track the delegation
     try:
@@ -1622,7 +1637,7 @@ def delegate(sender: str, agent: str, task: str, channel: str = "general") -> st
     return f"Task delegated to {agent} in #{channel}. They will see: {task[:200]}"
 
 
-def chat_stream_token(sender: str, message_id: int, token: str, done: bool = False, ctx: dict | None = None) -> str:
+def chat_stream_token(sender: str, message_id: int, token: str, done: bool = False, ctx: Context | None = None) -> str:
     """Stream a token to an existing message in real-time.
     Broadcasts via WebSocket so frontend renders character-by-character.
 

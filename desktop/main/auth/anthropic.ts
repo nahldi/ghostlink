@@ -47,21 +47,23 @@ export async function checkAnthropic(): Promise<AuthStatus> {
     return { ...base, authenticated: true, user: 'API key' };
   }
 
-  // Check auth status via CLI
+  // Check auth status via CLI — use positive matching to avoid false positives
   try {
     const output = await execCmd('claude', ['auth', 'status']);
-    // Accept any non-empty output that doesn't explicitly say "not authenticated"
-    if (output.length > 0 && !/not (logged in|authenticated|connected)/i.test(output)) {
+    if (/not (logged in|authenticated|connected)/i.test(output)) {
+      // Explicit negative — fall through to credential file check
+    } else if (/(?:logged in|authenticated|connected|verified|active session)/i.test(output)) {
       const userMatch = output.match(/(?:as|user|email|account|@)\s*(\S+)/i);
       return { ...base, authenticated: true, user: userMatch ? userMatch[1] : '(session)' };
     }
   } catch (err: any) {
-    // If command ran but returned non-zero, check stderr for auth info
+    // If command ran but returned non-zero, check stderr for positive auth signals
     const stderr = String(err?.stderr || '');
     const stdout = String(err?.stdout || '');
     const combined = stdout + stderr;
-    if (combined.length > 0 && !/not (logged|authenticated|connected)/i.test(combined) && !isCommandNotFound(err)) {
-      return { ...base, authenticated: true, user: '(session)' };
+    if (!isCommandNotFound(err) && /(?:logged in|authenticated|connected|verified|active session)/i.test(combined)) {
+      const userMatch = combined.match(/(?:as|user|email|account|@)\s*(\S+)/i);
+      return { ...base, authenticated: true, user: userMatch ? userMatch[1] : '(session)' };
     }
   }
 

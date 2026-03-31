@@ -9,30 +9,21 @@
  *   - Window controls (minimize / close)
  */
 
-// Try preload bridge first, fall back to direct ipcRenderer (nodeIntegration)
-let api = window.api;
+// contextIsolation is enabled — window.api is exposed via the preload bridge
+const api = window.api;
 if (!api) {
-  try {
-    const { ipcRenderer } = require('electron');
-    api = {
-      invoke: (...args) => ipcRenderer.invoke(...args),
-      on: (channel, cb) => { ipcRenderer.on(channel, (_e, ...a) => cb(...a)); return () => ipcRenderer.removeAllListeners(channel); },
-    };
-  } catch {
-    document.addEventListener('DOMContentLoaded', () => {
-      const errDiv = document.createElement('div');
-      errDiv.style.cssText = 'padding:40px;text-align:center;color:#f87171;font-family:sans-serif';
-      const h2 = document.createElement('h2');
-      h2.textContent = 'Launcher Error';
-      const p = document.createElement('p');
-      p.textContent = 'Could not initialize GhostLink bridge. Please reinstall.';
-      errDiv.appendChild(h2);
-      errDiv.appendChild(p);
-      document.body.appendChild(errDiv);
-    });
-  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'padding:40px;text-align:center;color:#f87171;font-family:sans-serif';
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Launcher Error';
+    const p = document.createElement('p');
+    p.textContent = 'Could not initialize GhostLink bridge. Please reinstall.';
+    errDiv.appendChild(h2);
+    errDiv.appendChild(p);
+    document.body.appendChild(errDiv);
+  });
 }
-// IPC ready
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 

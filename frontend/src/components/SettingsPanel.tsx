@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
+import { toast } from './Toast';
 import { AgentIcon } from './AgentIcon';
 import { SoundManager, SOUND_OPTIONS } from '../lib/sounds';
 import type { Plugin, SkillPack, Hook, Bridge, RetentionPolicy, AuditLogEntry } from '../types';
@@ -118,7 +119,7 @@ export function SettingsPanel() {
   // Instant-apply settings (toggles, theme)
   const applyInstant = useCallback((updates: Partial<Settings>) => {
     updateSettings(updates);
-    api.saveSettings(updates).catch((e) => console.warn('Settings save:', e.message || e));
+    api.saveSettings(updates).catch((e) => { toast('Settings failed to save', 'error'); console.warn('Settings save:', e.message || e); });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }, [updateSettings]);
@@ -133,7 +134,7 @@ export function SettingsPanel() {
       setSaved(true);
       setSaving(false);
       setTimeout(() => setSaved(false), 2000);
-    }).catch((e) => { console.warn('Settings save:', e instanceof Error ? e.message : String(e)); setSaving(false); });
+    }).catch((e) => { toast('Settings failed to save', 'error'); console.warn('Settings save:', e instanceof Error ? e.message : String(e)); setSaving(false); });
   }, [draft, hasPendingChanges, updateSettings]);
 
   // Auto-save after 2s of no changes

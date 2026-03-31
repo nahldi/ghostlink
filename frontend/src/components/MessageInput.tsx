@@ -950,7 +950,7 @@ export function MessageInput() {
 
       {/* Mention autocomplete dropdown */}
       {isOpen && (
-        <div className="absolute bottom-full left-4 right-4 mb-1 bg-surface-container-high border border-outline-variant/20 rounded-lg overflow-hidden shadow-xl z-50">
+        <div className="absolute bottom-full left-4 right-4 mb-1 glass-strong rounded-xl overflow-hidden shadow-xl z-50">
           {suggestions.map((s, i) => (
             <button
               key={s.name}
@@ -975,7 +975,7 @@ export function MessageInput() {
 
       {/* Slash command picker */}
       {showSlash && (
-        <div className="absolute bottom-full left-4 right-4 mb-1 bg-surface-container-high border border-outline-variant/20 rounded-lg overflow-hidden shadow-xl z-50">
+        <div className="absolute bottom-full left-4 right-4 mb-1 glass-strong rounded-xl overflow-hidden shadow-xl z-50">
           {filteredCommands.map((cmd, i) => (
             <button
               key={cmd.name}

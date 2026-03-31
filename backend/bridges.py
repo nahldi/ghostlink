@@ -262,7 +262,10 @@ class BaseBridge:
     def _get_external_channel(self, gl_channel: str) -> str | None:
         """Map GhostLink channel to external channel ID."""
         channel_map = self._config.get("channel_map", {})
-        return channel_map.get(gl_channel)
+        ext_id = channel_map.get(gl_channel)
+        if ext_id is not None and str(ext_id).isdigit():
+            return str(ext_id)
+        return None
 
     def _post_to_ghostlink(self, sender: str, text: str, channel: str = "general"):
         """Post an inbound message from external platform to GhostLink."""
@@ -482,7 +485,9 @@ class TelegramBridge(BaseBridge):
                 result = json.loads(resp.read())
                 return result if result.get("ok") else None
         except Exception as e:
-            log.debug("Telegram API %s error: %s", method, e)
+            # Sanitize error to avoid leaking bot token from URL in stack traces
+            err_msg = str(e).replace(self._token, "***") if self._token else str(e)
+            log.debug("Telegram API %s error: %s", method, err_msg)
             return None
 
     def _poll_loop(self):

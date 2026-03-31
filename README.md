@@ -276,9 +276,9 @@ Agent CLIs (tmux sessions via wrapper.py)
 
 | | Count |
 |---|---|
-| React components | 44 |
+| React components | 61 |
 | API endpoints | 190+ |
-| MCP tools | 17 |
+| MCP tools | 29 |
 | Built-in skills | 28 |
 | AI providers | 13 |
 | Channel bridges | 5 |

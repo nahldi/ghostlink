@@ -122,7 +122,17 @@ class SafetyScanner:
         except SyntaxError as e:
             return [{"severity": "error", "message": f"Syntax error: {e}", "line": getattr(e, 'lineno', 0)}]
 
+        _BLOCKED_NAMES = {"__builtins__", "__loader__", "__spec__"}
+
         for node in ast.walk(tree):
+            # Block direct access to dangerous dunder names (e.g. __builtins__["eval"])
+            if isinstance(node, ast.Name) and node.id in _BLOCKED_NAMES:
+                issues.append({
+                    "severity": "critical",
+                    "message": f"Blocked access to {node.id}",
+                    "line": node.lineno,
+                })
+
             # Check function calls
             if isinstance(node, ast.Call):
                 name = cls._get_call_name(node)
@@ -164,13 +174,24 @@ class SafetyScanner:
                             "line": node.lineno,
                         })
 
-            # Check attribute access on os module
+            # Check attribute access on dangerous modules/builtins
             if isinstance(node, ast.Attribute):
-                if isinstance(node.value, ast.Name) and node.value.id == "os":
-                    if node.attr in ("system", "popen", "exec", "execv", "execvp", "spawn"):
+                if isinstance(node.value, ast.Name):
+                    if node.value.id == "os" and node.attr in (
+                        "system", "popen", "exec", "execv", "execvp", "spawn",
+                        "remove", "unlink", "rmdir",
+                    ):
                         issues.append({
                             "severity": "critical",
                             "message": f"Blocked os.{node.attr} call",
+                            "line": node.lineno,
+                        })
+                    # Block __builtins__ access (can bypass blocked call checks
+                    # via __builtins__['eval'] or __builtins__.__dict__['exec'])
+                    if node.value.id == "__builtins__" or node.attr == "__builtins__":
+                        issues.append({
+                            "severity": "critical",
+                            "message": "Blocked __builtins__ access",
                             "line": node.lineno,
                         })
 

@@ -339,6 +339,18 @@ body {
   transform: translateY(-1px);
 }
 
+/* ── Mobile performance — reduce glass blur on smaller screens ── */
+@media (max-width: 768px) {
+  .glass, .glass-card, .liquid-glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .glass-strong {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+}
+
 /* ── Smooth transitions for interactive elements ── */
 button, a {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);

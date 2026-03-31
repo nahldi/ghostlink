@@ -131,8 +131,10 @@ export function Sidebar() {
 
       {/* Thin icon rail — always visible */}
       <div className="sidebar-rail w-14 h-screen fixed left-0 top-0 z-30 max-lg:hidden flex flex-col items-center py-3 gap-1" style={{
-        background: '#0a0a10',
-        borderRight: '1px solid rgba(255,255,255,0.03)',
+        background: 'rgba(8, 8, 14, 0.85)',
+        backdropFilter: 'blur(20px) saturate(1.3)',
+        WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+        borderRight: '1px solid rgba(255,255,255,0.04)',
       }}>
         {/* Logo — toggles channel/nav panel */}
         <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 cursor-pointer hover:scale-105 transition-transform"
@@ -195,9 +197,11 @@ export function Sidebar() {
         <motion.div className="fixed inset-0 z-[29]" onClick={() => setExpanded(false)}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
           <motion.div className="sidebar-panel fixed left-14 top-0 h-screen w-[200px] z-[31] py-3 overflow-y-auto" style={{
-            background: '#0d0d15',
-            borderRight: '1px solid rgba(255,255,255,0.04)',
-            boxShadow: '4px 0 20px rgba(0,0,0,0.3)',
+            background: 'rgba(10, 10, 18, 0.88)',
+            backdropFilter: 'blur(24px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
+            borderRight: '1px solid rgba(255,255,255,0.05)',
+            boxShadow: '4px 0 24px rgba(0,0,0,0.35), inset 1px 0 0 rgba(255,255,255,0.03)',
           }} onClick={e => e.stopPropagation()}
             initial={{ x: -200, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}

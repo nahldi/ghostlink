@@ -223,11 +223,9 @@ export function AddAgentModal({ onClose }: AddAgentModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative w-[480px] max-w-[94vw] max-h-[85vh] overflow-y-auto rounded-2xl"
+        className="relative w-[480px] max-w-[94vw] max-h-[85vh] overflow-y-auto rounded-2xl glass-card"
         style={{
-          background: 'linear-gradient(160deg, #141420 0%, #08080f 100%)',
-          border: '1px solid rgba(167, 139, 250, 0.12)',
-          boxShadow: '0 0 60px rgba(124, 58, 237, 0.08)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 60px rgba(124, 58, 237, 0.06)',
         }}
         onClick={(e) => e.stopPropagation()}
       >

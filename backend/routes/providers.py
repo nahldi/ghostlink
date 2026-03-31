@@ -60,6 +60,11 @@ async def test_provider_key(provider_id: str):
         "groq": ("https://api.groq.com/openai/v1/models", {"Authorization": f"Bearer {key}"}),
         "together": ("https://api.together.xyz/v1/models", {"Authorization": f"Bearer {key}"}),
         "huggingface": ("https://huggingface.co/api/whoami-v2", {"Authorization": f"Bearer {key}"}),
+        "mistral": ("https://api.mistral.ai/v1/models", {"Authorization": f"Bearer {key}"}),
+        "openrouter": ("https://openrouter.ai/api/v1/models", {"Authorization": f"Bearer {key}"}),
+        "deepseek": ("https://api.deepseek.com/models", {"Authorization": f"Bearer {key}"}),
+        "perplexity": ("https://api.perplexity.ai/chat/completions", {"Authorization": f"Bearer {key}"}),
+        "cohere": ("https://api.cohere.com/v2/models", {"Authorization": f"Bearer {key}"}),
     }
 
     if provider_id not in test_urls:

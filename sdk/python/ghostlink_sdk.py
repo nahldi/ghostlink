@@ -105,7 +105,8 @@ class GhostLinkClient:
 
     def search(self, query: str) -> list[dict]:
         """Search messages by keyword."""
-        return self._get(f"/api/search?q={query}")["results"]
+        from urllib.parse import quote_plus
+        return self._get(f"/api/search?q={quote_plus(query)}")["results"]
 
     # ── Agents ────────────────────────────────────────────────────
 

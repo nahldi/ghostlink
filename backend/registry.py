@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 import secrets
 from dataclasses import dataclass, field, asdict
@@ -64,6 +65,7 @@ _COLORS = {
 class AgentRegistry:
     def __init__(self):
         self._instances: dict[str, AgentInstance] = {}
+        self._lock = threading.Lock()
 
     def _occupied_slots(self, base: str) -> set[int]:
         return {inst.slot for inst in self._instances.values() if inst.base == base}
@@ -78,52 +80,58 @@ class AgentRegistry:
     MAX_AGENTS = 20  # Prevent resource exhaustion from unbounded spawning
 
     def register(self, base: str, label: str = "", color: str = "") -> AgentInstance:
-        if len(self._instances) >= self.MAX_AGENTS:
-            raise ValueError(f"Maximum agent limit reached ({self.MAX_AGENTS})")
-        if not label:
-            label = base.capitalize()
-        if not color:
-            color = _COLORS.get(base, "#d2bbff")
+        with self._lock:
+            if len(self._instances) >= self.MAX_AGENTS:
+                raise ValueError(f"Maximum agent limit reached ({self.MAX_AGENTS})")
+            if not label:
+                label = base.capitalize()
+            if not color:
+                color = _COLORS.get(base, "#d2bbff")
 
-        occupied = self._occupied_slots(base)
+            occupied = self._occupied_slots(base)
 
-        # Keep the first agent's public name stable; never rename an existing agent
-        # when a second instance joins.
-        if 1 not in occupied and base not in self._instances:
-            name = base
-            slot = 1
-        else:
-            slot = self._next_available_slot(base)
-            name = f"{base}-{slot}"
+            # Keep the first agent's public name stable; never rename an existing agent
+            # when a second instance joins.
+            if 1 not in occupied and base not in self._instances:
+                name = base
+                slot = 1
+            else:
+                slot = self._next_available_slot(base)
+                name = f"{base}-{slot}"
 
-        inst = AgentInstance(
-            name=name, base=base, label=label, color=color, slot=slot, state="active"
-        )
-        self._instances[name] = inst
-        return inst
+            inst = AgentInstance(
+                name=name, base=base, label=label, color=color, slot=slot, state="active"
+            )
+            self._instances[name] = inst
+            return inst
 
     def deregister(self, name: str) -> bool:
-        inst = self._instances.pop(name, None)
-        if inst:
-            return True
-        return False
+        with self._lock:
+            inst = self._instances.pop(name, None)
+            if inst:
+                return True
+            return False
 
     def get(self, name: str) -> AgentInstance | None:
         return self._instances.get(name)
 
     def get_all(self) -> list[AgentInstance]:
-        return list(self._instances.values())
+        with self._lock:
+            return list(self._instances.values())
 
     def get_public_list(self) -> list[dict]:
-        return [inst.public_dict() for inst in self._instances.values()]
+        with self._lock:
+            return [inst.public_dict() for inst in self._instances.values()]
 
     def set_state(self, name: str, state: str):
-        inst = self._instances.get(name)
-        if inst:
-            inst.state = state
+        with self._lock:
+            inst = self._instances.get(name)
+            if inst:
+                inst.state = state
 
     def resolve_token(self, token: str) -> AgentInstance | None:
-        for inst in self._instances.values():
-            if inst.token == token:
-                return inst
-        return None
+        with self._lock:
+            for inst in self._instances.values():
+                if inst.token == token:
+                    return inst
+            return None

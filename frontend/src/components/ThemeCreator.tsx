@@ -88,8 +88,7 @@ export function ThemeCreator({ onClose, onApply }: ThemeCreatorProps) {
       >
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
         <motion.div
-          className="relative w-[520px] max-w-[95vw] max-h-[85vh] overflow-y-auto rounded-2xl p-6"
-          style={{ background: 'linear-gradient(160deg, #141420 0%, #08080f 100%)', border: '1px solid rgba(167, 139, 250, 0.12)' }}
+          className="relative w-[520px] max-w-[95vw] max-h-[85vh] overflow-y-auto rounded-2xl p-6 glass-card"
           onClick={e => e.stopPropagation()}
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
-**Last updated:** 2026-03-30
-**Version:** v5.5.2
+**Last updated:** 2026-03-31
+**Version:** v5.6.0
 **Owner:** nahldi
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -91,7 +91,7 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 - **90+ completed features** (see FEATURES.md for full list)
 - **53 React components** (StreamingText, ThinkingParticles, Toast, UrlPreview, WorkspaceViewer, etc.)
 - **132+ API endpoints** (split into 13 route modules)
-- **17 MCP tools** (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_load, memory_list, memory_search, web_search, web_fetch, image_generate)
+- **29 MCP tools** — Chat (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim), Memory (memory_save, memory_get, memory_list, memory_search, memory_search_all), Web (web_fetch, web_search, browser_snapshot, image_generate), AI (gemini_image, gemini_video, text_to_speech, speech_to_text, code_execute), Agent (set_thinking, sessions_list, sessions_send, delegate), Streaming (chat_stream_token)
 - **13 known AI agents** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)
 - **13 AI providers** (Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Perplexity, Cohere, OpenRouter, Groq, Together, HuggingFace, Ollama)
 - **5 channel bridges** (Discord, Telegram, Slack, WhatsApp, Generic Webhook)

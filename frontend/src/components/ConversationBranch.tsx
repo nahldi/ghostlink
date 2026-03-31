@@ -71,8 +71,8 @@ export function BranchFromMessage({ message, onClose }: { message: Message; onCl
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="relative w-[400px] max-w-[92vw] rounded-2xl border border-outline-variant/15 p-4 space-y-3"
-        style={{ background: 'rgba(10, 10, 18, 0.98)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+        className="relative w-[400px] max-w-[92vw] rounded-2xl p-4 space-y-3 glass-card"
+        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
@@ -156,8 +156,8 @@ export function BranchList({ channel, onClose }: { channel: string; onClose: () 
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="relative w-[440px] max-w-[92vw] max-h-[70vh] rounded-2xl border border-outline-variant/15 overflow-hidden flex flex-col"
-        style={{ background: 'rgba(10, 10, 18, 0.98)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+        className="relative w-[440px] max-w-[92vw] max-h-[70vh] rounded-2xl overflow-hidden flex flex-col glass-card"
+        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-outline-variant/10 flex items-center justify-between shrink-0">

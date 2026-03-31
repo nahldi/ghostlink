@@ -30,12 +30,8 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
     <div className="fixed inset-0 z-[55] flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative w-[440px] max-w-[92vw] rounded-2xl overflow-hidden"
-        style={{
-          background: 'linear-gradient(160deg, #141420 0%, #08080f 100%)',
-          border: '1px solid rgba(167, 139, 250, 0.15)',
-          boxShadow: '0 0 60px rgba(124, 58, 237, 0.1)',
-        }}
+        className="relative w-[440px] max-w-[92vw] rounded-2xl overflow-hidden glass-card"
+        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/8">

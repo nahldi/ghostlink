@@ -258,9 +258,13 @@ class ExecPolicy:
 
     def check_command(self, agent_name: str, command: str) -> dict:
         """Check if a command is allowed for an agent."""
-        # Normalize shell escaping to prevent bypass via backslash-space, quotes, etc.
-        cmd_lower = command.replace("\\ ", " ").replace("\\t", "\t").strip().lower()
-        # Also strip surrounding quotes
+        # Normalize: strip null bytes, unicode escapes, shell escaping
+        cmd_lower = command.replace("\x00", "")  # null byte removal
+        cmd_lower = cmd_lower.replace("\\ ", " ").replace("\\t", "\t").strip().lower()
+        # Collapse common unicode/hex escape bypass attempts
+        import re
+        cmd_lower = re.sub(r'\\x[0-9a-fA-F]{2}', lambda m: chr(int(m.group()[2:], 16)), cmd_lower)
+        # Strip surrounding quotes
         if (cmd_lower.startswith('"') and cmd_lower.endswith('"')) or (cmd_lower.startswith("'") and cmd_lower.endswith("'")):
             cmd_lower = cmd_lower[1:-1]
 
@@ -331,7 +335,10 @@ class AuditLog:
     def get_recent(self, limit: int = 100, event_type: str = "") -> list[dict]:
         if not self._log_file.exists():
             return []
-        entries = []
+        from collections import deque
+        # Use a bounded deque to avoid loading the entire file into memory.
+        # Only the last `limit` matching entries are kept at any time.
+        entries: deque[dict] = deque(maxlen=limit)
         try:
             with open(self._log_file, "r", encoding="utf-8") as f:
                 for line in f:
@@ -347,7 +354,7 @@ class AuditLog:
                         continue
         except Exception:
             pass
-        return entries[-limit:]
+        return list(entries)
 
     def clear(self):
         if self._log_file.exists():

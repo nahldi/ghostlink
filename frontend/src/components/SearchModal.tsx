@@ -138,11 +138,9 @@ export function SearchModal({ onClose }: SearchModalProps) {
     <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative w-[560px] max-w-[92vw] max-h-[60vh] rounded-2xl overflow-hidden flex flex-col"
+        className="relative w-[560px] max-w-[92vw] max-h-[60vh] rounded-2xl overflow-hidden flex flex-col glass-card"
         style={{
-          background: 'linear-gradient(160deg, #141420 0%, #08080f 100%)',
-          border: '1px solid rgba(167, 139, 250, 0.15)',
-          boxShadow: '0 0 60px rgba(124, 58, 237, 0.1)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 60px rgba(124, 58, 237, 0.08)',
         }}
         onClick={(e) => e.stopPropagation()}
       >

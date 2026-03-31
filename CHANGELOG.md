@@ -1,5 +1,33 @@
 # GhostLink Changelog
 
+## v5.6.0 — 2026-03-31
+### Security Hardening, Liquid Glass Redesign, Runtime Fixes
+- **Electron security** — `contextIsolation: true` + `sandbox: true` on all windows (was disabled on wizard/launcher)
+- **Frontend lint zero** — burned 27 ESLint issues to 0 (real fixes + justified suppressions)
+- **React hooks violation fixed** — conditional `useState` in AgentCockpit moved above early returns
+- **Auth detection hardened** — Claude CLI auth uses positive pattern matching (no more false positives)
+- **Claude --resume removed** — fresh sessions on restart avoid $0.15 cache miss per resume
+- **MCP tool auth bypass fixed** — memory tools now enforce bearer token identity verification
+- **Registry thread safety** — concurrent agent spawns no longer race on slot assignment
+- **Router thread safety** — hop count tracking locked during read-modify-write cycle
+- **ExecPolicy hardened** — null bytes and hex escapes stripped before blocklist matching
+- **SSRF DNS rebinding fix** — post-connect IP validation closes TOCTOU gap in `web_fetch`
+- **Memory key collision fix** — `foo/bar` and `foo_bar` no longer map to same file (SHA suffix)
+- **SDK URL encoding** — `search()` query parameter properly encoded
+- **Webhook signature fix** — double body read bug in inbound webhook handler corrected
+- **Shutdown cleanup safety** — tmux session names properly quoted in shell commands
+- **Process lifecycle** — backend no longer spawns as detached process group
+- **Launcher quit fix** — close handler no longer blocks app exit during shutdown
+- **ARIA accessibility** — modal dialogs have `role="dialog"` + `aria-modal`
+- **Settings error toast** — API save failures shown to user instead of silently logged
+- **Scroll performance** — `setChatAtBottom` only fires when value changes
+- **Docs synced** — MCP tools 17→29, components 44→61, tests 57→132
+- **Manifest.json fix** — explicit routes for root-level static files
+- **Dynamic conversation starters** — empty chat adapts to online agents
+- **Reply previews** — parent message context with click-to-scroll
+- **Gemini session resume** — `--resume` flag for exec mode context persistence
+- **Stale docs archived** — v4.x docs moved to `docs/archive/`
+
 ## v5.2.0 — 2026-03-30
 ### MCP-Native Persistent Agent Architecture
 - **Persistent MCP Claude runner** — long-lived subprocess with stdin/stdout JSON pipes, no tmux dependency

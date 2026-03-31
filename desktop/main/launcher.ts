@@ -5,11 +5,14 @@
  * backend server, check for updates, and open the chat.
  */
 
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import log from 'electron-log';
 
 let launcherWindow: BrowserWindow | null = null;
+let appIsQuitting = false;
+
+app.on('before-quit', () => { appIsQuitting = true; });
 
 /**
  * Create and show the launcher window.
@@ -40,8 +43,8 @@ export function createLauncherWindow(): BrowserWindow {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: false,
-      sandbox: false,
+      contextIsolation: true,
+      sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
     },
@@ -54,9 +57,9 @@ export function createLauncherWindow(): BrowserWindow {
     log.info('Launcher window ready');
   });
 
-  // Hide instead of close so the tray can re-show it
+  // Hide instead of close so the tray can re-show it — but allow close during quit
   launcherWindow.on('close', (event) => {
-    if (launcherWindow && !launcherWindow.isDestroyed()) {
+    if (!appIsQuitting && launcherWindow && !launcherWindow.isDestroyed()) {
       event.preventDefault();
       launcherWindow.hide();
     }

@@ -1,17 +1,76 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "ghostlink-mcp"
-version = "5.5.5"
+version = "5.6.0"
 description = "GhostLink MCP Server — multi-agent AI chat hub"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi>=0.100",
-    "uvicorn>=0.20",
-    "mcp>=1.0",
+    "fastapi==0.135.2",
+    "uvicorn[standard]==0.42.0",
+    "aiosqlite==0.22.1",
+    "python-multipart==0.0.22",
+    "tomli==2.4.0",
+    "websockets==16.0",
+    "mcp==1.26.0",
+    "cryptography==46.0.5",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==9.0.2",
+    "pytest-asyncio==1.3.0",
+    "httpx==0.28.1",
 ]
 
 [project.scripts]
 ghostlink-mcp = "ghostlink_mcp_server:main"
 ghostlink-server = "ghostlink_server:main"
+
+[tool.setuptools]
+packages = ["routes", "plugins"]
+py-modules = [
+    "a2a_bridge",
+    "agent_memory",
+    "app",
+    "app_helpers",
+    "auth",
+    "automations",
+    "autonomous",
+    "branches",
+    "bridges",
+    "cli",
+    "deps",
+    "document_parser",
+    "ghostlink_mcp_server",
+    "ghostlink_server",
+    "jobs",
+    "mcp_bridge",
+    "mcp_proxy",
+    "memory_graph",
+    "plugin_loader",
+    "plugin_sdk",
+    "providers",
+    "rag",
+    "registry",
+    "remote_runner",
+    "repo_map",
+    "router",
+    "rules",
+    "sandbox",
+    "schedules",
+    "security",
+    "sessions",
+    "skills",
+    "specialization",
+    "store",
+    "worktree",
+    "wrapper",
+    "wrapper_mcp",
+    "wrapper_unix",
+]
 
 [tool.ruff]
 target-version = "py310"

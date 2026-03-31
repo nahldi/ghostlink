@@ -252,8 +252,8 @@ export function PersonaMarketplace() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-            className="relative w-[420px] max-w-[92vw] rounded-2xl border border-outline-variant/15 p-4 space-y-3"
-            style={{ background: 'rgba(10, 10, 18, 0.98)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+            className="relative w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 glass-card"
+            style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `${selectedPersona.color}15` }}>

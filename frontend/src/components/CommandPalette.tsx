@@ -332,8 +332,8 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: -10 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        className="relative w-[480px] max-w-[92vw] rounded-2xl border border-outline-variant/15 overflow-hidden"
-        style={{ background: 'rgba(10, 10, 18, 0.98)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+        className="relative w-[480px] max-w-[92vw] rounded-2xl overflow-hidden glass-card"
+        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(124, 58, 237, 0.05)' }}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >

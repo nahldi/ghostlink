@@ -91,8 +91,7 @@ export function WorkspaceViewer({ agentName, workspace, onClose }: WorkspaceView
         <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
 
         <motion.div
-          className="relative m-auto w-[900px] max-w-[95vw] h-[80vh] rounded-2xl flex overflow-hidden"
-          style={{ background: 'linear-gradient(160deg, #141420 0%, #08080f 100%)', border: '1px solid rgba(167, 139, 250, 0.1)' }}
+          className="relative m-auto w-[900px] max-w-[95vw] h-[80vh] rounded-2xl flex overflow-hidden glass-card"
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
