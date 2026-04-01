@@ -19,7 +19,8 @@ _GHOSTLINK_COMMENT_RE = re.compile(
     re.MULTILINE
 )
 _processed_comments: dict[str, float] = {}  # comment_key → timestamp (bounded to prevent memory growth)
-_MAX_PROCESSED_COMMENTS = 10000
+_MAX_PROCESSED_COMMENTS = 1000
+_COMMENT_EXPIRY_SECONDS = 3600  # 1 hour
 
 _watchers: dict[str, dict] = {}  # path → watcher state
 _changes: list[dict] = []  # recent changes
@@ -108,12 +109,17 @@ def _scan_for_ghostlink_comments(filepath: str):
             comment_key = f"{filepath}:{line_num}:{instruction}"
             if comment_key in _processed_comments:
                 continue
-            # Prune oldest half if at capacity
+            now = time.time()
+            # Expire entries older than 1 hour
+            expired = [k for k, ts in _processed_comments.items() if now - ts > _COMMENT_EXPIRY_SECONDS]
+            for k in expired:
+                del _processed_comments[k]
+            # Prune oldest half if still at capacity
             if len(_processed_comments) >= _MAX_PROCESSED_COMMENTS:
                 sorted_keys = sorted(_processed_comments, key=_processed_comments.get)  # type: ignore[arg-type]
                 for k in sorted_keys[:len(sorted_keys) // 2]:
                     del _processed_comments[k]
-            _processed_comments[comment_key] = time.time()
+            _processed_comments[comment_key] = now
             # Route to agents via the message queue
             log.info("Watch mode: found @ghostlink comment in %s:%d — %s", filepath, line_num, instruction)
             _route_comment_to_agent(filepath, line_num, instruction)

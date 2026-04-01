@@ -88,6 +88,15 @@ async def get_ws_token(request: Request):
     return {"token": deps._ws_token}
 
 
+@router.get("/api/health")
+async def health_check():
+    return {
+        "status": "ok",
+        "version": "5.6.1",
+        "uptime": time.time() - deps._settings.get("_server_start", time.time()),
+    }
+
+
 @router.get("/api/status")
 async def get_status():
     from app_helpers import get_full_agent_list
