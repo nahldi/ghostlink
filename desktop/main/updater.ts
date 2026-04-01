@@ -12,7 +12,7 @@ import log from 'electron-log';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
 import { WSL_EXE } from './auth/index';
 
 let launcherRef: BrowserWindow | null = null;
@@ -22,23 +22,24 @@ function isGitHubToken(value: string): boolean {
   return value.startsWith('ghp_') || value.startsWith('github_pat_') || value.startsWith('gho_');
 }
 
-function tryReadWslOutput(args: string[]): string {
-  try {
-    return execFileSync(WSL_EXE, args, {
+function tryReadWslOutput(args: string[]): Promise<string> {
+  return new Promise((resolve) => {
+    execFile(WSL_EXE, ['-e', ...args], {
       encoding: 'utf-8',
-      timeout: 8000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim().replace(/\r/g, '');
-  } catch {
-    return '';
-  }
+      timeout: 3000,
+    }, (err, stdout) => {
+      if (err) { resolve(''); return; }
+      resolve((stdout || '').trim().replace(/\r/g, ''));
+    });
+  });
 }
 
 /**
  * Read a GitHub token for private repo update checks.
  * Checks: GH_TOKEN env, GITHUB_TOKEN env, gh CLI config file, WSL gh CLI.
+ * Runs asynchronously to avoid blocking the main process event loop.
  */
-function getGitHubToken(): string {
+async function getGitHubToken(): Promise<string> {
   if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
   if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
 
@@ -60,14 +61,14 @@ function getGitHubToken(): string {
     } catch {}
   }
 
-  // Try reading from WSL without shell interpolation.
+  // Try reading from WSL (async — does not block the event loop).
   const wslCommands: Array<{ label: string; args: string[] }> = [
     { label: 'gh', args: ['gh', 'auth', 'token'] },
     { label: 'printenv GITHUB_TOKEN', args: ['printenv', 'GITHUB_TOKEN'] },
     { label: 'printenv GH_TOKEN', args: ['printenv', 'GH_TOKEN'] },
   ];
   for (const command of wslCommands) {
-    const result = tryReadWslOutput(command.args);
+    const result = await tryReadWslOutput(command.args);
     if (result && isGitHubToken(result)) {
       log.info('Found GitHub token from WSL (%s)', command.label);
       return result;
@@ -84,14 +85,19 @@ function getGitHubToken(): string {
 export function setupUpdater(launcherWindow: BrowserWindow): void {
   launcherRef = launcherWindow;
 
-  // Set GitHub token for private repo access
-  const ghToken = getGitHubToken();
-  if (ghToken) {
-    process.env.GH_TOKEN = ghToken;
-    log.info('GitHub token configured for auto-updater');
-  } else {
-    log.warn('No GitHub token found — auto-update may not work for private repos');
-  }
+  // Look up GitHub token asynchronously so WSL calls don't block the event loop.
+  // The token is only needed for private repo update checks — the updater
+  // event handlers work fine without it.
+  getGitHubToken().then((ghToken) => {
+    if (ghToken) {
+      process.env.GH_TOKEN = ghToken;
+      log.info('GitHub token configured for auto-updater');
+    } else {
+      log.warn('No GitHub token found — auto-update may not work for private repos');
+    }
+  }).catch((err) => {
+    log.warn('GitHub token lookup failed:', err.message ?? err);
+  });
 
   // Route updater logs through electron-log
   autoUpdater.logger = log;
