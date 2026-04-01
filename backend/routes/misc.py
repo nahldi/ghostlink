@@ -220,6 +220,72 @@ async def create_backup():
     )
 
 
+@router.post("/api/restore")
+async def restore_backup(file: UploadFile = File(...)):
+    """Restore GhostLink data from a backup ZIP created by /api/backup."""
+    import io
+    import shutil
+    import zipfile
+
+    data_dir = Path(deps._settings.get("data_dir", "./data")).resolve()
+
+    content = await file.read()
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile:
+        return JSONResponse({"error": "Invalid ZIP file"}, 400)
+
+    # Validate: only allow known safe file paths from our backup format
+    allowed_prefixes = ("settings.json", "ghostlink.db", "config.toml",
+                        "personas.json", "hooks.json", "memory/", "uploads/")
+    for name in zf.namelist():
+        if not any(name == prefix or name.startswith(prefix) for prefix in allowed_prefixes):
+            return JSONResponse({"error": f"Unexpected file in backup: {name}"}, 400)
+        # Block path traversal
+        if ".." in name or name.startswith("/"):
+            return JSONResponse({"error": f"Invalid path in backup: {name}"}, 400)
+
+    restored: list[str] = []
+
+    # Create backup of current state before overwriting
+    backup_dir = data_dir / ".pre-restore-backup"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("ghostlink.db", "config.toml", "personas.json", "hooks.json"):
+        src = data_dir / name
+        if src.exists():
+            shutil.copy2(str(src), str(backup_dir / name))
+
+    # Extract files
+    for name in zf.namelist():
+        dest = data_dir / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        if name == "settings.json":
+            # Merge restored settings with current (keep server-specific keys)
+            try:
+                restored_settings = json.loads(zf.read(name))
+                # Preserve runtime keys
+                for key in ("_server_start", "port"):
+                    if key in deps._settings:
+                        restored_settings[key] = deps._settings[key]
+                deps._settings.update(restored_settings)
+                restored.append("settings")
+            except Exception:
+                pass
+        elif name == "ghostlink.db":
+            dest.write_bytes(zf.read(name))
+            restored.append("database")
+        elif name.startswith("memory/") or name.startswith("uploads/"):
+            dest.write_bytes(zf.read(name))
+            restored.append(name)
+        else:
+            dest.write_bytes(zf.read(name))
+            restored.append(name)
+
+    return {"restored": len(restored), "files": restored[:20],
+            "pre_restore_backup": str(backup_dir)}
+
+
 @router.get("/api/status")
 async def get_status():
     from app_helpers import get_full_agent_list

@@ -1401,6 +1401,7 @@ function CleanupSection() {
   const [diagChecks, setDiagChecks] = useState<{ name: string; status: string; detail: string }[] | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreResult, setRestoreResult] = useState<string | null>(null);
 
   const handleCleanup = async () => {
     setCleaning(true);
@@ -1512,6 +1513,41 @@ function CleanupSection() {
         </button>
         <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
           Downloads a ZIP of all data: messages, settings, configs, agent memory, uploads
+        </p>
+      </div>
+
+      {/* Restore from backup */}
+      <div className="mt-3">
+        <button
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.zip';
+            input.onchange = async () => {
+              const file = input.files?.[0];
+              if (!file) return;
+              setRestoreResult(null);
+              const form = new FormData();
+              form.append('file', file);
+              try {
+                const r = await fetch('/api/restore', { method: 'POST', body: form }).then(r => r.json());
+                if (r.error) { setRestoreResult(`Error: ${r.error}`); }
+                else { setRestoreResult(`Restored ${r.restored} items. Reload to apply.`); }
+              } catch { setRestoreResult('Restore failed'); }
+              setTimeout(() => setRestoreResult(null), 8000);
+            };
+            input.click();
+          }}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container/40 border border-outline-variant/8 text-xs font-medium text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container/60 transition-all"
+        >
+          <span className="material-symbols-outlined text-[16px]">restore</span>
+          Restore from Backup
+        </button>
+        {restoreResult && (
+          <span className={`text-[11px] mt-1 block ${restoreResult.startsWith('Error') ? 'text-red-400/70' : 'text-green-400/70'}`}>{restoreResult}</span>
+        )}
+        <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
+          Upload a backup ZIP to restore settings, messages, and configs. Current data is backed up first.
         </p>
       </div>
 
