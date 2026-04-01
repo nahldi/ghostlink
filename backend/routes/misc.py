@@ -97,6 +97,129 @@ async def health_check():
     }
 
 
+@router.get("/api/diagnostics")
+async def diagnostics():
+    """Run system diagnostics — checks Python, database, disk, agents, ports."""
+    import shutil
+    import sqlite3
+
+    checks: list[dict] = []
+    data_dir = Path(deps._settings.get("data_dir", "./data")).resolve()
+
+    # Python version
+    import sys
+    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    checks.append({"name": "python", "status": "ok" if sys.version_info >= (3, 10) else "warn",
+                    "detail": py_ver, "required": "3.10+"})
+
+    # Database integrity
+    db_path = data_dir / "ghostlink.db"
+    if db_path.exists():
+        try:
+            conn = sqlite3.connect(str(db_path))
+            result = conn.execute("PRAGMA integrity_check").fetchone()
+            conn.close()
+            ok = result and result[0] == "ok"
+            size_mb = round(db_path.stat().st_size / 1_048_576, 2)
+            checks.append({"name": "database", "status": "ok" if ok else "error",
+                            "detail": f"{size_mb}MB, integrity={'ok' if ok else 'failed'}"})
+        except Exception as exc:
+            checks.append({"name": "database", "status": "error", "detail": str(exc)})
+    else:
+        checks.append({"name": "database", "status": "warn", "detail": "not found"})
+
+    # Disk space
+    try:
+        usage = shutil.disk_usage(str(data_dir))
+        free_gb = round(usage.free / 1_073_741_824, 1)
+        checks.append({"name": "disk_space", "status": "ok" if free_gb > 1 else "warn",
+                        "detail": f"{free_gb}GB free"})
+    except Exception:
+        checks.append({"name": "disk_space", "status": "warn", "detail": "unknown"})
+
+    # Registered agents
+    agent_count = len(deps.registry.get_all()) if deps.registry else 0
+    checks.append({"name": "agents", "status": "ok" if agent_count > 0 else "info",
+                    "detail": f"{agent_count} running"})
+
+    # Port availability
+    import socket
+    port = deps._settings.get("port", 8300)
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            s.bind(("127.0.0.1", int(port) + 1))
+        checks.append({"name": "port_conflict", "status": "ok", "detail": f"port {port} in use (self)"})
+    except OSError:
+        checks.append({"name": "port_conflict", "status": "info", "detail": f"adjacent port {int(port)+1} in use"})
+
+    # Required Python packages
+    missing_pkgs = []
+    for pkg in ["fastapi", "uvicorn", "aiosqlite", "websockets", "cryptography", "mcp"]:
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing_pkgs.append(pkg)
+    checks.append({"name": "dependencies", "status": "ok" if not missing_pkgs else "error",
+                    "detail": "all installed" if not missing_pkgs else f"missing: {', '.join(missing_pkgs)}"})
+
+    overall = "ok"
+    if any(c["status"] == "error" for c in checks):
+        overall = "error"
+    elif any(c["status"] == "warn" for c in checks):
+        overall = "warn"
+
+    return {"status": overall, "checks": checks}
+
+
+@router.get("/api/backup")
+async def create_backup():
+    """Create a full ZIP backup of all GhostLink data (messages, settings, configs)."""
+    import io
+    import zipfile
+
+    data_dir = Path(deps._settings.get("data_dir", "./data")).resolve()
+    buf = io.BytesIO()
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Settings
+        zf.writestr("settings.json", json.dumps(deps._settings, indent=2, default=str))
+
+        # Database
+        db_path = data_dir / "ghostlink.db"
+        if db_path.exists():
+            zf.write(str(db_path), "ghostlink.db")
+
+        # Config files
+        for name in ("config.toml", "personas.json", "hooks.json"):
+            cfg = data_dir / name
+            if cfg.exists():
+                zf.write(str(cfg), name)
+
+        # Agent memory files
+        mem_dir = data_dir / "memory"
+        if mem_dir.is_dir():
+            for f in mem_dir.rglob("*"):
+                if f.is_file() and f.stat().st_size < 10_000_000:
+                    zf.write(str(f), f"memory/{f.relative_to(mem_dir)}")
+
+        # Uploads (images, attachments)
+        upload_dir = data_dir / "uploads"
+        if upload_dir.is_dir():
+            for f in upload_dir.rglob("*"):
+                if f.is_file() and f.stat().st_size < 50_000_000:
+                    zf.write(str(f), f"uploads/{f.relative_to(upload_dir)}")
+
+    buf.seek(0)
+    from starlette.responses import StreamingResponse
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="ghostlink-backup-{timestamp}.zip"'},
+    )
+
+
 @router.get("/api/status")
 async def get_status():
     from app_helpers import get_full_agent_list
