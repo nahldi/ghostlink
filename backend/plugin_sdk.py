@@ -17,7 +17,6 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 log = logging.getLogger(__name__)
 

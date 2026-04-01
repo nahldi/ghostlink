@@ -98,10 +98,10 @@ def chunk_text(text: str, chunk_size: int = 2000, overlap: int = 200) -> list[di
 def summarize_document(text: str, max_length: int = 500) -> str:
     """Create a brief summary of a document's content."""
     lines = text.strip().split('\n')
-    non_empty = [l.strip() for l in lines if l.strip()]
+    non_empty = [line.strip() for line in lines if line.strip()]
 
     # Extract headers (markdown or uppercase lines)
-    headers = [l for l in non_empty[:50] if l.startswith('#') or (l.isupper() and len(l) < 80)]
+    headers = [line for line in non_empty[:50] if line.startswith('#') or (line.isupper() and len(line) < 80)]
 
     summary_parts = []
     if headers:

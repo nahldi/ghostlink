@@ -4,7 +4,6 @@ Watches directories where agents work and reports changes in real-time
 via WebSocket. Shows which files agents create, modify, or delete.
 """
 
-import json
 import logging
 import os
 import re
@@ -130,7 +129,6 @@ def _route_comment_to_agent(filepath: str, line_num: int, instruction: str):
             return
         filename = os.path.basename(filepath)
         text = f"[Watch Mode] `{filename}:{line_num}` — {instruction}"
-        import asyncio
 
         from mcp_bridge import _run_async
         _run_async(deps.store.add("system", text, "system", "general"))
@@ -157,7 +155,6 @@ def setup(app, store=None, registry=None, mcp_bridge=None):
     @app.post("/api/file-watch")
     async def start_watching(request):
         """Start watching a directory for file changes."""
-        from fastapi import Request
         body = await request.json()
         directory = body.get("directory", "")
         if not directory or not Path(directory).is_dir():
@@ -174,7 +171,6 @@ def setup(app, store=None, registry=None, mcp_bridge=None):
     @app.post("/api/file-watch/stop")
     async def stop_watching(request):
         """Stop watching a directory."""
-        from fastapi import Request
         body = await request.json()
         directory = body.get("directory", "")
         if directory in _watchers:

@@ -1,7 +1,6 @@
 """Skills registry — manages available skills and per-agent skill assignments."""
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 

@@ -82,7 +82,7 @@ def _append_jsonl_locked(queue_file: Path, payload: dict) -> None:
             break
         except FileExistsError:
             if time.time() >= deadline:
-                raise TimeoutError(f"timed out waiting for queue lock: {lock_path.name}")
+                raise TimeoutError(f"timed out waiting for queue lock: {lock_path.name}") from None
             time.sleep(0.05)
 
     try:

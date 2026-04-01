@@ -16,6 +16,7 @@ import { ConnectionBanner } from './components/ConnectionBanner';
 import { BulkDeleteBar } from './components/BulkDeleteBar';
 import { SoundManager } from './lib/sounds';
 import { SessionBar } from './components/SessionBar';
+import { toast } from './components/Toast';
 
 
 // Lazy-loaded components (reduce initial bundle from ~900KB)
@@ -112,7 +113,9 @@ function ConversationStarters({ channel }: { channel: string }) {
   ].slice(0, 6); // Max 6 to keep it clean
 
   const sendMessage = (text: string) => {
-    api.sendMessage(settings.username, text, channel).catch(() => {});
+    api.sendMessage(settings.username, text, channel).catch(() => {
+      toast('Failed to send message', 'error');
+    });
   };
 
   return (

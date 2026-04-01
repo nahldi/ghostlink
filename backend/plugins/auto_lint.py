@@ -7,9 +7,7 @@ Errors are fed back to the agent as a system message.
 Registered via the lifecycle hooks system (pre_tool_use / post_tool_use).
 """
 
-import json
 import logging
-import os
 import shutil
 import subprocess
 import threading

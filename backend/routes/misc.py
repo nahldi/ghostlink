@@ -8,7 +8,6 @@ import asyncio as _asyncio
 import html as _html
 import html.parser as _html_parser
 import json
-import os
 import re as _re
 import subprocess
 import time
@@ -1089,7 +1088,7 @@ async def send_voice_note(request: Request):
         if openai_key:
             providers.append(("openai", openai_key, "https://api.openai.com/v1/audio/transcriptions", "whisper-1"))
 
-        for prov, key, url, model in providers:
+        for _prov, key, url, model in providers:
             try:
                 form_data = aiohttp.FormData()
                 form_data.add_field("file", audio_bytes, filename="voice.webm", content_type="audio/webm")

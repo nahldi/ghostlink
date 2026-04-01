@@ -85,9 +85,11 @@ def _which_cli(command: str, path_value: str | None = None) -> str | None:
 
 
 def _workspace_spawn_warning(cwd: str) -> str | None:
-    path = Path(cwd)
-    parts_lower = {part.lower() for part in path.parts}
-    is_wsl_mounted_windows_path = len(path.parts) >= 3 and path.parts[0] == "/" and path.parts[1] == "mnt"
+    # Use the raw string for WSL path detection because pathlib on Windows
+    # normalises "/" to "\", breaking the parts[0] == "/" check.
+    normalised = cwd.replace("\\", "/")
+    is_wsl_mounted_windows_path = normalised.startswith("/mnt/")
+    parts_lower = {part.lower() for part in Path(cwd).parts}
     if is_wsl_mounted_windows_path and any(part.startswith("onedrive") for part in parts_lower):
         return (
             "Workspace is on OneDrive via /mnt. Some agent CLIs may fail or behave unpredictably "
@@ -563,7 +565,6 @@ async def deregister_agent(name: str):
 @router.get("/api/agent-templates")
 async def agent_templates(connected: str = ""):
     """Return available agent CLI templates with defaults."""
-    import shutil as _shutil
     _connected_set = set(c.strip() for c in connected.split(",") if c.strip())
     stored = deps._settings.get("connectedAgents", [])
     if isinstance(stored, list):
@@ -730,7 +731,6 @@ async def spawn_agent(request: Request):
     if len(role_description) > 500:
         return JSONResponse({"error": "roleDescription too long"}, 400)
 
-    import shutil as _shutil
 
     # Extra check for agents that need subcommands/extensions
     spawn_path = _expanded_cli_path()
@@ -1912,7 +1912,7 @@ def _files_match(left: Path, right: Path) -> bool:
 
 
 def _remove_empty_workspace_dirs(workspace: Path) -> None:
-    for current_root, dirs, _files in os.walk(workspace, topdown=False):
+    for current_root, _dirs, _files in os.walk(workspace, topdown=False):
         current = Path(current_root)
         if current == workspace:
             continue

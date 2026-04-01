@@ -118,7 +118,7 @@ def _run_async(coro):
     except concurrent.futures.TimeoutError:
         future.cancel()
         log.warning("_run_async: coroutine timed out after 5s (backpressure)")
-        raise TimeoutError("MCP bridge async operation timed out")
+        raise TimeoutError("MCP bridge async operation timed out") from None
 
 
 # ── Execution mode enforcement ─────────────────────────────────────
@@ -137,7 +137,6 @@ def _check_execution_mode(channel: str, tool_name: str) -> str | None:
         return None
     try:
         import deps as _deps
-        from sessions import SessionManager
         if _deps.session_manager:
             mode = _deps.session_manager.get_execution_mode(channel)
             if mode in ("plan", "review") and tool_name in _WRITE_TOOLS:
@@ -371,7 +370,7 @@ def chat_send(
     sender: str,
     message: str,
     channel: str = "general",
-    choices: list[str] = [],
+    choices: list[str] | None = None,
     reply_to: int = -1,
     job_id: int = 0,
     ctx: Context | None = None,
@@ -387,6 +386,8 @@ def chat_send(
         reply_to: Message ID to reply to (-1 for no reply)
         job_id: Post into a job conversation instead of main timeline (0 = main)
     """
+    if choices is None:
+        choices = []
     sender, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
@@ -669,7 +670,7 @@ def chat_progress(
     sender: str,
     channel: str = "general",
     title: str = "",
-    steps: list[str] = [],
+    steps: list[str] | None = None,
     current: int = 0,
     total: int = 0,
     message_id: int = 0,
@@ -686,6 +687,8 @@ def chat_progress(
         total: Total number of steps
         message_id: If updating an existing progress card, pass its message ID. 0 = create new.
     """
+    if steps is None:
+        steps = []
     sender, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
     if err:
         return err
@@ -848,7 +851,7 @@ def memory_save(sender: str, key: str, content: str, ctx: Context | None = None)
         return err
     from agent_memory import get_agent_memory
     mem = get_agent_memory(_data_dir, identity)
-    result = mem.save(key, content)
+    mem.save(key, content)
     return f"Saved memory '{key}' ({len(content)} chars)"
 
 
@@ -1619,7 +1622,7 @@ def delegate(sender: str, agent: str, task: str, channel: str = "general", ctx: 
 
     # Post the delegation as a message with @mention
     msg_text = f"@{agent} [Delegated by {identity}]: {task}"
-    msg = _run_async(_store.add(identity, msg_text, "chat", channel))
+    _run_async(_store.add(identity, msg_text, "chat", channel))
 
     # Trigger the target agent's queue (uses local _trigger_mentions, no circular import)
     _trigger_mentions(identity, msg_text, channel)

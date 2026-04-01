@@ -17,7 +17,6 @@ import logging
 import os
 import shutil
 import subprocess
-from pathlib import Path
 
 log = logging.getLogger(__name__)
 

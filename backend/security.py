@@ -39,7 +39,7 @@ except ImportError:
     raise ImportError(
         "cryptography package is required for GhostLink secrets encryption. "
         "Install it: pip install cryptography"
-    )
+    ) from None
 
 
 # ── Secrets Manager ─────────────────────────────────────────────────

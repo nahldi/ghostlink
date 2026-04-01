@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
 import deps
 
@@ -71,5 +70,5 @@ async def get_server_logs(limit: int = 100, level: str = ""):
     """Get recent server log entries for the UI log viewer."""
     logs = list(deps._server_logs)
     if level:
-        logs = [l for l in logs if l["level"] == level.upper()]
+        logs = [entry for entry in logs if entry["level"] == level.upper()]
     return {"logs": logs[-limit:]}

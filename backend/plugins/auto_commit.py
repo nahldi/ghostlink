@@ -56,8 +56,8 @@ def _generate_commit_message(diff_summary: str, agent: str) -> str:
     # Last line is the summary (e.g., "3 files changed, 45 insertions(+), 12 deletions(-)")
     summary_line = lines[-1].strip() if lines else "changes"
     # Count files
-    file_lines = [l for l in lines[:-1] if '|' in l]
-    file_names = [l.split('|')[0].strip() for l in file_lines[:5]]
+    file_lines = [line for line in lines[:-1] if '|' in line]
+    file_names = [line.split('|')[0].strip() for line in file_lines[:5]]
 
     if len(file_names) == 1:
         msg = f"Update {file_names[0]}"

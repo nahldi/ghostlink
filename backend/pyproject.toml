@@ -87,6 +87,7 @@ select = [
     "UP",    # pyupgrade
 ]
 ignore = [
+    "E402",  # module import not at top — deps.py must load first to set sys.path
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
     "B905",  # zip() without strict (Python 3.10+ only)

@@ -511,7 +511,7 @@ def _approval_watcher(
                         pass  # Fall through to manual approval
 
                     # Extract context: last 10 non-empty lines
-                    lines = [l for l in pane_text.strip().split('\n') if l.strip()]
+                    lines = [line for line in pane_text.strip().split('\n') if line.strip()]
                     context = '\n'.join(lines[-10:])
 
                     # Post to chat as approval_request message (v2.5.0: use tracked channel)
@@ -712,7 +712,6 @@ def main():
     command = agent_cfg.get("command") or _KNOWN_COMMANDS.get(agent, agent)
     agent_args = agent_cfg.get("args", [])
     cwd = os.environ.get("GHOSTLINK_AGENT_CWD") or agent_cfg.get("cwd", ".")
-    color = agent_cfg.get("color", "")
     label = args.label or agent_cfg.get("label", "")
     data_dir = ROOT / config.get("server", {}).get("data_dir", "./data")
     data_dir.mkdir(parents=True, exist_ok=True)

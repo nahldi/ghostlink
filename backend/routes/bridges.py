@@ -1,9 +1,10 @@
 """Channel bridge routes — Discord, Telegram, Slack, WhatsApp, Webhook."""
 from __future__ import annotations
 
-import deps
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+import deps
 
 router = APIRouter()
 
@@ -43,7 +44,9 @@ async def stop_bridge(platform: str):
 @router.post("/api/bridges/inbound")
 async def bridge_inbound(request: Request):
     """Receive messages from external platforms via webhook."""
-    import hashlib, hmac as _hmac, json as _json
+    import hashlib
+    import hmac as _hmac
+    import json as _json
 
     # Read raw body first — needed for signature verification before parsing
     raw = await request.body()

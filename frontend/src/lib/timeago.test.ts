@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { timeAgo, formatTimestamp } from './timeago';
 
 describe('timeAgo', () => {
+  const fixedNow = new Date('2026-03-31T12:00:00Z').getTime();
+
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-31T12:00:00Z'));
+    vi.spyOn(Date, 'now').mockReturnValue(fixedNow);
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   const now = () => Date.now() / 1000;

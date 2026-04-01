@@ -33,7 +33,7 @@ try:
 except ImportError:
     HAS_AIOHTTP = False
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -46,7 +46,7 @@ import plugin_loader
 from branches import BranchManager
 from bridges import BridgeManager
 from jobs import JobStore
-from plugin_sdk import EVENTS, SKILL_PACKS, HookManager, Marketplace, SafetyScanner, event_bus
+from plugin_sdk import HookManager, Marketplace, SafetyScanner, event_bus
 from providers import ProviderRegistry
 from registry import AgentRegistry
 from router import MessageRouter
@@ -276,7 +276,6 @@ async def _auto_spawn_agent(pa: dict):
     label = pa.get("label", base.capitalize())
     cwd = pa.get("cwd", ".")
     args = pa.get("args", [])
-    command = pa.get("command", base)
     try:
         spawn_path = os.environ.get("PATH", "")
         for extra in [os.path.expanduser("~/.npm-global/bin"), os.path.expanduser("~/.local/bin"), "/usr/local/bin"]:

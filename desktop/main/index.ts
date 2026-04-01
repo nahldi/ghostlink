@@ -634,7 +634,7 @@ function setupIPC(): void {
           log.info('[auth:browser] Found auth URL:', url);
           shell.openExternal(url);
           if (launcher && !launcher.isDestroyed()) {
-            launcher.webContents.send('auth:login-url', { provider, url });
+            launcher.webContents.send('auth:login-url', provider, url);
           }
         }
       });
@@ -648,7 +648,7 @@ function setupIPC(): void {
           urlFound = true;
           shell.openExternal(urlMatch[0]);
           if (launcher && !launcher.isDestroyed()) {
-            launcher.webContents.send('auth:login-url', { provider, url: urlMatch[0] });
+            launcher.webContents.send('auth:login-url', provider, urlMatch[0]);
           }
         }
       });
@@ -726,7 +726,7 @@ function setupIPC(): void {
           delete (currentSettings.apiKeys as Record<string, any>)[provider];
           if (Object.keys(currentSettings.apiKeys).length === 0) delete currentSettings.apiKeys;
         }
-        saveSettingsFile(currentSettings);
+        saveSettingsFile(currentSettings, getSettingsPath());
       }
 
       // Trigger auth refresh
@@ -872,10 +872,14 @@ app.whenReady().then(async () => {
           } else {
             log.warn(`Cannot decrypt API key for ${provider} — safeStorage not available`);
           }
-        } catch { /* key decrypt failed — skip */ }
+        } catch (decryptErr: any) {
+          log.warn(`Failed to decrypt API key for ${provider}:`, decryptErr?.message ?? decryptErr);
+        }
       }
     }
-  } catch { /* settings not loaded yet — skip */ }
+  } catch (settingsErr: any) {
+    log.warn('Could not restore API keys on startup:', settingsErr?.message ?? settingsErr);
+  }
 
   // Check if first run
   if (settingsExist()) {

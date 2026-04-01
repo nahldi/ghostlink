@@ -5,7 +5,6 @@ Creates a tmux session running the agent CLI, injects MCP read prompts
 when @mentioned, and lets users attach/detach.
 """
 
-import os
 import shlex
 import shutil
 import subprocess
@@ -129,7 +128,7 @@ def run_agent(
     from pathlib import Path
     abs_cwd = str(Path(cwd).resolve())
 
-    inject_fn = lambda text: inject(text, tmux_session=session_name, delay=inject_delay)
+    def inject_fn(text): return inject(text, tmux_session=session_name, delay=inject_delay)
     start_watcher(inject_fn)
 
     print(f"  Using tmux session: {session_name}")

@@ -8,7 +8,6 @@ Bridges are configured in Settings > Integrations and stored in data/bridges.jso
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -791,7 +790,8 @@ class WebhookBridge(BaseBridge):
             }).encode()
             headers = {"Content-Type": "application/json", "User-Agent": "GhostLink/1.8"}
             if self._secret:
-                import hashlib, hmac
+                import hashlib
+                import hmac
                 sig = hmac.new(self._secret.encode(), body, hashlib.sha256).hexdigest()
                 headers["X-GhostLink-Signature"] = sig
             req = urllib.request.Request(
