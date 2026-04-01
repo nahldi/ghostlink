@@ -1398,6 +1398,9 @@ function CleanupSection() {
   const [stopping, setStopping] = useState(false);
   const [serverStopped, setServerStopped] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [diagChecks, setDiagChecks] = useState<{ name: string; status: string; detail: string }[] | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
 
   const handleCleanup = async () => {
     setCleaning(true);
@@ -1451,6 +1454,66 @@ function CleanupSection() {
       <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
         Kills orphaned tmux sessions and dead processes to free up resources
       </p>
+
+      {/* Diagnostics */}
+      <div className="mt-3">
+        <button
+          onClick={async () => {
+            setDiagLoading(true);
+            try {
+              const r = await fetch('/api/diagnostics').then(r => r.json());
+              setDiagChecks(r.checks);
+            } catch { setDiagChecks(null); }
+            setDiagLoading(false);
+          }}
+          disabled={diagLoading}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container/40 border border-outline-variant/8 text-xs font-medium text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container/60 transition-all disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">{diagLoading ? 'hourglass_empty' : 'health_and_safety'}</span>
+          {diagLoading ? 'Running...' : 'Run Diagnostics'}
+        </button>
+        {diagChecks && (
+          <div className="mt-2 rounded-xl bg-surface-container/20 border border-outline-variant/8 overflow-hidden">
+            {diagChecks.map((c, i) => (
+              <div key={c.name} className={`flex items-center justify-between px-3 py-1.5 text-[10px] ${i % 2 === 0 ? '' : 'bg-surface-container/10'}`}>
+                <span className="text-on-surface-variant/60">{c.name.replace(/_/g, ' ')}</span>
+                <span className={`font-mono ${c.status === 'ok' ? 'text-green-400/70' : c.status === 'warn' ? 'text-yellow-400/70' : c.status === 'error' ? 'text-red-400/70' : 'text-on-surface-variant/40'}`}>{c.detail}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
+          Checks Python, database, disk space, agents, ports, and dependencies
+        </p>
+      </div>
+
+      {/* Backup */}
+      <div className="mt-3">
+        <button
+          onClick={async () => {
+            setBackupLoading(true);
+            try {
+              const resp = await fetch('/api/backup');
+              const blob = await resp.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = resp.headers.get('content-disposition')?.match(/filename="(.+)"/)?.[1] || 'ghostlink-backup.zip';
+              a.click();
+              URL.revokeObjectURL(url);
+            } catch { /* download failed */ }
+            setBackupLoading(false);
+          }}
+          disabled={backupLoading}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container/40 border border-outline-variant/8 text-xs font-medium text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container/60 transition-all disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">{backupLoading ? 'hourglass_empty' : 'backup'}</span>
+          {backupLoading ? 'Creating backup...' : 'Download Backup'}
+        </button>
+        <p className="text-[9px] text-on-surface-variant/30 mt-1.5">
+          Downloads a ZIP of all data: messages, settings, configs, agent memory, uploads
+        </p>
+      </div>
 
       {/* Re-run Wizard */}
       <div className="mt-3">
