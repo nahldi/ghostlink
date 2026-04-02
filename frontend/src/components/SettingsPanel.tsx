@@ -833,7 +833,7 @@ function SecurityTab() {
 function PermissionPresetsSection() {
   const [presets, setPresets] = useState<{ id: string; name: string; description: string }[]>([]);
   useEffect(() => {
-    fetch('/api/security/permission-presets').then(r => r.json()).then(d => setPresets(d.presets || [])).catch(() => {});
+    fetch('/api/security/permission-presets').then(r => r.json()).then(d => setPresets(d.presets || [])).catch((e) => console.error('Failed to load permission presets:', e));
   }, []);
   return (
     <div>
@@ -859,7 +859,7 @@ function ToolLogSection() {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
-    fetch('/api/security/tool-log?limit=50').then(r => r.json()).then(d => setEntries(d.entries || [])).catch(() => {});
+    fetch('/api/security/tool-log?limit=50').then(r => r.json()).then(d => setEntries(d.entries || [])).catch((e) => console.error('Failed to load tool log:', e));
   }, [open]);
   return (
     <div>
@@ -1557,7 +1557,7 @@ function CleanupSection() {
           onClick={() => {
             localStorage.removeItem('ghostlink_setup_complete');
             useChatStore.getState().updateSettings({ setupComplete: false });
-            api.saveSettings({ setupComplete: false }).catch(() => {});
+            api.saveSettings({ setupComplete: false }).catch((e) => console.error('Failed to persist setup reset:', e));
             window.location.reload();
           }}
           className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container/40 border border-outline-variant/8 text-xs font-medium text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container/60 transition-all"
@@ -1724,8 +1724,8 @@ function PersistentAgentsSection() {
     const updated = [...persistent, agent];
     updateSettings({ persistentAgents: updated });
     api.saveSettings({ persistentAgents: updated }).then(() => {
-      api.getStatus().then(r => setAgents(r.agents)).catch(() => {});
-    }).catch(() => {});
+      api.getStatus().then(r => setAgents(r.agents)).catch((e) => console.error('Failed to refresh agent status:', e));
+    }).catch((e) => console.error('Failed to save persistent agents:', e));
     setAdding(false);
     setNewCwd('');
   };

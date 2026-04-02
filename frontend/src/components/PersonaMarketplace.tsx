@@ -148,7 +148,7 @@ export function PersonaMarketplace() {
   useEffect(() => {
     fetch('/api/personas').then(r => r.ok ? r.json() : { personas: [] })
       .then(d => { if (d.personas?.length) setPersonas([...BUILTIN_PERSONAS, ...d.personas]); })
-      .catch(() => {});
+      .catch((e) => console.error('Failed to load personas:', e));
   }, []);
 
   const filtered = personas.filter(p => {

@@ -7,10 +7,13 @@ with individual JSON files for each memory key.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import time
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 _SAFE_NAME = re.compile(r'^[a-zA-Z0-9_-]{1,50}$')
 
@@ -82,7 +85,7 @@ class AgentMemory:
                     existing = json.loads(source.read_text("utf-8"))
                     entry["created_at"] = existing.get("created_at", entry["created_at"])
                 except Exception:
-                    pass
+                    log.warning("Corrupt memory file during migration: %s", source, exc_info=True)
                 # Remove legacy file if migrating to new path
                 if source == legacy and legacy != path:
                     legacy.unlink(missing_ok=True)
@@ -98,6 +101,7 @@ class AgentMemory:
             try:
                 return json.loads(path.read_text("utf-8"))
             except Exception:
+                log.warning("Failed to read memory key '%s' from %s", key, path, exc_info=True)
                 return None
 
     def list_all(self) -> list[dict]:
@@ -116,6 +120,7 @@ class AgentMemory:
                         "size": len(data.get("content", "")),
                     })
                 except Exception:
+                    log.warning("Corrupt memory file: %s", f, exc_info=True)
                     entries.append({"key": f.stem, "error": "corrupt"})
         return entries
 
@@ -160,7 +165,7 @@ class AgentMemory:
                             "score": score,
                         })
                 except Exception:
-                    pass
+                    log.debug("Skipping corrupt memory file during search: %s", f)
         results.sort(key=lambda r: r["score"], reverse=True)
         return results
 
@@ -209,7 +214,7 @@ def search_all_memories(data_dir: Path, query: str, limit: int = 20) -> list[dic
                         "updated_at": data.get("updated_at", 0),
                     })
             except Exception:
-                pass
+                log.debug("Skipping corrupt memory file during cross-agent search: %s", f)
     # Sort by most recently updated first
     results.sort(key=lambda r: r.get("updated_at", 0), reverse=True)
     return results[:limit]
@@ -297,7 +302,7 @@ def get_soul(data_dir: Path, agent_name: str) -> str:
         try:
             return soul_path.read_text("utf-8").strip()
         except Exception:
-            pass
+            log.warning("Failed to read soul file for %s: %s", agent_name, soul_path, exc_info=True)
     return _DEFAULT_SOUL.format(name=agent_name)
 
 
@@ -321,7 +326,7 @@ def get_notes(data_dir: Path, agent_name: str) -> str:
         try:
             return notes_path.read_text("utf-8")
         except Exception:
-            pass
+            log.warning("Failed to read notes for %s: %s", agent_name, notes_path, exc_info=True)
     return ""
 
 

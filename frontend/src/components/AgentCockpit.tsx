@@ -44,7 +44,8 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
           if ((data as Record<string, unknown>).runner === 'mcp') setRunner('mcp');
         }
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error('Failed to load agent info:', e);
         if (!cancelled) { setOutput(''); setActive(false); }
       });
     // Also fetch MCP log in parallel
@@ -53,7 +54,7 @@ function CockpitTerminal({ agent }: { agent: Agent }) {
         setMcpLog(data.entries);
         setRunner('mcp');
       }
-    }).catch(() => {});
+    }).catch((e) => console.error('Failed to load MCP log:', e));
     return () => { cancelled = true; };
   }, [agent.name]);
 
@@ -633,7 +634,8 @@ function CockpitBrowser({ agent }: { agent: Agent }) {
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error('Failed to load browser state:', e);
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
@@ -861,7 +863,7 @@ function CockpitReplay({ agent, onFileReverted }: { agent: Agent; onFileReverted
     setLoading(true);
     api.getAgentReplay(agent.name)
       .then((data) => { if (!cancelled) { setEvents((data.events || []).slice(-100)); setLoading(false); } })
-      .catch(() => { if (!cancelled) setLoading(false); });
+      .catch((e) => { console.error('Failed to load replay:', e); if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [agent.name]);
 
@@ -941,7 +943,7 @@ function CockpitReplay({ agent, onFileReverted }: { agent: Agent; onFileReverted
                   onClick={() => {
                     api.getAgentDiff(agent.name, selectedEvent.path!).then((d) => {
                       if (d?.diff) useChatStore.getState().setFileDiff(d);
-                    }).catch(() => {});
+                    }).catch((e) => console.error('Failed to load diff:', e));
                   }}
                   className="mt-2 text-[10px] px-2 py-1 rounded-md bg-primary/10 text-primary/60 hover:bg-primary/20 transition-colors"
                 >
@@ -1059,7 +1061,7 @@ export function AgentCockpit() {
       .then((data) => {
         if (!cancelled) setAgentPresence(data);
       })
-      .catch(() => { /* ignored */ });
+      .catch((e) => console.debug('Agent presence not available:', e));
     return () => { cancelled = true; };
   }, [agent, presence?.updated_at, setAgentPresence]);
 

@@ -212,7 +212,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         action: () => {
           useChatStore.getState().updateSettings({ theme: 'dark' });
           document.documentElement.setAttribute('data-theme', 'dark');
-          api.saveSettings({ theme: 'dark' }).catch(() => {});
+          api.saveSettings({ theme: 'dark' }).catch(() => toast('Theme saved locally but failed to persist', 'error'));
           onClose();
         },
       },
@@ -224,7 +224,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         action: () => {
           useChatStore.getState().updateSettings({ theme: 'cyberpunk' });
           document.documentElement.setAttribute('data-theme', 'cyberpunk');
-          api.saveSettings({ theme: 'cyberpunk' }).catch(() => {});
+          api.saveSettings({ theme: 'cyberpunk' }).catch(() => toast('Theme saved locally but failed to persist', 'error'));
           onClose();
         },
       },
@@ -236,7 +236,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         action: () => {
           useChatStore.getState().updateSettings({ theme: 'terminal' });
           document.documentElement.setAttribute('data-theme', 'terminal');
-          api.saveSettings({ theme: 'terminal' }).catch(() => {});
+          api.saveSettings({ theme: 'terminal' }).catch(() => toast('Theme saved locally but failed to persist', 'error'));
           onClose();
         },
       },
