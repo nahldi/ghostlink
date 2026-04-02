@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
-**Last updated:** 2026-03-31
-**Version:** v5.6.1
+**Last updated:** 2026-04-01
+**Version:** v5.7.0
 **Owner:** nahldi
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,9 +66,12 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v4.8.7)
+## CURRENT STATE (v5.7.0)
 
-### Recent Changes (v3.9.8 → v4.8.7)
+### Recent Changes (latest first)
+- **v5.7.0**: Ops & recovery toolkit — add `/api/health`, `/api/diagnostics`, `/api/backup`, and `/api/restore`; wire diagnostics/backup/restore into Settings; tighten updater reliability; trim back excess glass/glow styling; expand release verification.
+- **v5.6.1**: Fluidity pass — improve motion, bridge retry/rate limiting, expand frontend/backend tests, sync SDK version, and clean up backend linting.
+- **v5.6.0**: Security hardening + runtime fixes — tighten Electron isolation, fix auth detection and MCP auth gaps, harden SSRF/exec policy/runtime cleanup, and bring docs back in sync with the codebase.
 - **v4.8.7**: Maintenance release — refresh desktop toolchain to Electron 35 / electron-builder 26, clear remaining desktop audit debt, and keep the chunk-splitting frontend cleanup from the prior pass.
 - **v4.8.6**: Release job checkout fix — check out the repo in the dedicated release job before `gh run download`, so artifact collection and GitHub release creation run from a valid repository context.
 - **v4.8.5**: Final release workflow fix — force `electron-builder --publish never` in per-platform build jobs so tagged builds only upload artifacts to Actions; GitHub release publishing stays in the dedicated release job.
@@ -89,7 +92,7 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ### Numbers
 - **90+ completed features** (see FEATURES.md for full list)
-- **53 React components** (StreamingText, ThinkingParticles, Toast, UrlPreview, WorkspaceViewer, etc.)
+- **61 React components** (StreamingText, ThinkingParticles, Toast, UrlPreview, WorkspaceViewer, etc.)
 - **132+ API endpoints** (split into 13 route modules)
 - **29 MCP tools** — Chat (chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim), Memory (memory_save, memory_get, memory_list, memory_search, memory_search_all), Web (web_fetch, web_search, browser_snapshot, image_generate), AI (gemini_image, gemini_video, text_to_speech, speech_to_text, code_execute), Agent (set_thinking, sessions_list, sessions_send, delegate), Streaming (chat_stream_token)
 - **13 known AI agents** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)

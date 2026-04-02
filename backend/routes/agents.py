@@ -1004,48 +1004,58 @@ async def shutdown_server():
 @router.post("/api/heartbeat/{agent_name}")
 async def heartbeat(agent_name: str, request: Request):
     inst = deps.registry.get(agent_name)
-    if inst:
-        deps._last_heartbeats[agent_name] = time.time()
-        old_state = inst.state
-        was_triggered = getattr(inst, '_was_triggered', False)
-        if was_triggered:
-            inst.state = "thinking"
-            inst._think_ts = time.time()  # type: ignore[attr-defined]
-            inst._was_triggered = False  # type: ignore[attr-defined]
-        try:
-            body = await request.json()
-            if body.get("active"):
-                if time.time() - inst.registered_at > 5:
-                    inst.state = "thinking"
-                    inst._think_ts = time.time()  # type: ignore[attr-defined]
-            else:
-                last_think = getattr(inst, '_think_ts', 0)
-                if old_state == "thinking" and (time.time() - last_think) < 3:
-                    pass
-                elif not was_triggered:
-                    inst.state = "active"
-        except Exception:
+    if not inst:
+        return JSONResponse({"error": "not found"}, 404)
+
+    auth = request.headers.get("authorization", "")
+    token = ""
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+    elif request.headers.get("x-agent-token"):
+        token = request.headers.get("x-agent-token", "").strip()
+    if not token or not secrets.compare_digest(token, inst.token):
+        return JSONResponse({"error": "unauthorized"}, 401)
+
+    deps._last_heartbeats[agent_name] = time.time()
+    old_state = inst.state
+    was_triggered = getattr(inst, '_was_triggered', False)
+    if was_triggered:
+        inst.state = "thinking"
+        inst._think_ts = time.time()  # type: ignore[attr-defined]
+        inst._was_triggered = False  # type: ignore[attr-defined]
+    try:
+        body = await request.json()
+        if body.get("active"):
+            if time.time() - inst.registered_at > 5:
+                inst.state = "thinking"
+                inst._think_ts = time.time()  # type: ignore[attr-defined]
+        else:
             last_think = getattr(inst, '_think_ts', 0)
             if old_state == "thinking" and (time.time() - last_think) < 3:
                 pass
             elif not was_triggered:
                 inst.state = "active"
-        if inst.state != old_state:
-            from app_helpers import get_full_agent_list
-            await deps.broadcast("status", {"agents": get_full_agent_list()})
-            state_detail = "Processing requests" if inst.state == "thinking" else "Connected"
-            await set_agent_presence(
-                agent_name,
-                surface="thinking" if inst.state == "thinking" else "session",
-                status=inst.state.capitalize(),
-                detail=state_detail,
-                state=inst.state,
-            )
-        result: dict = {"ok": True, "name": inst.name}
-        if inst.is_token_expired():
-            result["token"] = inst.rotate_token()
-        return result
-    return JSONResponse({"error": "not found"}, 404)
+    except Exception:
+        last_think = getattr(inst, '_think_ts', 0)
+        if old_state == "thinking" and (time.time() - last_think) < 3:
+            pass
+        elif not was_triggered:
+            inst.state = "active"
+    if inst.state != old_state:
+        from app_helpers import get_full_agent_list
+        await deps.broadcast("status", {"agents": get_full_agent_list()})
+        state_detail = "Processing requests" if inst.state == "thinking" else "Connected"
+        await set_agent_presence(
+            agent_name,
+            surface="thinking" if inst.state == "thinking" else "session",
+            status=inst.state.capitalize(),
+            detail=state_detail,
+            state=inst.state,
+        )
+    result: dict = {"ok": True, "name": inst.name}
+    if inst.is_token_expired():
+        result["token"] = inst.rotate_token()
+    return result
 
 
 @router.post("/api/agents/{agent_name}/thinking")

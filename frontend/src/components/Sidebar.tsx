@@ -107,10 +107,8 @@ export function Sidebar() {
       {/* Context menu */}
       {contextMenu && (
         <div className="fixed inset-0 z-[60]" onClick={() => setContextMenu(null)} onKeyDown={(e) => { if (e.key === 'Escape') setContextMenu(null); }} role="presentation">
-          <div className="absolute rounded-xl p-1 min-w-[140px]" style={{
+          <div className="absolute rounded-xl p-1 min-w-[140px] glass-card" style={{
             left: contextMenu.x, top: contextMenu.y,
-            background: 'rgba(14, 14, 22, 0.98)', border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
           }}>
             <button onClick={() => { setEditingChannel(contextMenu.name); setEditName(contextMenu.name); setContextMenu(null); setExpanded(true); }}
               className="w-full text-left px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded-lg flex items-center gap-2">
@@ -130,15 +128,11 @@ export function Sidebar() {
       )}
 
       {/* Thin icon rail — always visible */}
-      <div className="sidebar-rail w-14 h-screen fixed left-0 top-0 z-30 max-lg:hidden flex flex-col items-center py-3 gap-1" style={{
-        background: '#0c0c14',
-        borderRight: '1px solid rgba(255,255,255,0.04)',
-      }}>
+      <div className="sidebar-rail w-14 h-screen fixed left-0 top-0 z-30 max-lg:hidden flex flex-col items-center py-3 gap-1 bg-surface-container-low border-r border-outline-variant/10">
         {/* Logo — toggles channel/nav panel */}
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 cursor-pointer hover:bg-white/8 transition-colors"
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 cursor-pointer hover:bg-white/8 transition-colors bg-primary/10"
           onClick={() => setExpanded(!expanded)}
           title="Channels & Navigation"
-          style={{ background: 'rgba(124, 58, 237, 0.15)' }}
         >
           <img src="/ghostlink.png" alt="GhostLink" className="w-6 h-6 object-contain" style={{ filter: 'invert(1)' }} />
         </div>
@@ -194,9 +188,7 @@ export function Sidebar() {
       {expanded && (
         <motion.div className="fixed inset-0 z-[29]" onClick={() => setExpanded(false)}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-          <motion.div className="sidebar-panel fixed left-14 top-0 h-screen w-[200px] z-[31] py-3 overflow-y-auto" style={{
-            background: '#0e0e16',
-            borderRight: '1px solid rgba(255,255,255,0.04)',
+          <motion.div className="sidebar-panel fixed left-14 top-0 h-screen w-[200px] z-[31] py-3 overflow-y-auto bg-surface-container border-r border-outline-variant/10" style={{
             boxShadow: '4px 0 16px rgba(0,0,0,0.2)',
           }} onClick={e => e.stopPropagation()}
             initial={{ x: -200, opacity: 0 }}
@@ -221,8 +213,8 @@ export function Sidebar() {
                 <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setAdding(false); }}
                   placeholder="name" autoFocus
-                  className="flex-1 bg-white/5 rounded-lg px-2 py-1.5 text-xs text-white placeholder:text-white/30 outline-none border border-white/5 focus:border-purple-500/30" />
-                <button onClick={handleCreate} className="px-2 rounded-lg bg-purple-500/20 text-purple-300 text-[10px]">+</button>
+                  className="flex-1 bg-white/5 rounded-lg px-2 py-1.5 text-xs text-white placeholder:text-white/30 outline-none border border-white/5 focus:border-primary/30" />
+                <button onClick={handleCreate} className="px-2 rounded-lg bg-primary/20 text-primary text-[10px]">+</button>
               </div>
             )}
 
@@ -233,7 +225,7 @@ export function Sidebar() {
                     <div className="flex gap-1 px-1">
                       <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleRename(ch.name); if (e.key === 'Escape') setEditingChannel(null); }}
-                        autoFocus className="flex-1 bg-white/5 rounded-lg px-2 py-1 text-xs text-white outline-none border border-purple-500/30" />
+                        autoFocus className="flex-1 bg-white/5 rounded-lg px-2 py-1 text-xs text-white outline-none border border-primary/30" />
                     </div>
                   ) : (
                     <button

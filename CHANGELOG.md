@@ -1,5 +1,18 @@
 # GhostLink Changelog
 
+## v5.7.0 — 2026-04-01
+### Ops & Recovery Toolkit, Updater Fixes, Visual Reset
+- **Health endpoint** — `/api/health` added for readiness checks and launcher polling
+- **Diagnostics endpoint** — `/api/diagnostics` reports runtime checks for Python, disk space, database presence, agents, and package availability
+- **Backup export** — `/api/backup` packages database, settings, and metadata for one-click recovery
+- **Restore workflow** — restore-from-backup endpoint and Settings UI flow added with ZIP validation, path safety checks, and pre-restore safety backup
+- **Settings UI wiring** — diagnostics, backup, and restore controls surfaced in the Settings panel
+- **Updater reliability** — async updater WSL token lookup fixed and desktop IPC/error logging tightened
+- **OneDrive-safe frontend build** — build flow adjusted for safer operation in synced Windows workspaces
+- **File watcher leak fix** — watcher cleanup corrected to avoid long-running memory growth
+- **Visual reset** — glass/glow excess stripped back in favor of cleaner minimal surfaces
+- **Ruff and test cleanup** — backend linting, frontend stability, and test reliability polish rolled into the release
+
 ## v5.6.1 — 2026-03-31
 ### Fluidity Pass, Bridge Reliability, Test Coverage
 - **Fluidity pass** — spring animations on message entrance, panels, modals, scroll-to-bottom button, agent bar chips, settings tabs, cockpit tabs, empty state cascade

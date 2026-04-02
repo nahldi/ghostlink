@@ -127,6 +127,15 @@ class ServerManager {
             electron_log_1.default.info('Server already running (pid %d)', this.process.pid);
             return { success: true, port: this.port };
         }
+        // Read user-configured port from settings (default 8300)
+        try {
+            const settings = getSettings();
+            const cfgPort = Number(settings?.port);
+            if (cfgPort && Number.isInteger(cfgPort) && cfgPort >= 1024 && cfgPort <= 65535) {
+                this.port = cfgPort;
+            }
+        }
+        catch { /* use default port */ }
         const portsToClear = [this.port, 8200, 8201];
         // Kill ALL stale GhostLink processes and free ports
         try {

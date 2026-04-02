@@ -10,15 +10,7 @@ html, body, #root {
   color: #e0dff0;
 }
 
-/* Dark scrollbar everywhere */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(167, 139, 250, 0.15) transparent;
-}
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(167, 139, 250, 0.15); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(167, 139, 250, 0.3); }
+/* Scrollbar — defined once, clean neutral */
 
 @theme {
   --color-primary: #a78bfa;
@@ -99,14 +91,12 @@ body {
   background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124, 58, 237, 0.03) 0%, transparent 70%);
 }
 
-/* ── Scrollbar ── */
-/* Firefox */
-* { scrollbar-color: #1a1a26 transparent; scrollbar-width: thin; }
-/* Chromium / Safari */
-::-webkit-scrollbar { width: 5px; }
+/* ── Scrollbar — single definition ── */
+* { scrollbar-color: rgba(255,255,255,0.08) transparent; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #1a1a26; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #222230; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
 /* ── Agent chip ── */
 
@@ -379,19 +369,18 @@ input:focus, select:focus, textarea:focus {
 
 .hljs { background: transparent !important; }
 
-/* ── Floating input ── */
+/* ── Floating input — subtle blur, not heavy ── */
 .input-float {
-  background: rgba(17, 17, 25, 0.9);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(17, 17, 25, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-top: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-/* ── Channel pill active ── */
+/* ── Channel pill active — clean, no glow ── */
 .channel-active {
   background: rgba(167, 139, 250, 0.1);
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  box-shadow: 0 0 12px rgba(167, 139, 250, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.15);
 }
 
 /* ── Mobile safe areas ── */
@@ -445,7 +434,6 @@ input:focus, select:focus, textarea:focus {
 }
 .setting-input:focus {
   border-color: rgba(167, 139, 250, 0.25);
-  box-shadow: 0 0 12px rgba(167, 139, 250, 0.06);
 }
 
 /* ── Settings section card ── */
@@ -623,16 +611,16 @@ input:focus, select:focus, textarea:focus {
 [data-theme="cyberpunk"] .glass-strong { background: rgba(14,0,22,0.95) !important; border-color: rgba(0,255,255,0.08) !important; }
 [data-theme="cyberpunk"] .input-float { background: rgba(20,0,32,0.9) !important; border-color: rgba(255,0,255,0.08) !important; }
 [data-theme="cyberpunk"] .sidebar-rail { background: #0d0018 !important; border-color: rgba(255,0,255,0.06) !important; }
-[data-theme="cyberpunk"] .channel-active { background: rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.3); box-shadow: 0 0 12px rgba(255,0,255,0.15); }
+[data-theme="cyberpunk"] .channel-active { background: rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.2); }
 [data-theme="cyberpunk"] .prose code:not(pre code) { background: rgba(255,0,255,0.12); color: #ff80ff; border: 1px solid rgba(255,0,255,0.2); }
 /* Sharp edges for cyberpunk */
 [data-theme="cyberpunk"] .rounded-2xl { border-radius: 4px !important; }
 [data-theme="cyberpunk"] .rounded-xl { border-radius: 3px !important; }
 [data-theme="cyberpunk"] .rounded-lg { border-radius: 2px !important; }
-[data-theme="cyberpunk"] .agent-chip { border: 1px solid rgba(255,0,255,0.15) !important; box-shadow: 0 0 8px rgba(255,0,255,0.08); }
+[data-theme="cyberpunk"] .agent-chip { border: 1px solid rgba(255,0,255,0.15) !important; }
 [data-theme="cyberpunk"] .msg-enter { animation: msg-slide-in 0.15s ease-out both; }
 [data-theme="cyberpunk"] .setting-input { border-color: rgba(255,0,255,0.1); }
-[data-theme="cyberpunk"] .setting-input:focus { border-color: rgba(255,0,255,0.4); box-shadow: 0 0 16px rgba(255,0,255,0.1); }
+[data-theme="cyberpunk"] .setting-input:focus { border-color: rgba(255,0,255,0.4); }
 [data-theme="cyberpunk"] ::-webkit-scrollbar-thumb { background: rgba(255,0,255,0.2); }
 
 /* ── Terminal Green ── full monospace, CRT scanlines, blinking cursor feel */
@@ -703,7 +691,7 @@ input:focus, select:focus, textarea:focus {
 [data-theme="ocean"] .glass-strong { background: rgba(5,18,32,0.95) !important; border-color: rgba(34,211,238,0.08) !important; }
 [data-theme="ocean"] .input-float { background: rgba(8,24,40,0.9) !important; }
 [data-theme="ocean"] .sidebar-rail { background: #041220 !important; }
-[data-theme="ocean"] .channel-active { background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.25); box-shadow: 0 0 16px rgba(34,211,238,0.08); }
+[data-theme="ocean"] .channel-active { background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.2); }
 /* Soft, rounded — underwater feel */
 [data-theme="ocean"] .rounded-2xl { border-radius: 20px !important; }
 [data-theme="ocean"] .rounded-xl { border-radius: 16px !important; }
@@ -740,12 +728,12 @@ input:focus, select:focus, textarea:focus {
 [data-theme="sunset"] .glass-strong { background: rgba(22,12,6,0.95) !important; }
 [data-theme="sunset"] .input-float { background: rgba(30,16,10,0.9) !important; }
 [data-theme="sunset"] .sidebar-rail { background: #150b06 !important; }
-[data-theme="sunset"] .channel-active { background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.25); box-shadow: 0 0 12px rgba(249,115,22,0.08); }
+[data-theme="sunset"] .channel-active { background: rgba(249,115,22,0.1); border-color: rgba(249,115,22,0.2); }
 /* Warm, cozy — generous padding feel */
 [data-theme="sunset"] .prose code:not(pre code) { background: rgba(249,115,22,0.1); color: #fdba74; }
 [data-theme="sunset"] .agent-chip { border-color: rgba(249,115,22,0.12) !important; }
 [data-theme="sunset"] .setting-input { border-color: rgba(249,115,22,0.08); }
-[data-theme="sunset"] .setting-input:focus { border-color: rgba(249,115,22,0.35); box-shadow: 0 0 12px rgba(249,115,22,0.08); }
+[data-theme="sunset"] .setting-input:focus { border-color: rgba(249,115,22,0.35); }
 [data-theme="sunset"] ::-webkit-scrollbar-thumb { background: rgba(249,115,22,0.15); }
 
 /* ── Midnight Purple ── */
@@ -774,13 +762,10 @@ input:focus, select:focus, textarea:focus {
 [data-theme="midnight"] .glass-strong { background: rgba(10,8,22,0.95) !important; }
 [data-theme="midnight"] .input-float { background: rgba(14,12,30,0.9) !important; }
 [data-theme="midnight"] .sidebar-rail { background: #0a0816 !important; }
-[data-theme="midnight"] .channel-active { background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.25); box-shadow: 0 0 16px rgba(129,140,248,0.1); }
-/* Dreamy, soft glow — everything has a subtle indigo haze */
+[data-theme="midnight"] .channel-active { background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.2); }
 [data-theme="midnight"] .prose code:not(pre code) { background: rgba(129,140,248,0.1); color: #a5b4fc; }
-[data-theme="midnight"] .agent-chip { box-shadow: 0 0 12px rgba(129,140,248,0.06); }
-[data-theme="midnight"] .bubble-glow:hover { box-shadow: 0 0 28px rgba(129,140,248,0.12); }
 [data-theme="midnight"] .setting-input { border-color: rgba(129,140,248,0.08); }
-[data-theme="midnight"] .setting-input:focus { border-color: rgba(129,140,248,0.35); box-shadow: 0 0 16px rgba(129,140,248,0.1); }
+[data-theme="midnight"] .setting-input:focus { border-color: rgba(129,140,248,0.35); }
 [data-theme="midnight"] ::-webkit-scrollbar-thumb { background: rgba(129,140,248,0.12); }
 
 /* ── Rose Gold ── */
@@ -809,13 +794,13 @@ input:focus, select:focus, textarea:focus {
 [data-theme="rosegold"] .glass-strong { background: rgba(22,10,14,0.95) !important; }
 [data-theme="rosegold"] .input-float { background: rgba(30,14,18,0.9) !important; }
 [data-theme="rosegold"] .sidebar-rail { background: #160a0e !important; }
-[data-theme="rosegold"] .channel-active { background: rgba(244,63,94,0.1); border-color: rgba(244,63,94,0.25); box-shadow: 0 0 12px rgba(244,63,94,0.08); }
+[data-theme="rosegold"] .channel-active { background: rgba(244,63,94,0.1); border-color: rgba(244,63,94,0.2); }
 /* Elegant, luxurious — pill-shaped buttons, extra rounded */
 [data-theme="rosegold"] .rounded-2xl { border-radius: 24px !important; }
 [data-theme="rosegold"] .agent-chip { border-radius: 24px !important; }
 [data-theme="rosegold"] .prose code:not(pre code) { background: rgba(244,63,94,0.1); color: #fda4af; }
 [data-theme="rosegold"] .setting-input { border-color: rgba(244,63,94,0.08); border-radius: 14px; }
-[data-theme="rosegold"] .setting-input:focus { border-color: rgba(244,63,94,0.3); box-shadow: 0 0 12px rgba(244,63,94,0.08); }
+[data-theme="rosegold"] .setting-input:focus { border-color: rgba(244,63,94,0.3); }
 [data-theme="rosegold"] ::-webkit-scrollbar-thumb { background: rgba(244,63,94,0.15); }
 
 /* ── Arctic ── */
@@ -849,33 +834,7 @@ input:focus, select:focus, textarea:focus {
    PREMIUM POLISH — Animations, transitions, micro-interactions
    ═══════════════════════════════════════════════════════════════════ */
 
-/* Liquid glass panel effect */
-.liquid-glass {
-  background: rgba(255, 255, 255, 0.02);
-  background-blend-mode: luminosity;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
-  position: relative;
-  overflow: hidden;
-}
-
-.liquid-glass::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 30%,
-    rgba(255,255,255,0) 50%, rgba(255,255,255,0) 70%,
-    rgba(255,255,255,0.04) 85%, rgba(255,255,255,0.12) 100%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
+/* liquid-glass — see clean definition above, no duplicate */
 
 /* Smooth page transitions */
 @keyframes fade-in-up {
@@ -888,10 +847,7 @@ input:focus, select:focus, textarea:focus {
   to   { opacity: 1; transform: scale(1); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
+/* shimmer — see definition above */
 
 /* Panel enter animation */
 .panel-enter {
@@ -903,13 +859,12 @@ input:focus, select:focus, textarea:focus {
   animation: fade-in-scale 0.2s ease-out both;
 }
 
-/* Card hover lift */
+/* Card hover — clean, no lift/glow */
 .card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.15s ease;
 }
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2), 0 0 20px rgba(167,139,250,0.05);
+  background: rgba(255,255,255,0.02);
 }
 
 /* Button press effect */
@@ -934,10 +889,7 @@ input:focus, select:focus, textarea:focus {
   border-radius: 6px;
 }
 
-/* Glow ring on focus */
-.focus-glow:focus-within {
-  box-shadow: 0 0 0 2px rgba(167,139,250,0.15), 0 0 20px rgba(167,139,250,0.08);
-}
+/* focus-glow — see clean definition above */
 
 /* Smooth text reveal */
 @keyframes text-reveal {
@@ -949,13 +901,12 @@ input:focus, select:focus, textarea:focus {
   animation: text-reveal 0.5s ease-out both;
 }
 
-/* Agent chip hover glow */
+/* Agent chip hover — subtle bg only */
 .agent-chip-glow {
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  transition: background 0.15s ease;
 }
 .agent-chip-glow:hover {
-  box-shadow: 0 0 15px var(--agent-color, rgba(167,139,250,0.3));
-  transform: translateY(-1px);
+  background: rgba(255,255,255,0.04);
 }
 
 /* Status dot pulse */
@@ -968,21 +919,7 @@ input:focus, select:focus, textarea:focus {
   animation: status-pulse 2s ease-in-out infinite;
 }
 
-/* Smooth scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.08);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.15);
-}
+/* Scrollbar — see single definition above */
 
 /* Toast notification animation */
 @keyframes toast-in {
@@ -994,28 +931,15 @@ input:focus, select:focus, textarea:focus {
   animation: toast-in 0.3s ease-out both;
 }
 
-/* Typing indicator dots */
-@keyframes typing-bounce {
-  0%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-4px); }
-}
+/* typing-bounce — see definition below */
 
 /* ── v2.4.0: Premium micro-interactions ─────────────────────────── */
 
-.hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.hover-glow {
-  transition: box-shadow 0.3s ease;
-}
-.hover-glow:hover {
-  box-shadow: 0 0 20px rgba(var(--accent-rgb, 168, 85, 247), 0.3);
-}
+/* hover-lift / hover-glow — stripped in visual reset, kept as no-ops for any remaining references */
+.hover-lift { transition: background 0.15s ease; }
+.hover-lift:hover { background: rgba(255,255,255,0.02); }
+.hover-glow { transition: background 0.15s ease; }
+.hover-glow:hover { background: rgba(255,255,255,0.02); }
 
 .press-scale {
   transition: transform 0.1s ease;
@@ -1024,21 +948,7 @@ input:focus, select:focus, textarea:focus {
   transform: scale(0.97);
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary, #333);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted, #888);
-}
+/* Scrollbar — see single definition above */
 
 /* Focus ring animation */
 *:focus-visible {

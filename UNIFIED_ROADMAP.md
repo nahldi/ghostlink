@@ -3,8 +3,8 @@
 > Single source of truth for all development. Supersedes GAB_ROADMAP, GAF_ROADMAP, V2.5_BUGFIX_ROADMAP, ROADMAP.md.
 > **For any AI picking this up: follow the phases IN ORDER within each track. Each item has acceptance criteria, files to change, smoke tests, and fail tests.**
 
-**Last updated:** 2026-03-31
-**Current version:** v5.6.1
+**Last updated:** 2026-04-01
+**Current version:** v5.7.0
 **Owner:** nahldi
 
 ---
