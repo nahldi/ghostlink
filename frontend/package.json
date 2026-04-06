@@ -8,8 +8,8 @@
     "build": "rm -rf dist && tsc -b && vite build",
     "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "preview": "vite preview",
-    "test": "node ./node_modules/vitest/vitest.mjs run --pool=forks --maxWorkers=1",
-    "test:watch": "node ./node_modules/vitest/vitest.mjs --pool=forks --maxWorkers=1"
+    "test": "node ./node_modules/vitest/vitest.mjs run --pool=forks --maxWorkers=1 --no-isolate",
+    "test:watch": "node ./node_modules/vitest/vitest.mjs --pool=forks --maxWorkers=1 --no-isolate"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",

@@ -35,6 +35,7 @@ memory/
 .DS_Store
 *.log
 .openclaw/
+.playwright-mcp/
 
 # Local screenshots/artifacts (personal, never distribute)
 ghostlink-*.png
