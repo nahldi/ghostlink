@@ -15,7 +15,7 @@
 - **217 API/websocket endpoints** across 14 route modules
 - **29 MCP tools** (chat, memory, web, AI, agent, streaming)
 - **13 AI providers** (Anthropic, OpenAI, Google, xAI, Groq, Together, HuggingFace, Ollama, Mistral, OpenRouter, DeepSeek, Perplexity, Cohere)
-- **13 supported agent CLIs** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)
+- **8 integrated agent CLIs** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Ollama) + 5 experimental (Pi, Cursor, Cody, Continue, OpenCode — launcher-listed but no MCP integration)
 - **66 React component files** with 9 visual themes
 - **220 automated tests** (171 backend + 49 frontend)
 - **Desktop app** (Electron) with auto-update, system tray, setup wizard

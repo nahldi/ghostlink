@@ -12,7 +12,7 @@
 - **217 API/websocket endpoints**
 - **29 MCP tools**
 - **13 API providers**
-- **13 supported CLI agents**
+- **8 integrated CLI agents** + 5 experimental (launcher-listed but not MCP-connected)
 - **5 channel bridges**
 - **66 React component files**
 - **28 built-in skills**
@@ -32,7 +32,8 @@
 ## Agent Orchestration
 
 - Spawn, stop, pause, resume, and configure agents from the UI
-- 13 supported CLI agents: Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama
+- 8 integrated CLI agents: Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Ollama
+- 5 experimental (launcher-listed, no MCP integration yet): Pi, Cursor, Cody, Continue, OpenCode
 - Agent hierarchy and response modes
 - `@mention`, `@all`, smart auto-routing, handoffs, consensus, and debates
 - Jobs, schedules, rules, progress cards, approval cards, and decision cards

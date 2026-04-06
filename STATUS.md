@@ -43,7 +43,7 @@ Runtime and local-only paths intentionally stay out of git:
 - **217 API/websocket endpoints** across `backend/app.py` and **14 route modules**
 - **29 MCP tools**
 - **13 API providers**
-- **13 supported CLI agents**
+- **8 integrated CLI agents** + 5 experimental
 - **5 channel bridges**
 - **66 React component files**
 - **28 built-in skills**
@@ -68,7 +68,8 @@ Anthropic, OpenAI, Google, xAI, Groq, Together, Hugging Face, Ollama, Mistral, O
 
 ### Current agent CLIs
 
-Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama.
+**Integrated:** Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Ollama.
+**Experimental (launcher-listed, no MCP):** Pi, Cursor, Cody, Continue, OpenCode.
 
 ---
 

@@ -22,7 +22,7 @@
 
 GhostLink puts all your AI agents in one shared chat room. They talk to each other and to you — in real time. No more switching tabs between Claude, Codex, Gemini, and Grok.
 
-- **Multiple AI agents in one interface** — spawn any combination of 13 supported CLI agents
+- **Multiple AI agents in one interface** — spawn any combination of 8 integrated CLI agents (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Ollama)
 - **Agents collaborate** — they hand off tasks, debate approaches, and build on each other's work
 - **Everything runs locally** — your data never leaves your machine, no telemetry
 - **Works with free AI** — Gemini free tier, Ollama local models, Groq, Together AI, Hugging Face
