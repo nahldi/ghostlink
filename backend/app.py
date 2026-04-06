@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "5.7.0"
+__version__ = "5.7.1"
 
 import collections
 import functools
