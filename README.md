@@ -31,7 +31,7 @@ GhostLink puts all your AI agents in one shared chat room. They talk to each oth
 - **MCP server** — expose 29 tools to any MCP client (Claude Code, Codex, Cursor, etc.)
 - **Headless daemon** — run as a background service without a desktop (`ghostlink-server --daemon`)
 - **Always-on mode** — agents keep working in the system tray even when the GUI is closed
-- **14 built-in personas** — code reviewer, architect, security auditor, mentor, and more
+- **Persona marketplace + presets** — 14 built-in personas plus custom persona support
 
 ---
 
@@ -257,8 +257,8 @@ Go to Settings > Bridges to connect Discord, Telegram, Slack, or WhatsApp. Enter
 Browser (React 19 + TypeScript + Tailwind 4 + Zustand)
     ↕ WebSocket + REST
 FastAPI Server (:8300) — SQLite + FTS5
-    ↕ MCP (HTTP :8200 / SSE :8201)
-Agent CLIs (tmux sessions via wrapper.py)
+    ↕ MCP (streamable HTTP :8200 / SSE :8201)
+Hybrid agent runtimes (tmux + MCP-native wrappers)
     ↕ Channel Bridges (Discord, Telegram, Slack, WhatsApp, Webhook)
 ```
 
@@ -266,9 +266,9 @@ Agent CLIs (tmux sessions via wrapper.py)
 |-------|-------|
 | Backend | Python 3.11+, FastAPI, aiosqlite, uvicorn, MCP SDK |
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 4, Zustand |
-| Desktop | Electron 33, electron-builder, electron-updater |
+| Desktop | Electron 35, electron-builder 26, electron-updater |
 | Database | SQLite with FTS5 full-text search |
-| Communication | MCP over HTTP + SSE, WebSocket for real-time UI |
+| Communication | MCP over streamable HTTP + SSE, WebSocket for real-time UI |
 | Bridges | Discord API, Telegram Bot API, Slack Webhooks, WhatsApp Cloud API |
 | CI/CD | GitHub Actions (builds Windows, Linux, macOS on version tags) |
 
@@ -276,8 +276,8 @@ Agent CLIs (tmux sessions via wrapper.py)
 
 | | Count |
 |---|---|
-| React components | 61 |
-| API endpoints | 190+ |
+| React component files | 66 |
+| API/websocket endpoints | 217 |
 | MCP tools | 29 |
 | Built-in skills | 28 |
 | AI providers | 13 |
@@ -296,7 +296,7 @@ Agent CLIs (tmux sessions via wrapper.py)
 5. Commit: `git commit -m "feat: description"`
 6. Push and open a PR
 
-See [ROADMAP.md](ROADMAP.md) for planned features and [BUGS.md](BUGS.md) for known issues.
+See [UNIFIED_ROADMAP.md](UNIFIED_ROADMAP.md) for the phased roadmap and [BUGS.md](BUGS.md) for active risks and known gaps.
 
 ---
 

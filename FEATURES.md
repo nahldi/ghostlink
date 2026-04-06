@@ -1,200 +1,177 @@
 # GhostLink — Feature Reference
 
-> Multi-agent AI chat orchestrator. One hub to spawn, control, and observe every AI CLI agent you run.
+**Last updated:** 2026-04-06  
+**Version:** v5.7.2
+
+> This file lists features that are actually shipped in the current codebase. Planned work belongs in `UNIFIED_ROADMAP.md`, not here.
 
 ---
 
-## COMPLETED FEATURES
+## Current Verified Counts
 
-### Core Chat
-- [x] **Real-time WebSocket** — messages, typing indicators, agent status, reactions, channel updates
-- [x] **Message animations** — CSS slideIn keyframe for new messages
-- [x] **Relative timestamps** — timeago.ts ("Just now", "2m ago", "1h ago")
-- [x] **Notification sounds** — per-agent sound assignment, SoundManager with play/mute/volume
-- [x] **Emoji reactions** — 6-emoji picker, toggle per user, stored in DB, broadcast via WebSocket
-- [x] **@all agents** — mention @all to wake every connected agent
-- [x] **23 slash commands** — /status, /clear, /export, /help, /focus, /theme, /mute, /unmute, /agents, /ping, /stats, /role, /consensus, /debate, /spawn, /kill, /pinned, /bookmarks, /jobs, /rules, /settings, /debug, /notify
-- [x] **Message editing** — double-click to edit, PATCH endpoint, broadcast updates
-- [x] **Message bookmarking** — star icon, /bookmarks command
-- [x] **Collapsible long messages** — auto-collapse at 600 chars with expand toggle
-- [x] **Code blocks with line numbers** — CodeBlock.tsx with syntax highlighting
-- [x] **Command history** — Up/Down arrows in input to recall previous messages (localStorage)
-- [x] **Message search** — FTS5 full-text search index with LIKE fallback
-- [x] **Connection status banners** — reconnecting/disconnected state with auto-retry
-
-### Agent Intelligence
-- [x] **Progress cards** — chat_progress MCP tool, live-updating step list with progress bar
-- [x] **Agent handoff cards** — HandoffCard.tsx detects @agent in messages
-- [x] **Context inheritance** — reply_to field on messages
-- [x] **Agent hierarchy** — manager/worker/peer roles via API
-- [x] **Approval gates** — chat_propose_job MCP tool, user approves/rejects
-- [x] **Pause/Resume agents** — POST /api/agents/{name}/pause and resume
-- [x] **Scheduled tasks** — ScheduleStore with cron expression parsing, background checker every 60s, CRUD API
-- [x] **Approval prompt interception** — detects CLI permission prompts in tmux, shows Allow/Deny cards in chat, injects response back to terminal
-- [x] **Smart context compression** — compresses old messages into summaries for token efficiency when agents read 30+ messages
-- [x] **Agent response modes** — per-agent: Only @mentioned, Always respond, Listen & decide, Silent observer
-- [x] **Agent presets** — 6 one-click presets: Code Reviewer, PM, DevOps, Creative Writer, Research Analyst, Test Engineer
-- [x] **Auto-route toggle** — settings toggle: agents receive ALL messages vs only @mentioned
-- [x] **Agent feedback** — thumbs up/down on agent messages, stored in agent memory
-- [x] **Voice input** — push-to-talk via Web Speech API, transcribes to message input
-- [x] **Share conversations** — export as self-contained styled HTML page
-- [x] **API rate limiting** — 120 req/min per IP on all /api/ endpoints
-- [x] **Token expiration** — agent tokens auto-rotate on heartbeat (1-hour TTL)
-- [x] **Skill safety scanning** — content validation blocks dangerous patterns (eval, exec, shell injection)
-- [x] **ARIA accessibility** — role/aria-label on main UI regions, reduced motion support
-- [x] **Config schema validation** — helpful errors on missing/malformed config.toml sections
-
-### Observability
-- [x] **Activity timeline** — GET /api/activity, real-time feed via WebSocket
-- [x] **Agent cost tracker** — token estimation, per-agent per-session tracking
-- [x] **Dashboard analytics** — GET /api/dashboard with message stats, hourly counts, agent status, token usage, estimated cost, uptime
-
-### Power User Features
-- [x] **Command palette Ctrl+K** — SearchModal.tsx with /, @, # modes
-- [x] **9 chat themes** — dark, light, cyberpunk, terminal, ocean, sunset, midnight, rosegold, arctic
-- [x] **Export system** — markdown, JSON, HTML formats
-- [x] **Keyboard shortcuts** — Ctrl+K, Ctrl+/, Ctrl+N, Ctrl+1-9, Alt+Up/Down, Escape, Ctrl+Shift+M
-- [x] **Desktop notifications + quiet hours** — Browser Notification API with configurable quiet hours
-- [x] **Conversation starters** — clickable suggestion chips in empty channels
-- [x] **Drag & drop files** — drag images into chat to upload
-- [x] **Rich URL previews** — OpenGraph cards with title, description, image, site name
-- [x] **Generative UI cards** — agents render tables, lists, key-value pairs, metrics, buttons, code blocks via metadata
-- [x] **Session snapshots** — export/import full session state as JSON
-- [x] **Message templates** — save/reuse frequently used prompts
-- [x] **Agent DM channels** — deterministic DM channels between agent pairs
-- [x] **Onboarding tour** — 6-step interactive walkthrough for new users
-
-### Desktop App
-- [x] **Electron desktop app with launcher** — single .exe, launcher + chat window
-- [x] **First-run setup wizard** — 6-screen guided setup
-- [x] **CLI auth detection** — Claude, Codex, Gemini, GitHub auth status
-- [x] **WSL-aware server management** — path translation, WSL shell commands
-- [x] **OneDrive path detection** — copies to /tmp for WSL compatibility
-- [x] **Auto-venv creation** — creates venv and installs deps on first run
-- [x] **System tray** — context menu with show/start/stop/quit
-- [x] **Auto-update** — electron-updater checks GitHub Releases, download + restart
-- [x] **Windows .exe installer** — NSIS with desktop shortcut
-
-### Agent Skills System
-- [x] **Skills registry** — 16 built-in skills cataloged with metadata
-- [x] **Per-agent skill enable/disable** — toggle in Agent Info Panel
-- [x] **Skills browser UI** — searchable, categorized skill list
-- [x] **Agent memory system** — persistent per-agent JSON storage
-- [x] **Agent SOUL identity** — personality prompts per agent
-- [x] **Agent notes scratch pad** — free-form notes per agent
-- [x] **Agent config** — per-agent model, temperature, system prompt
-
-### Channel Bridges (v1.9.0)
-- [x] **Discord bridge** — bidirectional message sync via bot token, message polling, formatted output
-- [x] **Telegram bridge** — Bot API long-polling, Markdown formatting, group/DM support
-- [x] **Slack bridge** — incoming webhook with custom username and emoji
-- [x] **WhatsApp bridge** — Cloud API (Meta Business) integration
-- [x] **Generic webhook bridge** — inbound/outbound with HMAC-SHA256 signing
-- [x] **Bridge management UI** — Settings > Bridges tab with token input, channel mapping, on/off toggles
-
-### Streaming & Observability (v1.7.0–v1.9.0)
-- [x] **Streaming thinking bubbles** — live agent reasoning visible in chat during processing
-- [x] **Server log viewer** — real-time backend logs in Settings with level filtering
-- [x] **Server config viewer** — ports, paths, routing mode, uptime at a glance
-- [x] **Provider API key verification** — tests key against provider API before saving
-
-### Settings & Configuration (v1.8.0)
-- [x] **Persistent agent editor** — edit label, workspace, CLI args, and color for saved agents
-- [x] **17 AI providers** — Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Perplexity, Cohere, OpenRouter, Groq, Together, HuggingFace, Ollama, Qwen, Fireworks, StepFun, MiniMax
-- [x] **Capability-based provider routing** — auto-selects best provider per capability
-- [x] **Free tier detection** — highlights free providers (Groq, Together, HuggingFace, Ollama)
-
-### Additional
-- [x] **Cloudflare tunnel** — one-click remote access
-- [x] **Server shutdown endpoint** — graceful agent termination
-- [x] **13 supported CLI agents** — Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama
-- [x] **Brand-accurate SVG icons** — per-provider icons and colors
-- [x] **Agent thinking glow** — spinning border animation while agent works
-- [x] **Webhook integration** — CRUD for webhook endpoints
-- [x] **Mobile responsive** — dvh units, ErrorBoundary, inline loading
-
-### Agent Intelligence
-- [x] **Consensus mode** — /consensus asks all agents the same question via @all
-- [x] **Agent debates** — /debate agent1 agent2 topic, structured FOR/AGAINST prompts
-- [x] **Smart auto-routing** — keyword-based message classification routes to best-fit agent (none/all/smart modes)
-
-### Observability
-- [x] **Terminal peek** — live view of agent tmux pane output with auto-scroll
-- [x] **File change feed** — real-time file change monitoring via plugin, tracks creates/modifies/deletes
-
-### Power User
-- [x] **Split view** — two channels side by side with divider
-- [x] **Session replay** — playback stored messages with original timing, speed controls
-- [x] **Plugin system** — drop-in Python modules in plugins/ directory, auto-discovered and loaded on startup
-
-### v3.x Additions
-- [x] **StreamingText** — word-by-word reveal animation for new agent messages (15ms/word)
-- [x] **ThinkingParticles** — SVG orbiting particles around agent chip during thinking
-- [x] **Toast stacking** — spring-animated, swipe-to-dismiss, max 5 visible
-- [x] **Mobile long-press** — 500ms hold for action menu on messages
-- [x] **Mobile sidebar gestures** — swipe-from-edge to open/close
-- [x] **Route split** — 3400→612 line app.py, 13 route modules
-- [x] **Integration tests** — 56 tests across core, integration, modules
-- [x] **DB recovery** — auto-restores from .bak on corrupt/empty SQLite files
-- [x] **Deque log rotation** — O(1) log management with maxlen
-- [x] **Memory cache TTL** — 5-minute TTL on agent memory cache
-
-### Desktop
-- [x] **Windows NSIS installer** — one-click with custom install directory
-- [x] **macOS .dmg installer** — drag to Applications
-- [x] **Linux AppImage + .deb** — universal and Debian packages
-- [x] **Native Windows Python support** — no WSL required when Python is installed natively
-- [x] **Auto-updates** — electron-updater with latest.yml from GitHub Releases
-- [x] **System tray** — quick actions, server control
-
-### v5.x — Multi-Agent Runtime & UX
-- [x] **WSL agent detection** — full wsl.exe path + `-e` flag for reliable CLI detection from packaged app
-- [x] **All 13 agents in launcher** — every supported CLI shown with install/connect/reconnect status
-- [x] **Free/Paid pricing badges** — Paid, Free Tier, Free + Setup, Local labels per agent
-- [x] **Experience mode picker** — Beginner/Standard/Advanced in wizard and settings
-- [x] **Honest auth detection** — `codex login status`, credential file checks, correct CLI commands
-- [x] **Reconnect button** — one-click re-auth for agents with stale tokens
-- [x] **Multi-agent spawn** — Claude, Codex, Gemini all spawn and respond via API
-- [x] **Stale session auto-cleanup** — old tmux sessions killed on server start
-- [x] **Spawn race fix** — registration check prioritized over process exit
-- [x] **OneDrive workspace warning** — wizard + spawn warn about WSL/OneDrive path issues
-- [x] **Shared auth safety** — warns before spawning agent if another instance uses shared auth
-- [x] **Spawn warnings in UI** — backend warnings surface as toast in Add Agent modal
-- [x] **PATH expansion** — backend includes `~/.local/bin`, `~/.npm-global/bin` for CLI resolution
-- [x] **tmux env export** — critical vars exported inline for npm-based CLIs
-
-### v5.7.x — Ops, Reliability, Performance
-- [x] **Health endpoint** — `/api/health` for readiness checks and launcher polling
-- [x] **Diagnostics endpoint** — runtime checks: Python, disk, database, agents, ports, deps
-- [x] **Backup/restore** — one-click ZIP backup + restore with pre-restore safety snapshot
-- [x] **Heartbeat auth hardening** — `secrets.compare_digest` token validation, 4 regression tests
-- [x] **Error visibility** — 22 silent error catches replaced with proper logging/toasts
-- [x] **Memory leak caps** — MCP logs, file diff cache, agent state all bounded with cleanup on deregister
-- [x] **Batch message deletion** — single SQL `DELETE WHERE id IN (...)` instead of per-ID loop
-- [x] **Export pagination** — 1000-row cap on `/api/export` and `/api/share`
-- [x] **Token streaming perf** — `appendToMessage` no longer remaps entire array per token
-- [x] **Reconnect throttling** — active channel first, 3 agents at a time, skip offline
-- [x] **Settings unification** — desktop/backend settings synced on server start
-- [x] **Launcher hardening** — double health verification, atomic wizard→launcher transition
-- [x] **Component architecture** — SettingsPanel 2023→1300, ChatMessage 625→333, MessageInput 1103→825 LOC
-- [x] **220 automated tests** — 171 backend + 49 frontend
-
-### Skills
-- [x] **Skills marketplace** — browse, install, create, export/import custom skills
-- [x] **Custom skill creator** — API with name, description, category, implementation type
-- [x] **28 built-in skills** — code review, debugging, testing, documentation, etc.
+- **217 API/websocket endpoints**
+- **29 MCP tools**
+- **13 API providers**
+- **13 supported CLI agents**
+- **5 channel bridges**
+- **66 React component files**
+- **28 built-in skills**
+- **220 automated tests** in the latest verified release cycle
 
 ---
 
-## ARCHITECTURE
+## Core Product
 
-### Ports
-- 8300: HTTP/WebSocket (configurable in config.toml)
-- 8200: MCP HTTP (configurable)
-- 8201: MCP SSE (configurable)
+- Real-time chat with WebSocket updates, typing indicators, reactions, bookmarks, and search
+- Multi-channel workspace with channel summaries, DMs, split view, and replay support
+- Message editing, export, share, snapshots, templates, and URL previews
+- Command palette, keyboard shortcuts, onboarding tour, and help panel
 
-### MCP Tools (29 shipped)
-chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_get, memory_list, memory_search, memory_search_all, web_fetch, web_search, browser_snapshot, image_generate, gemini_image, gemini_video, text_to_speech, speech_to_text, code_execute, set_thinking, sessions_list, sessions_send, delegate, chat_stream_token
+---
 
-### Components (61)
-ActivityTimeline, AddAgentModal, AgentBar, AgentIcon, AgentInfoPanel, AgentMiniCard, AgentStatusPill, ApprovalCard, BulkDeleteBar, ChannelSummary, ChannelTabs, ChatMessage, CodeBlock, CommandBar, ConnectionBanner, ConsensusCard, DecisionCard, EmptyState, GenerativeCard, HandoffCard, HelpPanel, JobProposal, JobsPanel, KeyboardShortcutsModal, MessageInput, MobileHeader, MobileSidebar, MobilePanel, OnboardingTour, ProgressCard, RemoteSession, ReplayViewer, RulesPanel, ScrollArrow, SearchModal, SessionBar, SessionLauncher, SettingsPanel, Sidebar, Skeleton, SplitView, StatsPanel, StreamingText, TerminalPeek, ThinkingParticles, Toast, TypingIndicator, UrlPreview
+## Agent Orchestration
+
+- Spawn, stop, pause, resume, and configure agents from the UI
+- 13 supported CLI agents: Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama
+- Agent hierarchy and response modes
+- `@mention`, `@all`, smart auto-routing, handoffs, consensus, and debates
+- Jobs, schedules, rules, progress cards, approval cards, and decision cards
+- Persistent agent settings including label, color, workspace, args, and model
+- Agent memory, SOUL identity, notes, and skills enable/disable
+
+---
+
+## MCP and Runtime
+
+- 29 built-in MCP tools across chat, memory, web, AI/media, agent control, and streaming
+- MCP exposed over:
+  - streamable HTTP on `:8200`
+  - SSE on `:8201`
+- Hybrid runtime model with tmux-backed wrappers and MCP-native runner support
+- Approval interception and permission preset support
+- Terminal peek and workspace/cockpit visibility
+
+Current shipped MCP tools:
+
+- Chat: `chat_send`, `chat_read`, `chat_join`, `chat_who`, `chat_channels`, `chat_rules`, `chat_progress`, `chat_propose_job`, `chat_react`, `chat_claim`
+- Memory: `memory_save`, `memory_get`, `memory_list`, `memory_search`, `memory_search_all`
+- Web: `web_fetch`, `web_search`, `browser_snapshot`, `image_generate`
+- AI/media: `gemini_image`, `gemini_video`, `text_to_speech`, `speech_to_text`, `code_execute`
+- Agent/runtime: `set_thinking`, `sessions_list`, `sessions_send`, `delegate`
+- Streaming: `chat_stream_token`
+
+---
+
+## Providers and Models
+
+Current API providers:
+
+- Anthropic
+- OpenAI
+- Google
+- xAI
+- Groq
+- Together
+- Hugging Face
+- Ollama
+- Mistral
+- OpenRouter
+- DeepSeek
+- Perplexity
+- Cohere
+
+Provider/runtime features:
+
+- Capability-based provider resolution
+- Free-tier-aware provider labeling
+- Provider API key verification on save
+- Model failover behavior
+- Local provider support through Ollama
+
+---
+
+## Desktop and Install Experience
+
+- Electron desktop app with launcher and setup wizard
+- Windows `.exe`, Linux `.AppImage` and `.deb`, macOS `.dmg`
+- Auth detection and reconnect flows for major agent CLIs
+- WSL-aware startup, OneDrive mitigation, dependency installation, and health polling
+- System tray controls and auto-update support
+- Neutral first-run setup flow for fresh installs
+
+---
+
+## Ops and Reliability
+
+Shipped in the current `v5.7.x` line:
+
+- `/api/health`
+- `/api/diagnostics`
+- `/api/backup`
+- `/api/restore`
+- Heartbeat auth hardening
+- Error visibility improvements
+- Bounded in-memory runtime caches
+- Batch message deletion
+- Paged export/share responses
+- Dead process reaping
+- Launcher startup hardening
+- Settings sync between desktop and backend
+- Reconnect throttling
+- Token streaming hot-path optimization
+
+---
+
+## UI and UX
+
+- 9 visual themes
+- Conversation starters and empty states
+- Toast system, streaming text, thinking particles, generative cards
+- Settings panel, jobs panel, rules panel, stats panel, search modal, command palette
+- Persona marketplace with 14 built-in personas plus custom persona CRUD
+- Component decomposition work already landed in `v5.7.2`:
+  - `SettingsPanel` reduced from 2023 to 1300 LOC
+  - `ChatMessage` reduced from 625 to 333 LOC
+  - `MessageInput` reduced from 1103 to 825 LOC
+
+---
+
+## Security and Trust
+
+- Encrypted secrets storage
+- SSRF protection
+- Rate limiting
+- Webhook signature verification
+- Approval interception and permission presets
+- AST-based plugin safety scanning
+- Agent token rotation and heartbeat validation
+- Audit/logging surfaces in Settings > Security and Settings > Advanced
+
+---
+
+## Integrations and Extensibility
+
+- Channel bridges: Discord, Telegram, Slack, WhatsApp, generic webhook
+- Plugin loading from `backend/plugins/`
+- Hook/event bus for plugin integration
+- Skills browser and custom skill creation/import/export
+- Python SDK in `sdk/python`
+
+---
+
+## What This File Does Not Claim
+
+This file intentionally does **not** claim the following as shipped today:
+
+- Per-plugin tool allowlists
+- Plugin signing/provenance verification
+- Fail-closed hook policy
+- Thinking level picker in the main UI
+- Context visibility controls
+- Unified task dashboard
+- Prompt cache optimization
+- Video/music generation beyond the current shipped media tools
+- Advanced dreaming-style memory
+- Full accessibility/systematic loading-state pass
+
+Those belong to [UNIFIED_ROADMAP.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md).

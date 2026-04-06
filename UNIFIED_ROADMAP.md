@@ -5,7 +5,6 @@
 
 **Last updated:** 2026-04-06
 **Current version:** v5.7.2
-**Owner:** nahldi
 **Comparison target:** OpenClaw v2026.4.5 (released 2026-04-06)
 
 ---
@@ -13,11 +12,11 @@
 ## Current State (v5.7.2)
 
 ### What GhostLink Has Today
-- **132+ API endpoints** across 13 route modules
+- **217 API/websocket endpoints** across 14 route modules
 - **29 MCP tools** (chat, memory, web, AI, agent, streaming)
-- **17 AI providers** (Anthropic, OpenAI, Google, xAI, Groq, Together, HuggingFace, Ollama, Mistral, OpenRouter, DeepSeek, Perplexity, Cohere, Qwen, Fireworks, StepFun, MiniMax)
+- **13 AI providers** (Anthropic, OpenAI, Google, xAI, Groq, Together, HuggingFace, Ollama, Mistral, OpenRouter, DeepSeek, Perplexity, Cohere)
 - **13 supported agent CLIs** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Pi, Cursor, Cody, Continue, OpenCode, Ollama)
-- **61 React components** with 9 visual themes
+- **66 React component files** with 9 visual themes
 - **220 automated tests** (171 backend + 49 frontend)
 - **Desktop app** (Electron) with auto-update, system tray, setup wizard
 - **Full ops toolkit**: health, diagnostics, backup/restore, server logs
@@ -42,6 +41,7 @@
 | Failed hooks fail closed | ✓ | ✗ | **Missing** — hook failures silently pass through |
 | Plugin signing/provenance | ✓ | ✗ | **Missing** — raw code installed to disk |
 | Owner-only allowlist management | ✓ | ✗ | **Missing** |
+| Per-agent identity pack / markdown context | ✓ | ⚡ | **Partial** — per-agent soul/memory exists, but workspace-level instruction files are shared and can be overwritten by another agent in the same repo |
 | Exec approval durable allowlist | ✓ | ⚡ | **Partial** — approval interception exists but no persistent allowlist |
 | SSRF browser redirect blocking | ✓ | ⚡ | **Partial** — SSRF protection exists but not browser-redirect-aware |
 | Encrypted secrets vault | ✓ | ✓ | **Have it** |
@@ -66,7 +66,7 @@
 ### Providers & Models
 | Feature | OpenClaw | GhostLink | Status |
 |---------|----------|-----------|--------|
-| 30+ providers | ✓ | ⚡ | **17 providers** — missing Amazon Bedrock, GitHub Copilot provider, Z.AI, BytePlus/Volcengine, Kimi, Microsoft Foundry |
+| 30+ providers | ✓ | ⚡ | **13 providers** — missing Amazon Bedrock, GitHub Copilot provider, Z.AI, BytePlus/Volcengine, Kimi, Microsoft Foundry |
 | Prompt caching optimization | ✓ | ✗ | **Missing** — no cache fingerprinting, no deterministic tool ordering for cache hits |
 | Provider request overrides | ✓ | ✗ | **Missing** — no shared transport controls for headers/auth/proxy/TLS |
 | Model failover | ✓ | ✓ | **Have it** |
@@ -180,6 +180,11 @@
 **What:** When user approves a command, offer "Always allow this command" option. Saved to `exec_approvals.json`. Future identical commands auto-approved.
 **Files:** `backend/mcp_bridge.py`, `backend/security.py`
 **Acceptance:** Approve with "always" → same command auto-passes next time. `/api/security/exec-approvals` CRUD endpoint. UI to manage allowlist.
+
+#### 1.5 — Agent Identity Pack & Workspace Isolation
+**What:** Replace the shared workspace-facing instruction files with a real per-agent identity pack. Each spawned agent gets its own metadata directory and markdown files such as `IDENTITY.md`, `SOUL.md`, `NOTES.md`, plus shared workspace files like `AGENTS.md` and `USER.md` kept separate from agent-specific state.
+**Files:** `backend/wrapper.py`, `backend/agent_memory.py`, `backend/routes/agents.py`, `backend/mcp_proxy.py`, `frontend/src/components/AgentInfoPanel.tsx`
+**Acceptance:** Spawning a second Claude/Codex/Gemini instance in the same workspace no longer overwrites another agent's instructions. Each agent can be pointed to its own identity pack path. Shared workspace guidance and per-agent identity stay separate and auditable.
 
 ---
 
@@ -340,7 +345,7 @@
 - **Full local-first** — zero telemetry, zero cloud dependency
 - **Plugin system** with AST safety scanner
 - **Ops toolkit** — diagnostics, backup/restore, server logs in UI
-- **17 AI providers** with failover and cost tracking
+- **13 AI providers** with failover and cost tracking
 - **Agent hierarchy** — manager/worker/peer roles with delegation
 
 ### After Phase 1-4, GhostLink Will Match OpenClaw On:
