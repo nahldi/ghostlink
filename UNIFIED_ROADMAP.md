@@ -213,6 +213,11 @@
 **Files:** `backend/routes/agents.py`, `backend/registry.py`, `frontend/src/components/AgentCockpit.tsx`
 **Acceptance:** Switch model mid-conversation. Agent uses new model for next response. No restart needed.
 
+#### 2.5 — Skills Center UX Overhaul
+**What:** Dedicated Skills section (not buried in agent creation or settings). Each skill gets a visual card with description, category, and enable/disable toggle. Toggle applies globally (all agents) or to specific agents. Browsable, searchable, categorized. Inspired by ClawHub's skill marketplace UX.
+**Files:** New `frontend/src/components/SkillsCenter.tsx`, `backend/skills.py` (extend), `backend/routes/plugins.py`
+**Acceptance:** Skills section accessible from sidebar or command palette. Each skill shows card with description + agent assignment. Enable "for all agents" or pick specific agents. Search/filter by category. Clean, visual layout — not a settings table.
+
 ---
 
 ### Phase 3: Task System Unification & Operator Visibility
