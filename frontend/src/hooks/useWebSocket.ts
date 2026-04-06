@@ -127,58 +127,62 @@ export function useWebSocket() {
         }
       });
 
-      // Fetch missed messages on reconnect
+      // Fetch missed messages on reconnect — throttled to avoid request storms
       unsubReconnect = client.onReconnect(async () => {
         try {
           const state = useChatStore.getState();
+
+          // 1. Agent status — single call, always needed
           const status = await api.getStatus().catch(() => ({ agents: state.agents }));
           if (status?.agents) {
             setAgents(status.agents);
           }
 
-          // Fetch missed messages across ALL channels, not just active one
+          // 2. Missed messages — active channel first, then others sequentially
           const lastMsg = state.messages[state.messages.length - 1];
           const sinceId = lastMsg?.id || 0;
           if (sinceId > 0) {
-            const channelNames = state.channels.map((c) => c.name);
-            if (!channelNames.includes(state.activeChannel)) {
-              channelNames.push(state.activeChannel);
+            // Active channel first (user sees this immediately)
+            try {
+              const resp = await api.getMessages(state.activeChannel, sinceId);
+              for (const msg of resp.messages || []) state.addMessage(msg);
+            } catch { /* channel may not exist */ }
+
+            // Other channels sequentially (background, not blocking UI)
+            const otherChannels = state.channels.map((c) => c.name).filter((n) => n !== state.activeChannel);
+            for (const ch of otherChannels) {
+              try {
+                const resp = await api.getMessages(ch, sinceId);
+                for (const msg of resp.messages || []) state.addMessage(msg);
+              } catch { /* channel may not exist */ }
             }
-            await Promise.all(
-              channelNames.map(async (ch) => {
-                try {
-                  const resp = await api.getMessages(ch, sinceId);
-                  const msgs = resp.messages || [];
-                  for (const msg of msgs) {
-                    state.addMessage(msg);
-                  }
-                } catch { /* channel may not exist yet */ }
-              }),
-            );
           }
 
-          const agentsToRefresh = (status?.agents || state.agents || []).map((agent) => agent.name);
-          await Promise.all(agentsToRefresh.map(async (agentName) => {
-            const [
-              presence,
-              browser,
-              terminal,
-              workspace,
-              replay,
-            ] = await Promise.all([
-              api.getAgentPresence(agentName).catch(() => null),
-              api.getAgentBrowserState(agentName).catch(() => null),
-              api.getAgentTerminalLive(agentName).catch(() => null),
-              api.getAgentWorkspaceChanges(agentName).catch(() => null),
-              api.getAgentReplay(agentName).catch(() => null),
-            ]);
+          // 3. Agent state — only online agents, 3 at a time max
+          const onlineAgents = (status?.agents || state.agents || [])
+            .filter((a) => a.state === 'active' || a.state === 'thinking' || a.state === 'idle')
+            .map((a) => a.name);
 
-            if (presence) setAgentPresence(presence);
-            if (browser) setBrowserState(browser);
-            if (terminal) setTerminalStream(terminal);
-            if (workspace?.changes) setWorkspaceChanges(agentName, workspace.changes);
-            if (replay?.events) setAgentReplayEvents(agentName, replay.events);
-          }));
+          const CONCURRENCY = 3;
+          for (let i = 0; i < onlineAgents.length; i += CONCURRENCY) {
+            const batch = onlineAgents.slice(i, i + CONCURRENCY);
+            await Promise.all(batch.map(async (agentName) => {
+              const [presence, browser, terminal, workspace, replay] = await Promise.all([
+                api.getAgentPresence(agentName).catch(() => null),
+                api.getAgentBrowserState(agentName).catch(() => null),
+                api.getAgentTerminalLive(agentName).catch(() => null),
+                api.getAgentWorkspaceChanges(agentName).catch(() => null),
+                api.getAgentReplay(agentName).catch(() => null),
+              ]);
+              if (presence) setAgentPresence(presence);
+              if (browser) setBrowserState(browser);
+              if (terminal) setTerminalStream(terminal);
+              if (workspace?.changes) setWorkspaceChanges(agentName, workspace.changes);
+              if (replay?.events) setAgentReplayEvents(agentName, replay.events);
+            }));
+          }
+
+          // 4. Workspace collaborators — low priority, after agents
           const [collaborators, invites] = await Promise.all([
             fetch('/api/workspace/collaborators').then((r) => r.ok ? r.json() : { collaborators: [] }).catch(() => ({ collaborators: [] })),
             fetch('/api/workspace/invites').then((r) => r.ok ? r.json() : { invites: [] }).catch(() => ({ invites: [] })),
