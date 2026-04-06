@@ -1704,12 +1704,13 @@ def _wrap_tool_with_hooks(func):
         # Extract agent identity from first arg (most tools have sender as first param)
         agent = args[0] if args else kwargs.get("sender", kwargs.get("name", "unknown"))
 
-        # Fire pre_tool_use hook
+        # Fire pre_tool_use hook — fail closed (hook error blocks the tool call)
         try:
             from plugin_sdk import event_bus
-            event_bus.emit("pre_tool_use", {"agent": agent, "tool": tool_name, "args": kwargs})
+            event_bus.emit("pre_tool_use", {"agent": agent, "tool": tool_name, "args": kwargs}, fail_closed=True)
         except Exception as e:
-            log.debug("pre_tool_use hook failed for %s: %s", tool_name, e)
+            log.warning("pre_tool_use hook BLOCKED tool %s for agent %s: %s", tool_name, agent, e)
+            return f"Error: tool '{tool_name}' blocked by pre_tool_use hook: {e}"
 
         # v3.9.7: Enforce execution mode (plan/review blocks write tools)
         channel = kwargs.get("channel", "general")

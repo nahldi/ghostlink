@@ -44,14 +44,24 @@ class EventBus:
             if handler in handlers:
                 handlers.remove(handler)
 
-    def emit(self, event: str, data: dict | None = None):
-        """Emit an event to all registered handlers."""
+    def emit(self, event: str, data: dict | None = None, *, fail_closed: bool = False):
+        """Emit an event to all registered handlers.
+
+        Args:
+            event: Event name to emit.
+            data: Event payload dict.
+            fail_closed: If True, handler exceptions propagate instead of being
+                swallowed. Use for security-critical hooks (pre_tool_use) where
+                a failed hook should block the operation.
+        """
         with self._lock:
             handlers = list(self._handlers.get(event, []))
         for handler in handlers:
             try:
                 handler(data or {})
             except Exception as e:
+                if fail_closed:
+                    raise  # Let caller handle — blocks the operation
                 log.warning("Event handler error for %s: %s", event, e)
 
     def list_events(self) -> list[str]:

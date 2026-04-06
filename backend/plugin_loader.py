@@ -30,6 +30,26 @@ def _load_manifest() -> dict:
     return {"plugins": {}, "disabled": []}
 
 
+def get_plugin_allowed_tools(plugin_name: str) -> list[str] | None:
+    """Return the allowed_tools list for a plugin, or None if unrestricted (builtin)."""
+    manifest = _load_manifest()
+    meta = manifest.get("plugins", {}).get(plugin_name, {})
+    if meta.get("builtin"):
+        return None  # Builtin plugins are trusted — no restriction
+    return meta.get("allowed_tools", [])
+
+
+def set_plugin_allowed_tools(plugin_name: str, tools: list[str]) -> bool:
+    """Set the allowed_tools list for a plugin."""
+    manifest = _load_manifest()
+    plugins = manifest.get("plugins", {})
+    if plugin_name not in plugins:
+        return False
+    plugins[plugin_name]["allowed_tools"] = tools
+    _save_manifest(manifest)
+    return True
+
+
 def _save_manifest(manifest: dict):
     PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
     MANIFEST_FILE.write_text(json.dumps(manifest, indent=2))
