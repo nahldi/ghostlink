@@ -303,6 +303,7 @@ async def _auto_spawn_agent(pa: dict):
         )
         async with deps._agent_lock:
             deps._pending_spawns[proc.pid] = proc
+        asyncio.create_task(deps.watch_agent_process_exit(proc, f"auto-spawn:{base}"))
         log.info("Auto-spawned %s (pid %d)", base, proc.pid)
     except Exception as e:
         log.warning("Auto-spawn failed for %s: %s", base, e)

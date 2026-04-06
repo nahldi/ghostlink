@@ -22,6 +22,9 @@ import deps
 
 router = APIRouter()
 
+_EXPORT_PAGE_DEFAULT = 1000
+_EXPORT_PAGE_MAX = 1000
+
 # ── Image upload helpers ──────────────────────────────────────────────
 
 _IMAGE_MAGIC = {
@@ -75,6 +78,59 @@ def _tunnel_share_url() -> str | None:
     if not deps._tunnel_url or not deps._tunnel_access_token:
         return None
     return f"{deps._tunnel_url}?access_token={deps._tunnel_access_token}"
+
+
+def _normalize_page_window(limit: int, offset: int) -> tuple[int, int]:
+    try:
+        limit_value = int(limit)
+    except (TypeError, ValueError):
+        limit_value = _EXPORT_PAGE_DEFAULT
+    try:
+        offset_value = int(offset)
+    except (TypeError, ValueError):
+        offset_value = 0
+
+    limit_value = max(1, min(_EXPORT_PAGE_MAX, limit_value))
+    offset_value = max(0, offset_value)
+    return limit_value, offset_value
+
+
+async def _fetch_channel_messages_page(channel: str, limit: int, offset: int) -> tuple[list[dict], int]:
+    if deps.store._db is None:
+        raise RuntimeError("Database not initialized. Call init() first.")
+
+    cursor = await deps.store._db.execute(
+        "SELECT COUNT(*) AS cnt FROM messages WHERE channel = ?",
+        [channel],
+    )
+    try:
+        total = int((await cursor.fetchone())["cnt"])
+    finally:
+        await cursor.close()
+
+    cursor = await deps.store._db.execute(
+        "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC LIMIT ? OFFSET ?",
+        [channel, limit, offset],
+    )
+    try:
+        rows = await cursor.fetchall()
+    finally:
+        await cursor.close()
+
+    return [deps.store._row_to_dict(r) for r in rows], total
+
+
+def _page_meta(channel: str, total: int, limit: int, offset: int, count: int) -> dict[str, int | bool | str]:
+    has_more = offset + count < total
+    return {
+        "channel": channel,
+        "count": count,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": has_more,
+        "truncated": has_more or total > limit,
+    }
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────
@@ -539,27 +595,23 @@ async def get_usage():
 # ── Export ───────────────────────────────────────────────────────────
 
 @router.get("/api/export")
-async def export_channel(channel: str = "general", format: str = "markdown"):
+async def export_channel(channel: str = "general", format: str = "markdown", limit: int = _EXPORT_PAGE_DEFAULT, offset: int = 0):
     if format not in ("markdown", "json", "html"):
         return JSONResponse({"error": f"unsupported format: {format}"}, 400)
-    if deps.store._db is None:
-        raise RuntimeError("Database not initialized. Call init() first.")
-    cursor = await deps.store._db.execute(
-        "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC",
-        [channel],
-    )
-    try:
-        rows = await cursor.fetchall()
-    finally:
-        await cursor.close()
-    msgs = [deps.store._row_to_dict(r) for r in rows]
+    limit, offset = _normalize_page_window(limit, offset)
+    msgs, total = await _fetch_channel_messages_page(channel, limit, offset)
+    meta = _page_meta(channel, total, limit, offset, len(msgs))
 
     if format == "json":
-        return {"messages": msgs, "channel": channel, "count": len(msgs)}
+        return {"messages": msgs, **meta}
     elif format == "html":
         ch_escaped = _html.escape(channel)
         html_lines = [f"<html><head><title>#{ch_escaped}</title></head><body style='background:#09090f;color:#e0dff0;font-family:sans-serif;padding:2rem'>"]
         html_lines.append(f"<h1>#{ch_escaped}</h1>")
+        if meta["truncated"]:
+            html_lines.append(
+                f"<p style='color:#999'>Showing {offset + 1 if msgs else 0}-{offset + len(msgs)} of {total} messages.</p>"
+            )
         for m in msgs:
             color = "#38bdf8" if m.get("type") == "chat" and m["sender"] not in [a.name for a in deps.registry.get_all()] else "#a78bfa"
             sender_escaped = _html.escape(m["sender"])
@@ -567,28 +619,23 @@ async def export_channel(channel: str = "general", format: str = "markdown"):
             time_escaped = _html.escape(m.get("time", ""))
             html_lines.append(f"<div style='margin:1rem 0;padding:0.75rem;border-radius:8px;background:rgba(255,255,255,0.03)'><b style='color:{color}'>{sender_escaped}</b> <small style='color:#666'>{time_escaped}</small><p>{text_escaped}</p></div>")
         html_lines.append("</body></html>")
-        return {"html": "\n".join(html_lines), "filename": f"{channel}-export.html"}
+        return {"html": "\n".join(html_lines), "filename": f"{channel}-export.html", **meta}
     else:
         md_lines = [f"# #{channel}\n"]
+        if meta["truncated"]:
+            md_lines.append(f"_Showing {offset + 1 if msgs else 0}-{offset + len(msgs)} of {total} messages._")
         for m in msgs:
             md_lines.append(f"**{m['sender']}** ({m.get('time', '')})\n{m['text']}\n---")
         md = "\n\n".join(md_lines)
-        return {"markdown": md, "filename": f"{channel}-export.md"}
+        return {"markdown": md, "filename": f"{channel}-export.md", **meta}
 
 
 @router.get("/api/share")
-async def share_conversation(channel: str = "general"):
+async def share_conversation(channel: str = "general", limit: int = _EXPORT_PAGE_DEFAULT, offset: int = 0):
     """Generate a self-contained shareable HTML page for a conversation."""
-    if deps.store._db is None:
-        raise RuntimeError("Database not initialized.")
-    cursor = await deps.store._db.execute(
-        "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC", [channel],
-    )
-    try:
-        rows = await cursor.fetchall()
-    finally:
-        await cursor.close()
-    msgs = [deps.store._row_to_dict(r) for r in rows]
+    limit, offset = _normalize_page_window(limit, offset)
+    msgs, total = await _fetch_channel_messages_page(channel, limit, offset)
+    meta = _page_meta(channel, total, limit, offset, len(msgs))
     agent_colors = {inst.name: inst.color for inst in deps.registry.get_all()}
 
     html_out = f"""<!DOCTYPE html>
@@ -608,6 +655,8 @@ code{{font-family:'JetBrains Mono',monospace}}
 </style></head><body>
 <h1>#{channel}</h1>
 """
+    if meta["truncated"]:
+        html_out += f'<p style="color:#666;margin-bottom:1rem">Showing {offset + 1 if msgs else 0}-{offset + len(msgs)} of {total} messages.</p>\n'
 
     for m in msgs:
         color = agent_colors.get(m["sender"], "#38bdf8")
@@ -617,9 +666,18 @@ code{{font-family:'JetBrains Mono',monospace}}
             .replace(">", "&gt;"))
         html_out += f'<div class="msg"><div class="sender" style="color:{color}">{m["sender"]}<span class="time">{m.get("time","")}</span></div><div class="text">{text_escaped}</div></div>\n'
 
-    html_out += f'<div class="footer">Exported from GhostLink — {len(msgs)} messages</div></body></html>'
+    html_out += f'<div class="footer">Exported from GhostLink — {len(msgs)} messages shown'
+    if meta["truncated"]:
+        html_out += f' of {total}'
+    html_out += "</div></body></html>"
 
-    return {"html": html_out, "filename": f"{channel}-share.html", "message_count": len(msgs)}
+    return {
+        "html": html_out,
+        "filename": f"{channel}-share.html",
+        "message_count": len(msgs),
+        "total_messages": total,
+        **meta,
+    }
 
 
 # ── Hierarchy ─────────────────────────────────────────────────────────
