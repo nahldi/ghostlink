@@ -76,6 +76,62 @@ _last_heartbeats: dict[str, float] = {}
 _AGENT_DETECTION_CACHE: dict[str, tuple[bool, float]] = {}
 _AGENT_DETECTION_CACHE_TTL = 60.0
 
+
+def _finalize_process(proc: subprocess.Popen) -> None:
+    try:
+        proc.wait(timeout=0)
+    except Exception:
+        pass
+
+
+async def reap_dead_agent_processes() -> list[str]:
+    cleaned: list[str] = []
+
+    async with _agent_lock:
+        for pid, proc in list(_pending_spawns.items()):
+            try:
+                if proc.poll() is None:
+                    continue
+            except Exception as exc:
+                log.debug("Pending spawn poll failed for pid %s: %s", pid, exc)
+            _pending_spawns.pop(pid, None)
+            _finalize_process(proc)
+            cleaned.append(f"pending:{pid}")
+
+        for name, proc in list(_agent_processes.items()):
+            try:
+                if proc.poll() is None:
+                    continue
+            except Exception as exc:
+                log.debug("Agent process poll failed for %s: %s", name, exc)
+            _agent_processes.pop(name, None)
+            _finalize_process(proc)
+            cleaned.append(f"process:{name}")
+
+    return cleaned
+
+
+async def watch_agent_process_exit(proc: subprocess.Popen, label: str = "") -> None:
+    pid = getattr(proc, "pid", None)
+    if pid is None:
+        return
+
+    try:
+        exit_code = await asyncio.to_thread(proc.wait)
+    except Exception as exc:
+        log.debug("Process watcher failed for %s (pid %s): %s", label or "agent", pid, exc)
+        return
+
+    cleaned = await reap_dead_agent_processes()
+    if cleaned:
+        log.info(
+            "Cleaned exited agent process %s (pid %s, exit %s): %s",
+            label or "agent",
+            pid,
+            exit_code,
+            ", ".join(cleaned),
+        )
+
 # ── WebSocket clients ────────────────────────────────────────────────
 
 _ws_clients: set = set()
@@ -142,12 +198,53 @@ _agent_presence: dict[str, dict] = {}
 _agent_browser_state: dict[str, dict] = {}
 _terminal_streams: dict[str, dict] = {}
 _mcp_invocation_logs: dict[str, collections.deque] = {}  # per-agent MCP invocation logs
+_MCP_LOG_MAXLEN = 200  # max entries per agent
+_MCP_LOG_MAX_AGENTS = 50  # max agents tracked
 _workspace_changes: collections.deque[dict] = collections.deque(maxlen=500)
 _agent_replay_log: collections.deque[dict] = collections.deque(maxlen=2000)
 _file_diff_cache: dict[str, dict[str, dict]] = {}
+_FILE_DIFF_MAX_PER_AGENT = 100  # max diffs cached per agent
 _agent_state_lock = threading.Lock()
 _workspace_collaborators: dict[str, dict] = {}
 _workspace_ws_users: dict[int, str] = {}
+
+
+def cleanup_agent_state(agent_name: str) -> None:
+    """Remove all in-memory state for a deregistered agent.
+
+    Call this when an agent is killed or deregistered to prevent
+    unbounded growth of per-agent caches and presence data.
+    """
+    _agent_presence.pop(agent_name, None)
+    _agent_browser_state.pop(agent_name, None)
+    _terminal_streams.pop(agent_name, None)
+    _mcp_invocation_logs.pop(agent_name, None)
+    _file_diff_cache.pop(agent_name, None)
+    _last_heartbeats.pop(agent_name, None)
+    # _pending_spawns is keyed by PID, cleaned by reap_dead_agent_processes()
+
+
+def get_or_create_mcp_log(agent_name: str) -> collections.deque:
+    """Get (or create) a capped MCP invocation log for an agent."""
+    if agent_name not in _mcp_invocation_logs:
+        # Evict oldest agent if at capacity
+        if len(_mcp_invocation_logs) >= _MCP_LOG_MAX_AGENTS:
+            oldest = next(iter(_mcp_invocation_logs))
+            del _mcp_invocation_logs[oldest]
+        _mcp_invocation_logs[agent_name] = collections.deque(maxlen=_MCP_LOG_MAXLEN)
+    return _mcp_invocation_logs[agent_name]
+
+
+def set_file_diff(agent_name: str, path: str, diff: dict) -> None:
+    """Cache a file diff for an agent, with per-agent cap."""
+    if agent_name not in _file_diff_cache:
+        _file_diff_cache[agent_name] = {}
+    cache = _file_diff_cache[agent_name]
+    if len(cache) >= _FILE_DIFF_MAX_PER_AGENT and path not in cache:
+        # Remove oldest entry
+        oldest_key = next(iter(cache))
+        del cache[oldest_key]
+    cache[path] = diff
 
 # ── Agent name validation ────────────────────────────────────────────
 

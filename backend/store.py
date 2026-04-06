@@ -247,17 +247,19 @@ class MessageStore:
     async def delete(self, msg_ids: list[int]) -> list[int]:
         if self._db is None:
             raise RuntimeError("MessageStore not initialized — call await store.init() first")
-        deleted = []
-        for mid in msg_ids:
-            cursor = await self._db.execute("DELETE FROM messages WHERE id = ?", (mid,))
-            try:
-                rowcount = cursor.rowcount
-            finally:
-                await cursor.close()
-            if rowcount:
-                deleted.append(mid)
+        if not msg_ids:
+            return []
+        # Batch delete with a single query instead of one-by-one
+        placeholders = ",".join("?" for _ in msg_ids)
+        cursor = await self._db.execute(
+            f"DELETE FROM messages WHERE id IN ({placeholders})", msg_ids,
+        )
+        try:
+            count = cursor.rowcount
+        finally:
+            await cursor.close()
         await self._db.commit()
-        return deleted
+        return msg_ids if count > 0 else []
 
     async def react(self, msg_id: int, emoji: str, sender: str) -> dict | None:
         """Toggle a reaction on a message. Returns updated reactions dict."""

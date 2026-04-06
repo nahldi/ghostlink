@@ -357,8 +357,7 @@ async def cache_file_diff(agent_name: str, path: str, before: str, after: str, a
         "timestamp": time.time(),
     }
     with deps._agent_state_lock:
-        agent_cache = deps._file_diff_cache.setdefault(agent_name, {})
-        agent_cache[path] = payload
+        deps.set_file_diff(agent_name, path, payload)
     await deps.broadcast("file_diff", {
         "agent": agent_name,
         "path": path,
@@ -549,6 +548,7 @@ async def deregister_agent(name: str):
     ok = deps.registry.deregister(name)
     if ok:
         mcp_bridge.cleanup_agent(name)
+        deps.cleanup_agent_state(name)
         deps._thinking_buffers.pop(name, None)
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
@@ -818,6 +818,7 @@ async def spawn_agent(request: Request):
         spawn_args.extend(extra_args)
 
     try:
+        await deps.reap_dead_agent_processes()
         spawn_env = os.environ.copy()
         spawn_env["PATH"] = spawn_path
         if cwd:
@@ -846,6 +847,7 @@ async def spawn_agent(request: Request):
 
         async with deps._agent_lock:
             deps._pending_spawns[proc.pid] = proc
+        asyncio.create_task(deps.watch_agent_process_exit(proc, f"spawn:{base}"))
 
         try:
             await _wait_for_spawn_health(proc, base, _stderr_buf)
@@ -883,6 +885,7 @@ async def kill_agent(name: str):
     ok = deps.registry.deregister(name)
     if ok:
         mcp_bridge.cleanup_agent(name)
+        deps.cleanup_agent_state(name)
 
     session_name = f"ghostlink-{name}"
     try:
@@ -948,14 +951,7 @@ async def cleanup_stale():
             except Exception as e:
                 log.debug("Failed to kill stale session %s: %s", session, e)
 
-    async with deps._agent_lock:
-        for key, proc in list(deps._agent_processes.items()):
-            try:
-                if proc.poll() is not None:
-                    deps._agent_processes.pop(key, None)
-                    cleaned.append(f"process:{key}")
-            except Exception as e:
-                log.debug("Process cleanup for %s: %s", key, e)
+    cleaned.extend(await deps.reap_dead_agent_processes())
 
     return {"ok": True, "cleaned": cleaned, "count": len(cleaned)}
 
@@ -1543,11 +1539,8 @@ async def post_mcp_invocation_log(name: str, request: Request):
         entry = await request.json()
     except Exception:
         return JSONResponse({"error": "invalid json"}, 400)
-    import collections
     with deps._agent_state_lock:
-        if name not in deps._mcp_invocation_logs:
-            deps._mcp_invocation_logs[name] = collections.deque(maxlen=100)
-        deps._mcp_invocation_logs[name].append(entry)
+        deps.get_or_create_mcp_log(name).append(entry)
     await deps.broadcast("mcp_invocation", {"agent": name, "entry": entry})
     return {"ok": True}
 
