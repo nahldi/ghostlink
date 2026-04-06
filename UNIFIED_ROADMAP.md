@@ -234,7 +234,13 @@
 **Files:** `backend/mcp_bridge.py` (progress tool enhancement), `frontend/src/components/ProgressCard.tsx`
 **Acceptance:** Agent progress shows as checklist in UI. Steps update in real-time. Completion percentage visible.
 
-#### 3.3 — Operator Dashboard Enhancement
+#### 3.3 — Agent Profile & Assignment Architecture
+**What:** Introduce stable `agent/profile ID` separate from display label and model. Skills, roles, and settings follow an inheritance model: `global default → role/profile default → per-agent override`. Each agent gets an effective-state view showing what's actually applied. Provider, role, and profile are cleanly separated in config — not conflated with display name.
+**Files:** `backend/registry.py` (profile model), `backend/skills.py` (inheritance), `backend/routes/agents.py` (config endpoints), `frontend/src/components/AgentCockpit.tsx` (effective-state view), `frontend/src/components/AgentInfoPanel.tsx`
+**Acceptance:** Two Claudes with different roles/profiles show different effective skills/settings. Skills Center assignments cascade through the inheritance model. Agent config UI shows "inherited from profile" vs "overridden" clearly. Renaming an agent doesn't break its identity or skill assignments.
+**Why this matters:** Without this, Skills Center (Phase 2) and Identity Pack (Phase 1.5) are just UI on top of brittle name-based coupling. This is the structural fix that makes agent management coherent.
+
+#### 3.4 — Operator Dashboard Enhancement
 **What:** Unified view: active tasks, agent health, cache stats, recent errors. Single "control room" screen.
 **Files:** `frontend/src/components/StatsPanel.tsx` (extend), new dashboard components
 **Acceptance:** One screen shows system health at a glance. No clicking through multiple panels needed.
