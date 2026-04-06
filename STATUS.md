@@ -1,4 +1,4 @@
-# GhostLink — Project Status & Handoff
+# GhostLink — Project Status
 
 **Last updated:** 2026-04-06
 **Version:** v5.7.2
@@ -327,26 +327,24 @@ npm run build:win   # Windows .exe
 
 ---
 
-## HANDOFF RULES
+## DEVELOPMENT RULES
 
-- **Never push personal data to GitHub** — SOUL.md, personal config.toml, local databases
+- **Never push personal data to GitHub** — settings.json, config.toml with API keys, local databases, agent memory
 - **Test everything** — fail test → fix test → smoke test before shipping
-- **Finn is particular about visual quality** — reference Linear, Raycast, Arc Browser, Warp terminal
+- **Visual quality matters** — reference Linear, Raycast, Arc Browser, Warp terminal for UI standards
 - **Audit before shipping** — compilation check all 3 codebases, verify every feature claim
-- **Incremental versions** — bump patch version after each test cycle (1.0.3 → 1.0.4 etc.)
+- **Incremental versions** — bump patch version after each test cycle
 - **Don't add features during bug-fix phases** — fix everything first, then add features
-- **Auto-update filename must match latest.yml** — use hyphens (GhostLink-Setup-1.0.3.exe) not spaces
+- **Auto-update filename must match latest.yml** — use hyphens (GhostLink-Setup-x.x.x.exe) not spaces
 
 ---
 
 ## KNOWN ISSUES
 
-See BUGS.md for full list. 72+ bugs fixed as of v3.9.4. All critical/high code bugs resolved. Remaining items:
-- BUG-007: OneDrive paths need /tmp copy (handled but slow — OS limitation)
-- BUG-011: Frontend dist path mismatch in packaged app (fallback exists)
-- BUG-089: ESLint 92 errors (cosmetic — `no-explicit-any`, empty catch blocks, no runtime impact)
-- BUG-088: WorktreeManager code exists but not wired into agent spawn/deregister lifecycle
-- BUG-046: OAuth sign-in not implemented (all providers work via API keys)
+See BUGS.md for full list. All critical and high-severity bugs are resolved as of v5.7.2. Remaining items:
+- OneDrive paths need /tmp copy for WSL (handled automatically — OS limitation)
+- ~51 ESLint `no-explicit-any` warnings (cosmetic, no runtime impact)
+- OAuth sign-in not implemented (all providers work via API keys)
 - ARCH-003: Desktop app requires WSL on Windows (no native Python support yet)
 
 ---

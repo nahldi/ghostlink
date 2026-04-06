@@ -100,7 +100,7 @@
 
 ### Settings & Configuration (v1.8.0)
 - [x] **Persistent agent editor** — edit label, workspace, CLI args, and color for saved agents
-- [x] **13 API providers** — Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Perplexity, Cohere, OpenRouter, Groq, Together, HuggingFace, Ollama
+- [x] **17 AI providers** — Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Perplexity, Cohere, OpenRouter, Groq, Together, HuggingFace, Ollama, Qwen, Fireworks, StepFun, MiniMax
 - [x] **Capability-based provider routing** — auto-selects best provider per capability
 - [x] **Free tier detection** — highlights free providers (Groq, Together, HuggingFace, Ollama)
 
@@ -163,6 +163,22 @@
 - [x] **PATH expansion** — backend includes `~/.local/bin`, `~/.npm-global/bin` for CLI resolution
 - [x] **tmux env export** — critical vars exported inline for npm-based CLIs
 
+### v5.7.x — Ops, Reliability, Performance
+- [x] **Health endpoint** — `/api/health` for readiness checks and launcher polling
+- [x] **Diagnostics endpoint** — runtime checks: Python, disk, database, agents, ports, deps
+- [x] **Backup/restore** — one-click ZIP backup + restore with pre-restore safety snapshot
+- [x] **Heartbeat auth hardening** — `secrets.compare_digest` token validation, 4 regression tests
+- [x] **Error visibility** — 22 silent error catches replaced with proper logging/toasts
+- [x] **Memory leak caps** — MCP logs, file diff cache, agent state all bounded with cleanup on deregister
+- [x] **Batch message deletion** — single SQL `DELETE WHERE id IN (...)` instead of per-ID loop
+- [x] **Export pagination** — 1000-row cap on `/api/export` and `/api/share`
+- [x] **Token streaming perf** — `appendToMessage` no longer remaps entire array per token
+- [x] **Reconnect throttling** — active channel first, 3 agents at a time, skip offline
+- [x] **Settings unification** — desktop/backend settings synced on server start
+- [x] **Launcher hardening** — double health verification, atomic wizard→launcher transition
+- [x] **Component architecture** — SettingsPanel 2023→1300, ChatMessage 625→333, MessageInput 1103→825 LOC
+- [x] **220 automated tests** — 171 backend + 49 frontend
+
 ### Skills
 - [x] **Skills marketplace** — browse, install, create, export/import custom skills
 - [x] **Custom skill creator** — API with name, description, category, implementation type
@@ -177,8 +193,8 @@
 - 8200: MCP HTTP (configurable)
 - 8201: MCP SSE (configurable)
 
-### MCP Tools (17 shipped)
-chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_load, memory_list, memory_search, web_search, web_fetch, image_generate
+### MCP Tools (29 shipped)
+chat_send, chat_read, chat_join, chat_who, chat_channels, chat_rules, chat_progress, chat_propose_job, chat_react, chat_claim, memory_save, memory_get, memory_list, memory_search, memory_search_all, web_fetch, web_search, browser_snapshot, image_generate, gemini_image, gemini_video, text_to_speech, speech_to_text, code_execute, set_thinking, sessions_list, sessions_send, delegate, chat_stream_token
 
-### Components (53)
+### Components (61)
 ActivityTimeline, AddAgentModal, AgentBar, AgentIcon, AgentInfoPanel, AgentMiniCard, AgentStatusPill, ApprovalCard, BulkDeleteBar, ChannelSummary, ChannelTabs, ChatMessage, CodeBlock, CommandBar, ConnectionBanner, ConsensusCard, DecisionCard, EmptyState, GenerativeCard, HandoffCard, HelpPanel, JobProposal, JobsPanel, KeyboardShortcutsModal, MessageInput, MobileHeader, MobileSidebar, MobilePanel, OnboardingTour, ProgressCard, RemoteSession, ReplayViewer, RulesPanel, ScrollArrow, SearchModal, SessionBar, SessionLauncher, SettingsPanel, Sidebar, Skeleton, SplitView, StatsPanel, StreamingText, TerminalPeek, ThinkingParticles, Toast, TypingIndicator, UrlPreview
