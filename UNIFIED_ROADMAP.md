@@ -181,10 +181,17 @@
 **Files:** `backend/mcp_bridge.py`, `backend/security.py`
 **Acceptance:** Approve with "always" → same command auto-passes next time. `/api/security/exec-approvals` CRUD endpoint. UI to manage allowlist.
 
-#### 1.5 — Agent Identity Pack & Workspace Isolation
-**What:** Replace the shared workspace-facing instruction files with a real per-agent identity pack. Each spawned agent gets its own metadata directory and markdown files such as `IDENTITY.md`, `SOUL.md`, `NOTES.md`, plus shared workspace files like `AGENTS.md` and `USER.md` kept separate from agent-specific state.
-**Files:** `backend/wrapper.py`, `backend/agent_memory.py`, `backend/routes/agents.py`, `backend/mcp_proxy.py`, `frontend/src/components/AgentInfoPanel.tsx`
-**Acceptance:** Spawning a second Claude/Codex/Gemini instance in the same workspace no longer overwrites another agent's instructions. Each agent can be pointed to its own identity pack path. Shared workspace guidance and per-agent identity stay separate and auditable.
+#### 1.5 — Agent Runtime Identity System
+**What:** Replace file-based "read these docs" identity with a server-owned, runtime-enforced agent identity system. Identity must survive long sessions, context compaction, resumes, and same-model multi-agent setups without drift.
+
+**Architecture:**
+1. **Server-owned identity record** — Immutable mapping per agent instance: stable internal ID, provider, display label, workspace, role/profile, enabled skills, identity pack path, memory namespaces. Every tool call, memory lookup, queue, and file path resolved from this server-side record, not agent self-knowledge.
+2. **Launch/resume injection** — Every spawn, reconnect, resume, and model switch re-injects the full identity context. Provider adapters (`.claude/instructions.md`, `.codex/instructions.md`, etc.) write to per-agent paths, not shared workspace root. Identity is injected, not remembered.
+3. **Per-agent isolated context** — `.ghostlink/agents/<instance-id>/IDENTITY.md`, `SOUL.md`, `NOTES.md`, `state.json`. Shared workspace files (`AGENTS.md`, `USER.md`) are coordination docs, NOT the source of truth for any agent's identity.
+4. **GhostLink behavior embedded at platform layer** — Communication model, channel/routing rules, approval behavior, skill/capability model, ownership boundaries, tool usage expectations — all injected and enforced by runtime, not described in markdown the agent might forget.
+
+**Files:** `backend/registry.py` (identity record), `backend/wrapper.py` (injection), `backend/wrapper_mcp.py` (injection), `backend/agent_memory.py` (namespaced paths), `backend/mcp_bridge.py` (identity enforcement), `backend/routes/agents.py` (identity API)
+**Acceptance:** Two same-model agents in one workspace have fully isolated identity. Agent never needs to "remember" who it is — server tells it on every interaction. Killing and restarting an agent restores the same identity. Renaming or re-labeling doesn't break identity continuity.
 
 ---
 
@@ -286,20 +293,34 @@
 ---
 
 ### Phase 6: Memory & Intelligence Upgrade
-**Priority:** MEDIUM — Long-term differentiator
+**Priority:** MEDIUM — Long-term differentiator, completes identity system
 **Effort:** 2-3 weeks
 
-#### 5.1 — Weighted Memory Recall
-**What:** Memory entries gain relevance scores based on recency, access frequency, and explicit importance. Search results weighted by these scores.
-**Files:** `backend/agent_memory.py`
-**Acceptance:** Recently accessed memories rank higher. Frequently referenced memories persist longer. Configurable decay rate.
+#### 6.1 — Memory Stratification
+**What:** Replace flat key-value memory with layered memory system:
+- **Identity memory** — who this agent is, its role, capabilities, boundaries (durable, never evicted)
+- **User/workspace memory** — who it works for, project context, team conventions (long-lived, slow decay)
+- **Task/session memory** — current tasks, recent decisions, active context (session-scoped, fast decay)
+- **Promoted long-term summaries** — compressed summaries of important interactions promoted from session memory (equivalent to OpenClaw's "dreaming" direction)
+**Files:** `backend/agent_memory.py` (layer model), `backend/mcp_bridge.py` (memory tools), `backend/routes/agents.py`
+**Acceptance:** Identity memory survives indefinitely. Session memory auto-summarized on session end. Search returns results weighted by layer + recency. Agent identity doesn't drift even after 100+ turn conversations.
 
-#### 5.2 — Memory Tagging & Categories
-**What:** Memory entries support tags and categories for organized retrieval.
-**Files:** `backend/agent_memory.py`, `backend/mcp_bridge.py` (memory tools)
-**Acceptance:** `memory_save` accepts tags. `memory_search` can filter by tag. UI shows tags on memory entries.
+#### 6.2 — Selective Identity Reinforcement
+**What:** Identity context gets reattached at key boundaries (not every call):
+- Context compaction events
+- Session resume/reconnect
+- Delegation to/from other agents
+- Task/role boundary changes
+- Context budget drops below threshold
+**Files:** `backend/mcp_bridge.py`, `backend/wrapper.py`, `backend/wrapper_mcp.py`
+**Acceptance:** After context compaction, agent still knows who it is without re-reading files. After delegation, receiving agent gets full identity context of the delegator. Measurable: identity-correct responses after compaction vs. baseline.
 
-#### 5.3 — Prompt Cache Diagnostics
+#### 6.3 — Weighted Recall & Tagging
+**What:** Memory entries gain relevance scores (recency, access frequency, explicit importance). Tags and categories for organized retrieval.
+**Files:** `backend/agent_memory.py`, `backend/mcp_bridge.py`
+**Acceptance:** `memory_save` accepts tags + importance. `memory_search` weights by relevance. Recently accessed memories rank higher.
+
+#### 6.4 — Prompt Cache Diagnostics
 **What:** `/api/diagnostics` includes cache hit/miss rates. UI shows cache efficiency per provider.
 **Files:** `backend/routes/misc.py`, `frontend/src/components/settings/AdvancedTab.tsx`
 **Acceptance:** Cache stats visible in diagnostics. Shows hit rate, estimated savings.
