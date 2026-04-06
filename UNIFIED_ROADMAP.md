@@ -135,6 +135,27 @@
 
 ## Implementation Phases
 
+### Phase 0: Verified Baseline (Before Any New Work)
+**Priority:** GATE — No implementation starts until this passes
+**Goal:** Ensure every claim in this roadmap is factually verified against the live codebase
+
+**Baseline checklist:**
+- [ ] All tests pass: `backend 171+`, `frontend 49+`
+- [ ] `npm run build` clean, `npx tsc --noEmit` clean
+- [ ] Desktop TypeScript builds clean
+- [ ] Version consistent across all files (app.py, pyproject.toml, misc.py, desktop/package.json, frontend/package.json, sdk, package-lock.json files)
+- [ ] Working tree clean on master
+- [ ] All .md files (STATUS, BUGS, CHANGELOG, FEATURES, ROADMAP) reflect current v5.7.2 state
+- [ ] No stale version references in any doc
+
+**Doc sync rules for future work:**
+- Every commit that changes version MUST update all 7+ version locations
+- Every new feature MUST be added to FEATURES.md
+- Every release MUST update CHANGELOG.md and STATUS.md
+- ROADMAP comparison matrix MUST be re-verified quarterly against competitor releases
+
+---
+
 ### Phase 1: Security & Trust Hardening
 **Priority:** CRITICAL — Biggest maturity gap vs OpenClaw
 **Effort:** 1 week
@@ -162,39 +183,55 @@
 
 ---
 
-### Phase 2: Agent Control & Intelligence
-**Priority:** HIGH — Visible product wins
-**Effort:** 1-2 weeks
+### Phase 2: Quick Control Wins
+**Priority:** HIGH — Fast visible product improvements
+**Effort:** 3-5 days
 
 #### 2.1 — Thinking Level Picker (UI)
 **What:** Per-agent thinking level selector in chat header and agent cockpit. Options: off, minimal, low, medium, high.
 **Files:** `frontend/src/App.tsx` (header), `frontend/src/components/AgentCockpit.tsx`, `frontend/src/types/index.ts`
 **Acceptance:** Picker visible in chat header. Changes apply immediately via PATCH /api/agents/{name}/config. Persists across sessions.
-**Note:** Backend already supports `thinkingLevel` on registry instances.
+**Note:** Backend already supports `thinkingLevel` on registry instances. This is UI-only work.
 
 #### 2.2 — Context Visibility Per-Channel
 **What:** Per-channel setting controlling what context agents receive: `all` (everything), `allowlist` (only from allowed senders), `allowlist_quote` (allowed senders + quoted context).
 **Files:** `backend/routes/channels.py`, `backend/mcp_bridge.py` (message filtering), `frontend/src/components/Sidebar.tsx` (channel settings)
 **Acceptance:** Channel settings include contextVisibility. MCP `chat_read` respects the filter. UI shows context mode per channel.
 
-#### 2.3 — Unified Task System
-**What:** Merge SQLite jobs, per-agent task queues, and scheduled tasks into one task model with unified dashboard.
-**Files:** `backend/jobs.py` (extend), `backend/routes/agents.py` (task endpoints), `frontend/src/components/JobsPanel.tsx` (unify)
-**Acceptance:** Single `/api/tasks` endpoint. Dashboard shows all tasks regardless of source. Filter by agent, status, type.
+#### 2.3 — Stop Button During Tool Execution
+**What:** UI button to cancel an in-progress agent tool call. Sends cancel signal to agent process.
+**Files:** `frontend/src/components/ChatMessage.tsx` (stop button), `backend/routes/agents.py` (cancel endpoint)
+**Acceptance:** Stop button visible during tool execution. Click cancels the operation. Agent receives cancellation signal.
 
 #### 2.4 — Live Model Switching
 **What:** Switch an agent's model without restarting it. PATCH endpoint + UI control.
 **Files:** `backend/routes/agents.py`, `backend/registry.py`, `frontend/src/components/AgentCockpit.tsx`
 **Acceptance:** Switch model mid-conversation. Agent uses new model for next response. No restart needed.
 
-#### 2.5 — Stop Button During Tool Execution
-**What:** UI button to cancel an in-progress agent tool call. Sends cancel signal to agent process.
-**Files:** `frontend/src/components/ChatMessage.tsx` (stop button), `backend/routes/agents.py` (cancel endpoint)
-**Acceptance:** Stop button visible during tool execution. Click cancels the operation. Agent receives cancellation signal.
+---
+
+### Phase 3: Task System Unification & Operator Visibility
+**Priority:** HIGH — Structural coherence, foundation for future features
+**Effort:** 1-2 weeks
+
+#### 3.1 — Unified Task Model
+**What:** Merge SQLite jobs, per-agent task queues, and scheduled tasks into one task model with unified dashboard.
+**Files:** `backend/jobs.py` (extend), `backend/routes/agents.py` (task endpoints), `frontend/src/components/JobsPanel.tsx` (unify)
+**Acceptance:** Single `/api/tasks` endpoint. Dashboard shows all tasks regardless of source. Filter by agent, status, type.
+
+#### 3.2 — Structured Progress Events
+**What:** Agents emit structured plan/progress updates (steps, substeps, completion %) that render as step-by-step UI.
+**Files:** `backend/mcp_bridge.py` (progress tool enhancement), `frontend/src/components/ProgressCard.tsx`
+**Acceptance:** Agent progress shows as checklist in UI. Steps update in real-time. Completion percentage visible.
+
+#### 3.3 — Operator Dashboard Enhancement
+**What:** Unified view: active tasks, agent health, cache stats, recent errors. Single "control room" screen.
+**Files:** `frontend/src/components/StatsPanel.tsx` (extend), new dashboard components
+**Acceptance:** One screen shows system health at a glance. No clicking through multiple panels needed.
 
 ---
 
-### Phase 3: Provider Expansion & Caching
+### Phase 4: Provider Expansion & Caching
 **Priority:** HIGH — Competitive parity on model access
 **Effort:** 1 week
 
@@ -216,7 +253,7 @@
 
 ---
 
-### Phase 4: Media Generation
+### Phase 5: Media Generation
 **Priority:** MEDIUM — Differentiator but not core
 **Effort:** 1-2 weeks
 
@@ -232,7 +269,7 @@
 
 ---
 
-### Phase 5: Memory & Intelligence Upgrade
+### Phase 6: Memory & Intelligence Upgrade
 **Priority:** MEDIUM — Long-term differentiator
 **Effort:** 2-3 weeks
 
@@ -253,7 +290,7 @@
 
 ---
 
-### Phase 6: UI & Accessibility
+### Phase 7: UI & Accessibility
 **Priority:** MEDIUM — Quality of life
 **Effort:** 2-3 weeks
 
@@ -279,7 +316,7 @@
 
 ---
 
-### Phase 7: Platform & Integrations (Defer)
+### Phase 8: Platform & Integrations (Defer)
 **Priority:** LOW — Large effort, specialized value
 **Effort:** 4+ weeks
 
@@ -306,14 +343,14 @@
 - **17 AI providers** with failover and cost tracking
 - **Agent hierarchy** — manager/worker/peer roles with delegation
 
-### After Phase 1-3, GhostLink Will Match OpenClaw On:
+### After Phase 1-4, GhostLink Will Match OpenClaw On:
 - Plugin security posture (allowlists, provenance, fail-closed hooks)
 - Agent control depth (thinking level, context visibility, model switching)
 - Provider coverage (20+ providers)
 - Prompt caching optimization
 - Task system unification
 
-### Remaining Gaps (Phase 4-7, Lower Priority):
+### Remaining Gaps (Phase 5-8, Lower Priority):
 - Media generation (video/music)
 - Advanced memory (dreaming/weighted recall)
 - Additional channel bridges (Matrix, MS Teams)
