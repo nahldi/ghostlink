@@ -1,194 +1,20 @@
 import { useState, useRef, useCallback, useMemo, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
-import { motion } from 'framer-motion';
 import { useChatStore } from '../stores/chatStore';
 import { useMentionAutocomplete } from '../hooks/useMentionAutocomplete';
 import { api } from '../lib/api';
 import { toast } from './Toast';
 import { VoiceCall } from './VoiceCall';
-
-// ── Voice Input (Web Speech API) ───────────────────────────────────
-
-// Web Speech API types (not in standard TS lib)
-interface SpeechRecognitionResult { readonly [index: number]: { transcript: string; confidence: number }; }
-interface SpeechRecognitionResultList { readonly length: number; readonly [index: number]: SpeechRecognitionResult; }
-interface SpeechRecognitionEvent extends Event { readonly results: SpeechRecognitionResultList; }
-interface SpeechRecognitionErrorEvent extends Event { readonly error: string; readonly message?: string; }
-interface SpeechRecognitionInstance {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-
-const _win = window as Window & { SpeechRecognition?: new () => SpeechRecognitionInstance; webkitSpeechRecognition?: new () => SpeechRecognitionInstance };
-const SpeechRecognition = _win.SpeechRecognition || _win.webkitSpeechRecognition;
-const HAS_BROWSER_STT = !!SpeechRecognition;
-const HAS_MEDIA_DEVICES = !!(navigator.mediaDevices?.getUserMedia);
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function useVoiceInput(onTranscript: (text: string) => void, lang?: string) {
-  const [listening, setListening] = useState(false);
-  const [error, setError] = useState('');
-  const [permissionState, setPermissionState] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-
-  // Check mic permission on mount
-  useEffect(() => {
-    if (navigator.permissions?.query) {
-      navigator.permissions.query({ name: 'microphone' as PermissionName }).then(result => {
-        setPermissionState(result.state as 'granted' | 'denied' | 'prompt');
-        result.addEventListener('change', () => setPermissionState(result.state as 'granted' | 'denied' | 'prompt'));
-      }).catch(() => setPermissionState('unknown'));
-    }
-  }, []);
-
-  const requestMicPermission = useCallback(async (): Promise<boolean> => {
-    if (!HAS_MEDIA_DEVICES) {
-      setError('Microphone not supported in this browser');
-      return false;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Got permission — stop the test stream
-      stream.getTracks().forEach(t => t.stop());
-      setPermissionState('granted');
-      setError('');
-      return true;
-    } catch (e: unknown) {
-      const err = e instanceof Error ? e : new Error(String(e));
-      if (err.name === 'NotAllowedError') {
-        setPermissionState('denied');
-        setError('Microphone access denied. Check browser permissions.');
-      } else if (err.name === 'NotFoundError') {
-        setError('No microphone found. Connect a microphone and try again.');
-      } else {
-        setError('Microphone error: ' + err.message);
-      }
-      return false;
-    }
-  }, []);
-
-  const start = useCallback(async () => {
-    if (listening) return;
-    setError('');
-
-    // Request permission first if needed
-    if (permissionState !== 'granted') {
-      const ok = await requestMicPermission();
-      if (!ok) return;
-    }
-
-    // Try browser SpeechRecognition first (real-time, free)
-    if (HAS_BROWSER_STT) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = lang || navigator.language || 'en-US';
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          const transcript = event.results[0][0].transcript;
-          onTranscript(transcript);
-          setListening(false);
-        };
-
-        recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
-          if (e.error === 'not-allowed') {
-            setError('Microphone access denied');
-            setPermissionState('denied');
-          } else if (e.error === 'no-speech') {
-            setError('No speech detected. Try again.');
-          } else {
-            setError('Speech recognition error: ' + (e.error || 'unknown'));
-          }
-          setListening(false);
-        };
-
-        recognition.onend = () => setListening(false);
-
-        recognitionRef.current = recognition;
-        recognition.start();
-        setListening(true);
-        return;
-      } catch {
-        // Fall through to server-side
-      }
-    }
-
-    // Fallback: Record audio and send to /api/transcribe (Whisper)
-    if (HAS_MEDIA_DEVICES) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        chunksRef.current = [];
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunksRef.current.push(e.data);
-        };
-
-        mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach(t => t.stop());
-          const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-          // Send to server for transcription
-          try {
-            const fd = new FormData();
-            fd.append('audio', audioBlob, 'recording.webm');
-            const resp = await fetch('/api/transcribe', { method: 'POST', body: fd });
-            if (resp.ok) {
-              const data = await resp.json();
-              if (data.text) onTranscript(data.text);
-              else setError('No speech detected');
-            } else {
-              const err = await resp.json().catch(() => ({ error: 'Transcription failed' }));
-              setError(err.error || 'Transcription failed');
-            }
-          } catch (e: unknown) {
-            setError('Transcription error: ' + getErrorMessage(e));
-          }
-          setListening(false);
-        };
-
-        mediaRecorderRef.current = mediaRecorder;
-        mediaRecorder.start();
-        setListening(true);
-      } catch (e: unknown) {
-        setError('Could not start recording: ' + getErrorMessage(e));
-      }
-    } else {
-      setError('Voice input not available in this browser');
-    }
-  }, [listening, onTranscript, lang, permissionState, requestMicPermission]);
-
-  const stop = useCallback(() => {
-    recognitionRef.current?.stop();
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-    setListening(false);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.abort();
-      if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-    };
-  }, []);
-
-  const available = HAS_BROWSER_STT || HAS_MEDIA_DEVICES;
-  return { listening, start, stop, available, error, permissionState };
-}
+import {
+  DropZoneOverlay,
+  MentionAutocomplete,
+  PendingAttachmentPreview,
+  ReplyIndicator,
+  SendButton,
+  SlashCommandPicker,
+  VoiceControls,
+  type PendingAttachment,
+} from './message-input/MessageInputChrome';
+import { getErrorMessage, HAS_MEDIA_DEVICES, useVoiceInput } from './message-input/useVoiceInput';
 
 interface SlashCommand {
   name: string;
@@ -219,7 +45,7 @@ export function MessageInput() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedDraft, setSavedDraft] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string; type: string }[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   // Voice note recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -918,82 +744,35 @@ export function MessageInput() {
   };
 
   return (
-    <div
-      className="relative"
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+    <DropZoneOverlay
+      isDragging={isDragging}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
     >
-      {/* Drop zone overlay */}
-      {isDragging && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 border-2 border-dashed border-primary/40 rounded-xl backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-primary text-sm font-medium">
-            <span className="material-symbols-outlined">cloud_upload</span>
-            Drop files to upload
-          </div>
-        </div>
-      )}
-
-      {/* Reply indicator */}
-      {replyTo && (
-        <div className="w-full flex items-center gap-2 px-4 py-2 bg-surface-container border-t border-outline-variant/10 text-xs text-on-surface-variant">
-          <span className="material-symbols-outlined text-sm">reply</span>
-          Replying to <span className="font-bold text-primary">{replyTo.sender}</span>
-          <button
-            onClick={() => setReplyTo(null)}
-            className="ml-auto text-outline hover:text-on-surface"
-          >
-            <span className="material-symbols-outlined text-sm">close</span>
-          </button>
-        </div>
-      )}
-
-      {/* Mention autocomplete dropdown */}
-      {isOpen && (
-        <div className="absolute bottom-full left-4 right-4 mb-1 glass-strong rounded-xl overflow-hidden shadow-xl z-50">
-          {suggestions.map((s, i) => (
-            <button
-              key={s.name}
-              onClick={() => {
-                const newText = applyMention(s.name);
-                setText(newText);
-                setSelectedIndex(0);
-                textareaRef.current?.focus();
-              }}
-              className={`w-full text-left px-4 py-2 text-xs flex items-center gap-2 transition-colors ${
-                i === selectedIndex
-                  ? 'bg-primary-container/20 text-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest'
-              }`}
-            >
-              <span className="font-bold">@{s.name}</span>
-              <span className="text-outline">{s.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Slash command picker */}
-      {showSlash && (
-        <div className="absolute bottom-full left-4 right-4 mb-1 glass-strong rounded-xl overflow-hidden shadow-xl z-50">
-          {filteredCommands.map((cmd, i) => (
-            <button
-              key={cmd.name}
-              onClick={() => executeSlashCommand(cmd)}
-              className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-3 transition-colors ${
-                i === slashIndex
-                  ? 'bg-primary-container/20 text-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container-highest'
-              }`}
-            >
-              <span className="font-bold text-primary/80">{cmd.name}</span>
-              <span className="text-outline">{cmd.description}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Input area */}
+      <ReplyIndicator replyTo={replyTo} onClear={() => setReplyTo(null)} />
+      <MentionAutocomplete
+        isOpen={isOpen}
+        suggestions={suggestions}
+        selectedIndex={selectedIndex}
+        onSelect={(name) => {
+          const newText = applyMention(name);
+          setText(newText);
+          setSelectedIndex(0);
+          textareaRef.current?.focus();
+        }}
+      />
+      <SlashCommandPicker
+        commands={showSlash ? filteredCommands : []}
+        selectedIndex={slashIndex}
+        onPick={(commandName) => {
+          const command = filteredCommands.find((candidate) => candidate.name === commandName);
+          if (command) executeSlashCommand(command);
+        }}
+      />
       <div className="w-full flex items-end gap-2 p-3 lg:px-8 lg:py-4 safe-bottom">
         <button
           onClick={() => window.dispatchEvent(new CustomEvent('ghostlink:open-session-launcher'))}
@@ -1009,29 +788,10 @@ export function MessageInput() {
         >
           <span className="material-symbols-outlined text-xl">attachment</span>
         </button>
-        {/* Pending attachment previews */}
-        {pendingAttachments.length > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            {pendingAttachments.map((att, i) => (
-              <div key={i} className="relative group">
-                {att.type.startsWith('image/') ? (
-                  <img src={att.url} alt={att.name} className="w-8 h-8 rounded-lg object-cover border border-outline-variant/15" />
-                ) : (
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center border border-outline-variant/15">
-                    <span className="material-symbols-outlined text-[14px] text-on-surface-variant/40">description</span>
-                  </div>
-                )}
-                <button
-                  onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
-                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-error/90 text-white flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label={`Remove ${att.name}`}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <PendingAttachmentPreview
+          attachments={pendingAttachments}
+          onRemove={(index) => setPendingAttachments((prev) => prev.filter((_, candidate) => candidate !== index))}
+        />
         <textarea
           ref={textareaRef}
           value={text}
@@ -1047,57 +807,19 @@ export function MessageInput() {
           rows={1}
           className="flex-1 bg-surface-container/50 rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/30 resize-none max-h-40 outline-none border border-outline-variant/8 focus:border-primary/25 transition-colors duration-150"
         />
-        {/* Voice Note Recording */}
-        {isRecording ? (
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-[11px] text-red-400 font-mono tabular-nums w-8">
-              {Math.floor(recordingTime / 60)}:{String(recordingTime % 60).padStart(2, '0')}
-            </span>
-            <button onClick={cancelRecording} className="p-1.5 rounded-lg text-on-surface-variant/40 hover:text-red-400 hover:bg-red-500/10 transition-colors" aria-label="Cancel recording" title="Cancel">
-              <span className="material-symbols-outlined text-lg">close</span>
-            </button>
-            <button onClick={stopRecording} className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors" aria-label="Send voice note" title="Send voice note">
-              <span className="material-symbols-outlined text-lg">send</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Mic button — voice note */}
-            <button
-              onClick={startRecording}
-              disabled={!canUseVoiceInput}
-              className="p-2.5 rounded-xl text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container-high/60 transition-all active:scale-90"
-              title={canUseVoiceInput ? 'Record voice note' : 'Voice input unavailable in this browser'}
-              aria-label="Record voice note"
-            >
-              <span className="material-symbols-outlined text-xl">mic</span>
-            </button>
-            {/* Phone button — voice call */}
-            <button
-              onClick={() => setShowVoiceCall(true)}
-              disabled={!canUseVoiceInput}
-              className="p-2.5 rounded-xl text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container-high/60 transition-all active:scale-90"
-              title={canUseVoiceInput ? 'Start voice call' : 'Voice input unavailable in this browser'}
-              aria-label="Start voice call with agent"
-            >
-              <span className="material-symbols-outlined text-xl">call</span>
-            </button>
-          </div>
-        )}
-        <motion.button
-          onClick={handleSend}
-          disabled={!text.trim()}
-          whileTap={{ scale: 0.88 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-          className="p-2.5 rounded-xl bg-primary-container text-primary-fixed hover:brightness-110 transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
-        >
-          <span className="material-symbols-outlined text-xl">send</span>
-        </motion.button>
+        <VoiceControls
+          isRecording={isRecording}
+          recordingTime={recordingTime}
+          canUseVoiceInput={canUseVoiceInput}
+          onCancelRecording={cancelRecording}
+          onStopRecording={stopRecording}
+          onStartRecording={startRecording}
+          onOpenVoiceCall={() => setShowVoiceCall(true)}
+        />
+        <SendButton disabled={!text.trim()} onClick={() => { void handleSend(); }} />
       </div>
 
-      {/* Voice Call Overlay */}
       {showVoiceCall && <VoiceCall onClose={() => setShowVoiceCall(false)} />}
-    </div>
+    </DropZoneOverlay>
   );
 }
