@@ -1,5 +1,12 @@
 # GhostLink Changelog
 
+## v5.7.1 — 2026-04-06
+### Safe Dependency Refresh
+- **Frontend toolchain patches** — upgraded `vite` from `8.0.1` to `8.0.3` and `typescript-eslint` from `8.57.x` to `8.58.0`
+- **Backend dependency patches** — upgraded `fastapi` to `0.135.3`, `uvicorn` to `0.43.0`, `python-multipart` to `0.0.24`, `mcp` to `1.27.0`, and `cryptography` to `46.0.6`
+- **Release consistency** — synced runtime/package/SDK version strings to `5.7.1` and corrected stale package-lock metadata
+- **Verification** — backend tests, frontend tests, lint, frontend build, and desktop TypeScript build all re-run clean on the upgraded set
+
 ## v5.7.0 — 2026-04-01
 ### Ops & Recovery Toolkit, Updater Fixes, Visual Reset
 - **Health endpoint** — `/api/health` added for readiness checks and launcher polling

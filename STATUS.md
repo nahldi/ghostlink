@@ -1,7 +1,7 @@
 # GhostLink — Project Status & Handoff
 
-**Last updated:** 2026-04-01
-**Version:** v5.7.0
+**Last updated:** 2026-04-06
+**Version:** v5.7.1
 **Owner:** nahldi
 **GitHub:** https://github.com/nahldi/ghostlink (public)
 **License:** MIT
@@ -66,9 +66,10 @@ GhostLink is a local-first multi-agent AI chat platform. It puts all your AI age
 
 ---
 
-## CURRENT STATE (v5.7.0)
+## CURRENT STATE (v5.7.1)
 
 ### Recent Changes (latest first)
+- **v5.7.1**: Safe dependency refresh — upgrade `vite`, `typescript-eslint`, `fastapi`, `uvicorn`, `python-multipart`, `mcp`, and `cryptography`; rerun backend/frontend verification; sync version metadata and lockfiles.
 - **v5.7.0**: Ops & recovery toolkit — add `/api/health`, `/api/diagnostics`, `/api/backup`, and `/api/restore`; wire diagnostics/backup/restore into Settings; tighten updater reliability; trim back excess glass/glow styling; expand release verification.
 - **v5.6.1**: Fluidity pass — improve motion, bridge retry/rate limiting, expand frontend/backend tests, sync SDK version, and clean up backend linting.
 - **v5.6.0**: Security hardening + runtime fixes — tighten Electron isolation, fix auth detection and MCP auth gaps, harden SSRF/exec policy/runtime cleanup, and bring docs back in sync with the codebase.
