@@ -1,5 +1,16 @@
 # GhostLink Changelog
 
+## v5.7.2 — 2026-04-06
+### Reliability, Performance, Architecture
+- **Launcher/setup wizard fixes** — unified desktop/backend settings path, fixed setupComplete lifecycle so wizard doesn't re-appear, hardened server start health verification, made wizard→launcher transition atomic
+- **Backend memory safety** — capped MCP invocation logs (200/agent, 50 agents max), file diff cache (100/agent), added cleanup_agent_state() for deregistration, batch message deletion
+- **Export/share pagination** — unbounded SELECT * replaced with 1000-row paged queries with pagination metadata
+- **Dead process reaping** — zombie agent processes now cleaned up automatically via reap_dead_agent_processes()
+- **Token streaming perf** — appendToMessage no longer remaps entire message array per token (reverse scan + single clone)
+- **Reconnect throttling** — WebSocket reconnect now fetches active channel first, batches agent state 3 at a time, skips offline agents
+- **Component architecture** — SettingsPanel split from 2023→1300 LOC (SecurityTab + AdvancedTab extracted), ChatMessage 625→333 LOC, MessageInput 1103→825 LOC
+- **Test coverage** — 220 total tests (171 backend + 49 frontend)
+
 ## v5.7.1 — 2026-04-06
 ### Safe Dependency Refresh
 - **Frontend toolchain patches** — upgraded `vite` from `8.0.1` to `8.0.3` and `typescript-eslint` from `8.57.x` to `8.58.0`

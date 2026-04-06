@@ -148,7 +148,7 @@ async def get_ws_token(request: Request):
 async def health_check():
     return {
         "status": "ok",
-        "version": "5.7.1",
+        "version": "5.7.2",
         "uptime": time.time() - deps._settings.get("_server_start", time.time()),
     }
 

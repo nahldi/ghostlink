@@ -39,7 +39,7 @@ async def test_health_returns_ok(ops_env):
     from routes.misc import health_check
     result = await health_check()
     assert result["status"] == "ok"
-    assert result["version"] == "5.7.1"
+    assert result["version"] == "5.7.2"
     assert result["uptime"] >= 0
 
 
