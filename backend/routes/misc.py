@@ -325,6 +325,7 @@ async def save_settings(request: Request):
         "channels", "persistentAgents", "autoRoute", "autoStart", "connectedAgents",
         "quietHoursStart", "quietHoursEnd", "soundEnabled", "soundVolume",
         "soundPerAgent", "timezone", "timeFormat", "voiceLanguage",
+        "setupComplete", "platform", "shell", "workspace", "experienceMode",
     }
     filtered = {k: v for k, v in body.items() if k in _ALLOWED_SETTINGS}
     async with deps._settings_lock:

@@ -199,6 +199,8 @@ class ServerManager {
                 }
             }
         }
+        // Sync desktop settings to backend data dir so the backend sees wizard config
+        this.syncSettingsToBackend(backendPath);
         electron_log_1.default.info('Starting backend — python=%s  cwd=%s  port=%d', pythonPath, backendPath, this.port);
         try {
             this.process = (0, child_process_1.spawn)(pythonPath, ['app.py'], {
@@ -415,6 +417,8 @@ class ServerManager {
                 break;
             }
         }
+        // Sync desktop settings to backend data dir so the backend sees wizard config
+        this.syncSettingsToBackend(backendPath);
         electron_log_1.default.info('Starting backend via WSL — python=%s app=%s', wslPython, joinWslPath(wslBackend, 'app.py'));
         // Capture all output for crash diagnostics
         let serverOutput = '';
@@ -543,6 +547,49 @@ class ServerManager {
     /**
      * True when running from a packaged (asar / resources) build.
      */
+    /**
+     * Sync desktop settings (~/.ghostlink/settings.json) into the backend's
+     * data directory so the backend can read wizard-completed config
+     * (setupComplete, persistentAgents, platform, workspace, etc.).
+     */
+    syncSettingsToBackend(backendPath) {
+        try {
+            const desktopSettings = getSettings();
+            if (!desktopSettings) return;
+            // Read backend config.toml to find its data_dir
+            let dataDir = path_1.default.join(backendPath, 'data');
+            try {
+                const configPath = path_1.default.join(backendPath, 'config.toml');
+                if (fs_1.default.existsSync(configPath)) {
+                    const configText = fs_1.default.readFileSync(configPath, 'utf-8');
+                    const match = configText.match(/data_dir\s*=\s*"([^"]+)"/);
+                    if (match) {
+                        const cfgDataDir = match[1];
+                        dataDir = path_1.default.isAbsolute(cfgDataDir)
+                            ? cfgDataDir
+                            : path_1.default.resolve(backendPath, cfgDataDir);
+                    }
+                }
+            } catch { /* use default data dir */ }
+            fs_1.default.mkdirSync(dataDir, { recursive: true });
+            const backendSettingsPath = path_1.default.join(dataDir, 'settings.json');
+            // Merge: if backend settings exist, desktop wizard keys take priority
+            let merged = { ...desktopSettings };
+            if (fs_1.default.existsSync(backendSettingsPath)) {
+                try {
+                    const backendSettings = JSON.parse(fs_1.default.readFileSync(backendSettingsPath, 'utf-8'));
+                    // Start from backend settings, overlay desktop wizard keys
+                    merged = { ...backendSettings, ...desktopSettings };
+                    // Preserve backend runtime keys that desktop shouldn't overwrite
+                    if (backendSettings._server_start) merged._server_start = backendSettings._server_start;
+                } catch { /* backend settings corrupt — overwrite with desktop */ }
+            }
+            fs_1.default.writeFileSync(backendSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');
+            electron_log_1.default.info('Synced desktop settings to backend data dir: %s', backendSettingsPath);
+        } catch (err) {
+            electron_log_1.default.warn('Failed to sync settings to backend: %s', err?.message ?? err);
+        }
+    }
     isPackaged() {
         return electron_1.app.isPackaged;
     }
