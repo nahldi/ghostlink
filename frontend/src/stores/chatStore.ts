@@ -167,11 +167,24 @@ export const useChatStore = create<ChatState>((set) => ({
       ),
     })),
   appendToMessage: (id, token) =>
-    set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === id ? { ...m, text: m.text + token } : m
-      ),
-    })),
+    set((s) => {
+      let targetIndex = -1;
+      for (let i = s.messages.length - 1; i >= 0; i -= 1) {
+        if (s.messages[i].id === id) {
+          targetIndex = i;
+          break;
+        }
+      }
+
+      if (targetIndex === -1) {
+        return s;
+      }
+
+      const messages = [...s.messages];
+      const target = messages[targetIndex];
+      messages[targetIndex] = { ...target, text: target.text + token };
+      return { messages };
+    }),
   deleteMessages: (ids) =>
     set((s) => ({
       messages: s.messages.filter((m) => !ids.includes(m.id)),

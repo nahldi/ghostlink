@@ -57,6 +57,29 @@ describe('chatStore', () => {
     expect(useChatStore.getState().messages[0].text).toBe('Hello world');
   });
 
+  it('appendToMessage preserves untouched message identities', () => {
+    const first = {
+      id: 1, uid: 'test-1', sender: 'claude', text: 'Hello',
+      type: 'chat' as const, timestamp: Date.now() / 1000,
+      time: '12:00', channel: 'general',
+    };
+    const second = {
+      id: 2, uid: 'test-2', sender: 'codex', text: 'World',
+      type: 'chat' as const, timestamp: Date.now() / 1000,
+      time: '12:01', channel: 'general',
+    };
+
+    useChatStore.getState().setMessages([first, second]);
+    const before = useChatStore.getState().messages;
+
+    useChatStore.getState().appendToMessage(2, '!');
+
+    const after = useChatStore.getState().messages;
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).not.toBe(before[1]);
+    expect(after[1].text).toBe('World!');
+  });
+
   it('deletes messages', () => {
     const msg1 = { id: 1, uid: 'test-1', sender: 'user', text: 'a', type: 'chat' as const, timestamp: 1, time: '1', channel: 'general' };
     const msg2 = { id: 2, uid: 'test-2', sender: 'user', text: 'b', type: 'chat' as const, timestamp: 2, time: '2', channel: 'general' };
