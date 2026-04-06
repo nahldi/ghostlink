@@ -181,6 +181,7 @@ class ServerManager {
             electron_log_1.default.error(msg);
             return { success: false, error: msg };
         }
+        this.syncSettingsToBackend(backendPath);
         // Ensure Python deps are installed (first-run auto-install)
         try {
             this.exec(pythonPath, ['-c', 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)', 'fastapi'], { stdio: 'ignore', timeout: 5_000 });
@@ -199,8 +200,6 @@ class ServerManager {
                 }
             }
         }
-        // Sync desktop settings to backend data dir so the backend sees wizard config
-        this.syncSettingsToBackend(backendPath);
         electron_log_1.default.info('Starting backend — python=%s  cwd=%s  port=%d', pythonPath, backendPath, this.port);
         try {
             this.process = (0, child_process_1.spawn)(pythonPath, ['app.py'], {
@@ -214,6 +213,7 @@ class ServerManager {
             });
             this.attachProcessHandlers();
             await this.waitForReady();
+            await this.confirmHealthyStartup();
             electron_log_1.default.info('Backend server is ready on port %d', this.port);
             return { success: true, port: this.port };
         }
@@ -337,6 +337,7 @@ class ServerManager {
                 return { success: false, error: 'Cannot access backend from WSL (OneDrive path). Try installing to a local folder instead.' };
             }
         }
+        this.syncSettingsToWsl(backendPath, wslBackend);
         // Check if ALL required deps are installed
         const requiredModules = ['fastapi', 'uvicorn', 'aiosqlite', 'mcp', 'tomli', 'websockets', 'cryptography'];
         let depsOk = true;
@@ -417,8 +418,6 @@ class ServerManager {
                 break;
             }
         }
-        // Sync desktop settings to backend data dir so the backend sees wizard config
-        this.syncSettingsToBackend(backendPath);
         electron_log_1.default.info('Starting backend via WSL — python=%s app=%s', wslPython, joinWslPath(wslBackend, 'app.py'));
         // Capture all output for crash diagnostics
         let serverOutput = '';
@@ -442,6 +441,7 @@ class ServerManager {
             });
             this.attachProcessHandlers();
             await this.waitForReady();
+            await this.confirmHealthyStartup();
             electron_log_1.default.info('Backend server is ready on port %d (via WSL)', this.port);
             return { success: true, port: this.port };
         }
@@ -482,6 +482,8 @@ class ServerManager {
         this.process.on('error', (err) => {
             electron_log_1.default.error('Backend process error:', err);
             this.process = null;
+            if (this.onServerExit)
+                this.onServerExit();
         });
     }
     /**
@@ -543,55 +545,110 @@ class ServerManager {
             pid: this.process?.pid,
         };
     }
+    async ensureHealthy(timeoutMs = 1_500) {
+        if (!this.process || this.process.exitCode !== null) {
+            return false;
+        }
+        const probe = await this.probeEndpoint('/api/health', timeoutMs);
+        return probe.ok;
+    }
     // ---------- private helpers ----------
     /**
      * True when running from a packaged (asar / resources) build.
      */
-    /**
-     * Sync desktop settings (~/.ghostlink/settings.json) into the backend's
-     * data directory so the backend can read wizard-completed config
-     * (setupComplete, persistentAgents, platform, workspace, etc.).
-     */
+    isPackaged() {
+        return electron_1.app.isPackaged;
+    }
+    getConfiguredDataDir(backendPath) {
+        try {
+            const configPath = path_1.default.join(backendPath, 'config.toml');
+            if (fs_1.default.existsSync(configPath)) {
+                const configText = fs_1.default.readFileSync(configPath, 'utf-8');
+                const match = configText.match(/data_dir\s*=\s*"([^"]+)"/);
+                if (match?.[1]) {
+                    return match[1];
+                }
+            }
+        }
+        catch {
+            // Fall back to the backend default.
+        }
+        return './data';
+    }
+    resolveNativeDataDir(backendPath) {
+        const dataDir = this.getConfiguredDataDir(backendPath);
+        return path_1.default.isAbsolute(dataDir)
+            ? dataDir
+            : path_1.default.resolve(backendPath, dataDir);
+    }
+    resolveWslDataDir(backendPath, wslBackendPath) {
+        const dataDir = this.getConfiguredDataDir(backendPath);
+        if (path_1.default.win32.isAbsolute(dataDir)) {
+            return winToWsl(dataDir);
+        }
+        if (path_1.default.posix.isAbsolute(dataDir)) {
+            return dataDir;
+        }
+        return joinWslPath(wslBackendPath, dataDir.replace(/\\/g, '/'));
+    }
     syncSettingsToBackend(backendPath) {
         try {
             const desktopSettings = getSettings();
-            if (!desktopSettings) return;
-            // Read backend config.toml to find its data_dir
-            let dataDir = path_1.default.join(backendPath, 'data');
-            try {
-                const configPath = path_1.default.join(backendPath, 'config.toml');
-                if (fs_1.default.existsSync(configPath)) {
-                    const configText = fs_1.default.readFileSync(configPath, 'utf-8');
-                    const match = configText.match(/data_dir\s*=\s*"([^"]+)"/);
-                    if (match) {
-                        const cfgDataDir = match[1];
-                        dataDir = path_1.default.isAbsolute(cfgDataDir)
-                            ? cfgDataDir
-                            : path_1.default.resolve(backendPath, cfgDataDir);
-                    }
-                }
-            } catch { /* use default data dir */ }
+            if (!desktopSettings)
+                return;
+            const dataDir = this.resolveNativeDataDir(backendPath);
             fs_1.default.mkdirSync(dataDir, { recursive: true });
             const backendSettingsPath = path_1.default.join(dataDir, 'settings.json');
-            // Merge: if backend settings exist, desktop wizard keys take priority
             let merged = { ...desktopSettings };
             if (fs_1.default.existsSync(backendSettingsPath)) {
                 try {
                     const backendSettings = JSON.parse(fs_1.default.readFileSync(backendSettingsPath, 'utf-8'));
-                    // Start from backend settings, overlay desktop wizard keys
                     merged = { ...backendSettings, ...desktopSettings };
-                    // Preserve backend runtime keys that desktop shouldn't overwrite
-                    if (backendSettings._server_start) merged._server_start = backendSettings._server_start;
-                } catch { /* backend settings corrupt — overwrite with desktop */ }
+                    if (backendSettings._server_start)
+                        merged._server_start = backendSettings._server_start;
+                }
+                catch {
+                    // Corrupt settings should not block startup.
+                }
             }
             fs_1.default.writeFileSync(backendSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');
             electron_log_1.default.info('Synced desktop settings to backend data dir: %s', backendSettingsPath);
-        } catch (err) {
+        }
+        catch (err) {
             electron_log_1.default.warn('Failed to sync settings to backend: %s', err?.message ?? err);
         }
     }
-    isPackaged() {
-        return electron_1.app.isPackaged;
+    syncSettingsToWsl(backendPath, wslBackendPath) {
+        try {
+            const desktopSettings = getSettings();
+            if (!desktopSettings)
+                return;
+            const dataDir = this.resolveWslDataDir(backendPath, wslBackendPath);
+            const backendSettingsPath = joinWslPath(dataDir, 'settings.json');
+            this.execWsl(['mkdir', '-p', dataDir], { stdio: 'pipe', timeout: 5_000 });
+            let merged = { ...desktopSettings };
+            const existingSettings = this.tryExecWsl(['cat', backendSettingsPath], { stdio: 'pipe', timeout: 5_000 });
+            if (existingSettings) {
+                try {
+                    const backendSettings = JSON.parse(existingSettings);
+                    merged = { ...backendSettings, ...desktopSettings };
+                    if (backendSettings._server_start)
+                        merged._server_start = backendSettings._server_start;
+                }
+                catch {
+                    // Corrupt settings should not block startup.
+                }
+            }
+            this.execWsl(['tee', backendSettingsPath], {
+                input: JSON.stringify(merged, null, 2),
+                stdio: ['pipe', 'ignore', 'pipe'],
+                timeout: 5_000,
+            });
+            electron_log_1.default.info('Synced desktop settings to WSL backend data dir: %s', backendSettingsPath);
+        }
+        catch (err) {
+            electron_log_1.default.warn('Failed to sync settings to WSL backend: %s', err?.message ?? err);
+        }
     }
     /**
      * Resolve the absolute path to the backend directory (Windows path).
@@ -681,23 +738,47 @@ class ServerManager {
                         reject(new Error('Backend process exited before becoming ready'));
                         return;
                     }
-                    const req = http_1.default.get(`http://127.0.0.1:${this.port}/api/status`, (res) => {
-                        if (res.statusCode === 200) {
-                            clearInterval(timer);
-                            resolve();
-                        }
-                        res.resume();
-                    });
-                    req.on('error', () => {
-                        // Server not ready yet — keep polling
-                    });
-                    req.setTimeout(400, () => req.destroy());
                     if (attempts >= maxAttempts) {
                         clearInterval(timer);
                         reject(new Error(`Backend did not become ready after ${(maxAttempts * intervalMs) / 1000}s`));
+                        return;
                     }
+                    this.probeEndpoint('/api/health', 400).then((probe) => {
+                        if (!probe.ok) {
+                            return;
+                        }
+                        clearInterval(timer);
+                        resolve();
+                    }).catch(() => {
+                        // Server not ready yet — keep polling
+                    });
                 }, intervalMs);
             }, initialDelay);
+        });
+    }
+    async confirmHealthyStartup() {
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+        if (!this.process || this.process.exitCode !== null) {
+            throw new Error('Backend exited immediately after reporting ready');
+        }
+        const probe = await this.probeEndpoint('/api/health', 1_000);
+        if (!probe.ok) {
+            const detail = probe.statusCode ? ` (HTTP ${probe.statusCode})` : '';
+            throw new Error(`Backend failed post-start health verification${detail}`);
+        }
+    }
+    probeEndpoint(endpointPath, timeoutMs) {
+        return new Promise((resolve) => {
+            const req = http_1.default.get(`http://127.0.0.1:${this.port}${endpointPath}`, (res) => {
+                const statusCode = res.statusCode;
+                res.resume();
+                resolve({ ok: statusCode === 200, statusCode });
+            });
+            req.on('error', () => resolve({ ok: false }));
+            req.setTimeout(timeoutMs, () => {
+                req.destroy();
+                resolve({ ok: false });
+            });
         });
     }
     /**

@@ -31,6 +31,11 @@ interface StartResult {
   error?: string;
 }
 
+interface HttpProbeResult {
+  ok: boolean;
+  statusCode?: number;
+}
+
 // ── Platform helpers ─────────────────────────────────────────────────────────
 
 function getSettings(): Record<string, any> | null {
@@ -213,6 +218,8 @@ class ServerManager {
       return { success: false, error: msg };
     }
 
+    this.syncSettingsToBackend(backendPath);
+
     // Ensure Python deps are installed (first-run auto-install)
     try {
       this.exec(
@@ -249,6 +256,7 @@ class ServerManager {
 
       this.attachProcessHandlers();
       await this.waitForReady();
+      await this.confirmHealthyStartup();
       log.info('Backend server is ready on port %d', this.port);
       return { success: true, port: this.port };
     } catch (err: any) {
@@ -401,6 +409,8 @@ class ServerManager {
       }
     }
 
+    this.syncSettingsToWsl(backendPath, wslBackend);
+
     // Check if ALL required deps are installed
     const requiredModules = ['fastapi', 'uvicorn', 'aiosqlite', 'mcp', 'tomli', 'websockets', 'cryptography'];
     let depsOk = true;
@@ -505,6 +515,7 @@ class ServerManager {
 
       this.attachProcessHandlers();
       await this.waitForReady();
+      await this.confirmHealthyStartup();
       log.info('Backend server is ready on port %d (via WSL)', this.port);
       return { success: true, port: this.port };
     } catch (err: any) {
@@ -549,6 +560,7 @@ class ServerManager {
     this.process.on('error', (err) => {
       log.error('Backend process error:', err);
       this.process = null;
+      if (this.onServerExit) this.onServerExit();
     });
   }
 
@@ -614,6 +626,14 @@ class ServerManager {
     };
   }
 
+  async ensureHealthy(timeoutMs = 1_500): Promise<boolean> {
+    if (!this.process || this.process.exitCode !== null) {
+      return false;
+    }
+    const probe = await this.probeEndpoint('/api/health', timeoutMs);
+    return probe.ok;
+  }
+
   // ---------- private helpers ----------
 
   /**
@@ -621,6 +641,103 @@ class ServerManager {
    */
   private isPackaged(): boolean {
     return app.isPackaged;
+  }
+
+  private getConfiguredDataDir(backendPath: string): string {
+    try {
+      const configPath = path.join(backendPath, 'config.toml');
+      if (fs.existsSync(configPath)) {
+        const configText = fs.readFileSync(configPath, 'utf-8');
+        const match = configText.match(/data_dir\s*=\s*"([^"]+)"/);
+        if (match?.[1]) {
+          return match[1];
+        }
+      }
+    } catch {
+      // Fall back to the backend default.
+    }
+
+    return './data';
+  }
+
+  private resolveNativeDataDir(backendPath: string): string {
+    const dataDir = this.getConfiguredDataDir(backendPath);
+    return path.isAbsolute(dataDir)
+      ? dataDir
+      : path.resolve(backendPath, dataDir);
+  }
+
+  private resolveWslDataDir(backendPath: string, wslBackendPath: string): string {
+    const dataDir = this.getConfiguredDataDir(backendPath);
+
+    if (path.win32.isAbsolute(dataDir)) {
+      return winToWsl(dataDir);
+    }
+
+    if (path.posix.isAbsolute(dataDir)) {
+      return dataDir;
+    }
+
+    return joinWslPath(wslBackendPath, dataDir.replace(/\\/g, '/'));
+  }
+
+  private syncSettingsToBackend(backendPath: string): void {
+    try {
+      const desktopSettings = getSettings();
+      if (!desktopSettings) return;
+
+      const dataDir = this.resolveNativeDataDir(backendPath);
+      fs.mkdirSync(dataDir, { recursive: true });
+      const backendSettingsPath = path.join(dataDir, 'settings.json');
+
+      let merged = { ...desktopSettings };
+      if (fs.existsSync(backendSettingsPath)) {
+        try {
+          const backendSettings = JSON.parse(fs.readFileSync(backendSettingsPath, 'utf-8'));
+          merged = { ...backendSettings, ...desktopSettings };
+          if (backendSettings._server_start) merged._server_start = backendSettings._server_start;
+        } catch {
+          // Corrupt settings should not block startup.
+        }
+      }
+
+      fs.writeFileSync(backendSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');
+      log.info('Synced desktop settings to backend data dir: %s', backendSettingsPath);
+    } catch (err: any) {
+      log.warn('Failed to sync settings to backend: %s', err?.message ?? err);
+    }
+  }
+
+  private syncSettingsToWsl(backendPath: string, wslBackendPath: string): void {
+    try {
+      const desktopSettings = getSettings();
+      if (!desktopSettings) return;
+
+      const dataDir = this.resolveWslDataDir(backendPath, wslBackendPath);
+      const backendSettingsPath = joinWslPath(dataDir, 'settings.json');
+      this.execWsl(['mkdir', '-p', dataDir], { stdio: 'pipe', timeout: 5_000 });
+
+      let merged = { ...desktopSettings };
+      const existingSettings = this.tryExecWsl(['cat', backendSettingsPath], { stdio: 'pipe', timeout: 5_000 });
+      if (existingSettings) {
+        try {
+          const backendSettings = JSON.parse(existingSettings);
+          merged = { ...backendSettings, ...desktopSettings };
+          if (backendSettings._server_start) merged._server_start = backendSettings._server_start;
+        } catch {
+          // Corrupt settings should not block startup.
+        }
+      }
+
+      this.execWsl(['tee', backendSettingsPath], {
+        input: JSON.stringify(merged, null, 2),
+        stdio: ['pipe', 'ignore', 'pipe'],
+        timeout: 5_000,
+      });
+      log.info('Synced desktop settings to WSL backend data dir: %s', backendSettingsPath);
+    } catch (err: any) {
+      log.warn('Failed to sync settings to WSL backend: %s', err?.message ?? err);
+    }
   }
 
   /**
@@ -721,26 +838,54 @@ class ServerManager {
             return;
           }
 
-          const req = http.get(`http://127.0.0.1:${this.port}/api/status`, (res) => {
-            if (res.statusCode === 200) {
-              clearInterval(timer);
-              resolve();
-            }
-            res.resume();
-          });
-
-          req.on('error', () => {
-            // Server not ready yet — keep polling
-          });
-
-          req.setTimeout(400, () => req.destroy());
-
           if (attempts >= maxAttempts) {
             clearInterval(timer);
             reject(new Error(`Backend did not become ready after ${(maxAttempts * intervalMs) / 1000}s`));
+            return;
           }
+
+          this.probeEndpoint('/api/health', 400).then((probe) => {
+            if (!probe.ok) {
+              return;
+            }
+
+            clearInterval(timer);
+            resolve();
+          }).catch(() => {
+            // Server not ready yet — keep polling
+          });
         }, intervalMs);
       }, initialDelay);
+    });
+  }
+
+  private async confirmHealthyStartup(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+    if (!this.process || this.process.exitCode !== null) {
+      throw new Error('Backend exited immediately after reporting ready');
+    }
+
+    const probe = await this.probeEndpoint('/api/health', 1_000);
+    if (!probe.ok) {
+      const detail = probe.statusCode ? ` (HTTP ${probe.statusCode})` : '';
+      throw new Error(`Backend failed post-start health verification${detail}`);
+    }
+  }
+
+  private probeEndpoint(endpointPath: string, timeoutMs: number): Promise<HttpProbeResult> {
+    return new Promise((resolve) => {
+      const req = http.get(`http://127.0.0.1:${this.port}${endpointPath}`, (res) => {
+        const statusCode = res.statusCode;
+        res.resume();
+        resolve({ ok: statusCode === 200, statusCode });
+      });
+
+      req.on('error', () => resolve({ ok: false }));
+      req.setTimeout(timeoutMs, () => {
+        req.destroy();
+        resolve({ ok: false });
+      });
     });
   }
 

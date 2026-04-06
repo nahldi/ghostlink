@@ -89,6 +89,26 @@ async function isPythonModuleAvailable(command: string, moduleName: string, useW
   }
 }
 
+const REQUIRED_PYTHON_MODULES = [
+  'fastapi',
+  'uvicorn',
+  'aiosqlite',
+  'multipart',
+  'mcp',
+  'tomli',
+  'websockets',
+  'cryptography',
+] as const;
+
+async function hasRequiredPythonModules(command: string, useWsl: boolean): Promise<boolean> {
+  for (const moduleName of REQUIRED_PYTHON_MODULES) {
+    if (!await isPythonModuleAvailable(command, moduleName, useWsl)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 async function findExecutable(command: string, useWsl: boolean): Promise<boolean> {
   try {
     if (useWsl) {
@@ -246,6 +266,51 @@ function createWizardWindow(): BrowserWindow {
   return wizardWindow;
 }
 
+async function waitForWindowVisible(window: BrowserWindow, label: string, timeoutMs = 15_000): Promise<void> {
+  if (window.isDestroyed()) {
+    throw new Error(`${label} window was destroyed before it became ready`);
+  }
+
+  if (window.isVisible()) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const webContents = window.webContents as any;
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      window.removeListener('ready-to-show', onReady);
+      window.removeListener('show', onReady);
+      window.removeListener('closed', onClosed);
+      webContents.removeListener('did-fail-load', onFailLoad);
+    };
+
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn();
+    };
+
+    const onReady = () => finish(resolve);
+    const onClosed = () => finish(() => reject(new Error(`${label} window closed before it became ready`)));
+    const onFailLoad = (_event: Event, errorCode: number, errorDescription: string) => {
+      finish(() => reject(new Error(`${label} window failed to load (${errorCode}): ${errorDescription}`)));
+    };
+
+    const timeout = setTimeout(() => {
+      finish(() => reject(new Error(`${label} window did not become ready within ${timeoutMs}ms`)));
+    }, timeoutMs);
+
+    window.once('ready-to-show', onReady);
+    window.once('show', onReady);
+    window.once('closed', onClosed);
+    webContents.once('did-fail-load', onFailLoad);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Chat window
 // ---------------------------------------------------------------------------
@@ -340,7 +405,7 @@ function setupWizardIPC(): void {
       }
 
       if (found && pythonPath) {
-        depsInstalled = await isPythonModuleAvailable(pythonPath, 'fastapi', true);
+        depsInstalled = await hasRequiredPythonModules(pythonPath, true);
       }
     } else {
       const supportedPython = await findSupportedPython(false);
@@ -351,7 +416,7 @@ function setupWizardIPC(): void {
       }
 
       if (found && pythonPath) {
-        depsInstalled = await isPythonModuleAvailable(pythonPath, 'fastapi', false);
+        depsInstalled = await hasRequiredPythonModules(pythonPath, false);
       }
     }
 
@@ -380,6 +445,11 @@ function setupWizardIPC(): void {
         await runCommand(WSL_EXE, [supportedPython.command, '-m', 'pip', 'install', '-r', wslReqPath], 120_000);
       } else {
         await runCommand(supportedPython.command, ['-m', 'pip', 'install', '-r', reqPath], 120_000);
+      }
+
+      const installed = await hasRequiredPythonModules(supportedPython.command, useWsl);
+      if (!installed) {
+        return { success: false, error: 'Python dependencies are still missing after installation' };
       }
 
       return { success: true };
@@ -452,21 +522,33 @@ function setupWizardIPC(): void {
       // Save settings to ~/.ghostlink/settings.json
       saveSettings(sanitizedSettings);
 
-      // Close wizard window — set transitioning flag so app doesn't quit
       isTransitioning = true;
-      if (wizardWindow && !wizardWindow.isDestroyed()) {
-        wizardWindow.destroy();
-        wizardWindow = null;
-      }
+      const currentWizard = wizardWindow;
+      let launcher: BrowserWindow | null = null;
+      try {
+        launcher = createLauncherWindow();
+        await waitForWindowVisible(launcher, 'Launcher');
 
-      // Now open the launcher
-      const launcher = createLauncherWindow();
-      isTransitioning = false;
-      setupTray(launcher);
-      setupUpdater(launcher);
-      checkForUpdates().catch((err) => {
-        log.warn('Initial update check failed:', err.message ?? err);
-      });
+        if (currentWizard && !currentWizard.isDestroyed()) {
+          currentWizard.destroy();
+          if (wizardWindow === currentWizard) {
+            wizardWindow = null;
+          }
+        }
+
+        setupTray(launcher);
+        setupUpdater(launcher);
+        checkForUpdates().catch((err) => {
+          log.warn('Initial update check failed:', err.message ?? err);
+        });
+      } catch (transitionErr) {
+        if (launcher && !launcher.isDestroyed()) {
+          launcher.destroy();
+        }
+        throw transitionErr;
+      } finally {
+        isTransitioning = false;
+      }
 
       return { success: true };
     } catch (err: any) {
@@ -778,12 +860,30 @@ function setupIPC(): void {
   });
 
   // ── App-level ─────────────────────────────────────────────────────────
-  ipcMain.handle('app:open-chat', () => {
+  ipcMain.handle('app:open-chat', async () => {
     const status = serverManager.getStatus();
     if (!status.running) {
       log.warn('app:open-chat — server is not running');
       return { success: false, error: 'Server is not running' };
     }
+
+    const healthy = await serverManager.ensureHealthy();
+    if (!healthy) {
+      const launcher = getLauncherWindow();
+      const error = 'Server is not responding yet. Check the launcher for errors and try again.';
+      log.warn('app:open-chat — backend health verification failed');
+      if (launcher && !launcher.isDestroyed()) {
+        if (serverManager.getStatus().running) {
+          launcher.webContents.send('server:error', error);
+          launcher.show();
+          launcher.focus();
+        } else {
+          launcher.webContents.send('server:stopped');
+        }
+      }
+      return { success: false, error };
+    }
+
     createChatWindow(status.port);
     return { success: true };
   });

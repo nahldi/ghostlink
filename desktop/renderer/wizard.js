@@ -258,12 +258,14 @@ async function runPythonCheck() {
           pythonOk = true;
           $btnPythonNext.disabled = false;
         } else {
-          $depsStatus.innerHTML = '<span style="color:#f87171;font-size:16px;">&#10007;</span><span>Failed to install dependencies</span>';
+          const errorText = installResult && installResult.error
+            ? ': ' + escapeHtml(String(installResult.error))
+            : '';
+          $depsStatus.innerHTML = '<span style="color:#f87171;font-size:16px;">&#10007;</span><span>Failed to install dependencies' + errorText + '</span>';
           $depsStatus.className = 'check-status error';
           $depsProgress.style.display = 'none';
-          // Still allow proceeding — user can fix deps later
-          pythonOk = true;
-          $btnPythonNext.disabled = false;
+          pythonOk = false;
+          $btnPythonNext.disabled = true;
         }
       }
     } else {
@@ -393,10 +395,13 @@ document.getElementById('btn-finish')?.addEventListener('click', async () => {
   $btn.disabled = true;
 
   try {
-    await api.invoke('wizard:complete', settings);
+    const result = await api.invoke('wizard:complete', settings);
+    if (!result || !result.success) {
+      throw new Error((result && result.error) || 'GhostLink could not finish setup');
+    }
   } catch (err) {
     console.error('Failed to complete wizard:', err);
-    $btn.textContent = 'Start GhostLink';
+    $btn.textContent = 'Finish Setup';
     $btn.disabled = false;
   }
 });

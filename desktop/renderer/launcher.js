@@ -639,8 +639,12 @@ api.on('server:started', (port) => {
     if (providerStatuses.length > 0) syncConnectedToBackend(providerStatuses);
   }, 1500);
   // Auto-open the chat window after a short delay
-  setTimeout(() => {
-    api.invoke('app:open-chat');
+  setTimeout(async () => {
+    const result = await api.invoke('app:open-chat');
+    if (!result || !result.success) {
+      setServerState('error');
+      $footerStatus.textContent = (result && result.error) || 'Server started but chat could not open';
+    }
   }, 2000);
 });
 
