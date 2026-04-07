@@ -78,7 +78,6 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 **Rough effort:** 1-3 days
 
 ### Current blockers
-- Windows frontend build script still uses `rm -rf`
 - working tree is not clean
 - roadmap/status/bugs wording is not fully aligned
 - local readiness truth and historical release truth are mixed together in docs
@@ -113,7 +112,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 
 #### `ned`
 - Fix frontend/Electron/build blockers.
-- Own the Windows frontend build issue.
+- Own frontend/Electron/build readiness follow-through after the Windows build fix.
 
 ### File ownership
 - `jeff`: roadmap/spec docs only

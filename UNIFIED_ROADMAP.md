@@ -30,7 +30,6 @@
 - Ops toolkit: health, diagnostics, backup, restore, logs
 
 ### Current local blockers before new implementation
-- Windows frontend build is not clean because `frontend/package.json` uses `rm -rf dist`
 - Working tree is not clean
 - Active docs still need consistency cleanup around roadmap, bugs, and readiness wording
 - Workspace-facing agent identity injection still depends on shared instruction files in the repo root
