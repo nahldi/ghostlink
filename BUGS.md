@@ -18,11 +18,11 @@ None currently open that block normal install, startup, or core chat use in the 
 ### Plugin trust model is incomplete
 
 - Plugins are safety-scanned, but GhostLink still lacks:
-  - per-plugin tool allowlists
-  - fail-closed hook behavior
   - install provenance/signing
   - owner-managed trust controls
-- This is the top platform maturity gap and is Phase 1 in `UNIFIED_ROADMAP.md`.
+  - durable exec approval allowlists
+- Per-plugin tool allowlists and fail-closed pre-tool-use hooks are already implemented.
+- This remains a top platform maturity gap and is tracked in the early roadmap phases in `UNIFIED_ROADMAP.md`.
 
 ### Agent identity isolation is incomplete
 

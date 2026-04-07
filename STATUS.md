@@ -17,12 +17,14 @@ GhostLink is a local-first multi-agent AI chat platform. It provides a shared ch
 This is the current verified baseline for `v5.7.2`:
 
 - Latest release line is `v5.7.0`, `v5.7.1`, `v5.7.2`
-- Latest verified automated test baseline: **220 tests** total
-  - Backend: **171**
-  - Frontend: **49**
+- Latest verified automated test baseline: **220 test cases** total
+  - Backend: **171 cases** across 17 test files
+  - Frontend: **49 cases** across 4 test files
 - Frontend lint/build and desktop TypeScript build were re-verified during the `v5.7.2` release cycle
 - No tracked runtime data, local settings, API keys, or local databases are included in git
 - Release/install defaults remain neutral for new users
+
+For current local execution order and active readiness work, start with [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md).
 
 Runtime and local-only paths intentionally stay out of git:
 
@@ -129,7 +131,7 @@ See [CHANGELOG.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/CHANGE
 
 These are current, real gaps. They are tracked in [UNIFIED_ROADMAP.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md), not historical bug archaeology:
 
-- Plugin trust model is still incomplete: no per-plugin tool allowlists, no signing/provenance, no fail-closed hook policy
+- Plugin trust model is still incomplete: per-plugin tool allowlists and fail-closed hooks now exist, but provenance/signing, owner-managed trust controls, and durable exec approval allowlists are still missing
 - Workspace-facing agent identity is still too loose: per-agent memory exists, but shared instruction files can still be overwritten by another agent in the same workspace
 - Thinking level picker exists in backend concepts but not in the main UI
 - Context visibility controls are missing
@@ -158,6 +160,7 @@ These are current, real gaps. They are tracked in [UNIFIED_ROADMAP.md](/mnt/c/Us
 - [CHANGELOG.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/CHANGELOG.md): release history
 - [FEATURES.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/FEATURES.md): current shipped capability reference
 - [BUGS.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md): active risks and known gaps
+- [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md): active execution roadmap for fresh agents
 - [UNIFIED_ROADMAP.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md): phased execution plan
 - `docs/archive/`: historical audits and retired planning docs
 - `docs/screenshots/`: retained product screenshots and audit captures

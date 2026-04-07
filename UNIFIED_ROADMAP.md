@@ -1,410 +1,363 @@
-# GhostLink — Development Roadmap
+# GhostLink - Unified Roadmap
 
-> Single source of truth for all development.
-> **For any AI picking this up: follow the phases IN ORDER. Each item has scope, files to change, acceptance criteria, and complexity estimate.**
+> Strategic source of truth for GhostLink development.
+> Fresh agents should read [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md) first for active execution work.
 
 **Last updated:** 2026-04-06
 **Current version:** v5.7.2
-**Comparison target:** OpenClaw v2026.4.5 (released 2026-04-06)
+**Comparison target:** OpenClaw v2026.4.5
+**Operating model:** 5-agent team
 
 ---
 
-## Current State (v5.7.2)
+## Current Reality
 
-### What GhostLink Has Today
-- **217 API/websocket endpoints** across 14 route modules
-- **29 MCP tools** (chat, memory, web, AI, agent, streaming)
-- **13 AI providers** (Anthropic, OpenAI, Google, xAI, Groq, Together, HuggingFace, Ollama, Mistral, OpenRouter, DeepSeek, Perplexity, Cohere)
-- **8 integrated agent CLIs** (Claude, Codex, Gemini, Grok, Copilot, Aider, Goose, Ollama) + 5 experimental (Pi, Cursor, Cody, Continue, OpenCode — launcher-listed but no MCP integration)
-- **66 React component files** with 9 visual themes
-- **220 automated tests** (171 backend + 49 frontend)
-- **Desktop app** (Electron) with auto-update, system tray, setup wizard
-- **Full ops toolkit**: health, diagnostics, backup/restore, server logs
-- **Security**: heartbeat auth, API rate limiting, SSRF protection, encrypted secrets vault, plugin AST safety scanning, exec policy
-- **Real-time**: WebSocket events, typing indicators, streaming tokens, agent presence
+### Verified product baseline
+- 217 API/websocket endpoints across 14 route modules
+- 29 MCP tools
+- 13 API providers
+- 8 integrated CLI agents plus 5 experimental launcher-listed agents
+- 66 React component files
+- 220 automated test cases
+- Desktop app with launcher, setup wizard, auto-update, and system tray
 
-### Recent Releases
-- **v5.7.2** (2026-04-06): Launcher/wizard fixes, backend memory safety, export pagination, streaming perf, reconnect throttling, component architecture splits
-- **v5.7.1** (2026-04-06): Safe dependency refresh (vite, fastapi, uvicorn, mcp, cryptography)
-- **v5.7.0** (2026-04-01): Ops toolkit, heartbeat auth, visual reset, error visibility, 46 new tests
+### Verified strengths
+- Multi-agent shared chat with real-time updates
+- Channel bridges for Discord, Telegram, Slack, and WhatsApp
+- MCP bridge over streamable HTTP and SSE
+- Per-agent memory, soul, notes, and token-scoped identity enforcement
+- Plugin safety scanning, heartbeat auth hardening, rate limiting, SSRF protections
+- Ops toolkit: health, diagnostics, backup, restore, logs
 
----
-
-## OpenClaw v2026.4.5 Feature Comparison
-
-### Legend: ✓ We have it | ⚡ Partial/weaker | ✗ Missing
-
-### Security & Trust
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| Plugin tool allowlist (per-plugin) | ✓ | ✗ | **Missing** — plugins have AST scanning but no per-plugin tool allowlist |
-| Failed hooks fail closed | ✓ | ✗ | **Missing** — hook failures silently pass through |
-| Plugin signing/provenance | ✓ | ✗ | **Missing** — raw code installed to disk |
-| Owner-only allowlist management | ✓ | ✗ | **Missing** |
-| Per-agent identity pack / markdown context | ✓ | ⚡ | **Partial** — per-agent soul/memory exists, but workspace-level instruction files are shared and can be overwritten by another agent in the same repo |
-| Exec approval durable allowlist | ✓ | ⚡ | **Partial** — approval interception exists but no persistent allowlist |
-| SSRF browser redirect blocking | ✓ | ⚡ | **Partial** — SSRF protection exists but not browser-redirect-aware |
-| Encrypted secrets vault | ✓ | ✓ | **Have it** |
-| API rate limiting | ✓ | ✓ | **Have it** |
-| MCP tool call audit trail | ✓ | ✓ | **Have it** |
-| Permission presets | ✓ | ✓ | **Have it** |
-| Agent token rotation | ✓ | ✓ | **Have it** |
-
-### Agent Intelligence & Control
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| Thinking level picker | ✓ | ⚡ | **Backend exists** — `thinkingLevel` in registry, no UI picker |
-| Context visibility per-channel | ✓ | ✗ | **Missing** — all agents see all context in channel |
-| Unified task system + dashboard | ✓ | ⚡ | **Split** — SQLite jobs + separate agent task JSON + UI panel exists but not unified |
-| Progress/plan structured updates | ✓ | ⚡ | **Partial** — `chat_progress` MCP tool exists, no structured plan events |
-| Subagent delegation | ✓ | ✓ | **Have it** — `delegate` MCP tool |
-| Live model switching | ✓ | ⚡ | **Partial** — model configurable per agent but no live switch without restart |
-| Agent response modes | ✓ | ✓ | **Have it** — 4 modes per agent |
-| Agent pause/resume | ✓ | ✓ | **Have it** |
-| Scheduled tasks (cron) | ✓ | ✓ | **Have it** |
-
-### Providers & Models
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| 30+ providers | ✓ | ⚡ | **13 providers** — missing Amazon Bedrock, GitHub Copilot provider, Z.AI, BytePlus/Volcengine, Kimi, Microsoft Foundry |
-| Prompt caching optimization | ✓ | ✗ | **Missing** — no cache fingerprinting, no deterministic tool ordering for cache hits |
-| Provider request overrides | ✓ | ✗ | **Missing** — no shared transport controls for headers/auth/proxy/TLS |
-| Model failover | ✓ | ✓ | **Have it** |
-| Free tier providers | ✓ | ✓ | **Have it** — Groq, Together, HuggingFace, Ollama |
-
-### Media Generation
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| Video generation (xAI, Runway, ComfyUI) | ✓ | ✗ | **Missing** |
-| Music generation (Lyria, MiniMax) | ✓ | ✗ | **Missing** |
-| Image generation | ✓ | ✓ | **Have it** — DALL-E, Imagen, FLUX |
-| TTS / STT | ✓ | ✓ | **Have it** |
-
-### Memory & Caching
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| Advanced memory (Dreaming) | ✓ | ✗ | **Missing** — we have basic key-value JSON memory |
-| Weighted recall promotion | ✓ | ✗ | **Missing** |
-| Cross-agent memory search | ✓ | ✓ | **Have it** — `memory_search_all` |
-| Prompt cache diagnostics | ✓ | ✗ | **Missing** |
-
-### Channels & Integrations
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| Discord bridge | ✓ | ✓ | **Have it** |
-| Telegram bridge | ✓ | ✓ | **Have it** |
-| Slack bridge | ✓ | ✓ | **Have it** |
-| WhatsApp bridge | ✓ | ✓ | **Have it** |
-| Matrix bridge | ✓ | ✗ | **Missing** |
-| MS Teams bridge | ✓ | ✗ | **Missing** |
-| Synology Chat bridge | ✓ | ✗ | **Missing** |
-| Context visibility per-channel | ✓ | ✗ | **Missing** |
-| Per-channel allowlists | ✓ | ✗ | **Missing** |
-
-### UI & UX
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| Multilingual UI (16 languages) | ✓ | ✗ | **Missing** |
-| ClawHub plugin marketplace search | ✓ | ⚡ | **Partial** — marketplace UI exists, no remote search |
-| Thinking level picker in chat header | ✓ | ✗ | **Missing** (backend ready) |
-| Loading/skeleton states | ✓ | ⚡ | **Partial** — some components have them, many don't |
-| Stop button during tool execution | ✓ | ✗ | **Missing** |
-| Accessibility (WCAG) | ✓ | ⚡ | **Partial** — some aria-labels, not systematic |
-
-### Platform & Gateway
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| iOS APNs notifications | ✓ | ✗ | **Missing** |
-| macOS LaunchAgent | ✓ | ✗ | **Missing** |
-| Windows Task Scheduler integration | ✓ | ✗ | **Missing** |
-| Device pairing security | ✓ | ✗ | **Missing** |
-| Claude CLI MCP bridge (loopback) | ✓ | ✗ | **Missing** |
-| PID recycling detection | ✓ | ✗ | **Missing** |
-| Remote tunnel (Cloudflare) | ✓ | ✓ | **Have it** |
-| Desktop app with auto-update | ✓ | ✓ | **Have it** |
-
-### Developer Experience
-| Feature | OpenClaw | GhostLink | Status |
-|---------|----------|-----------|--------|
-| Config schema export | ✓ | ✗ | **Missing** |
-| Doctor/health check CLI | ✓ | ⚡ | **Partial** — /api/diagnostics exists, no CLI `doctor` command |
-| Plugin config TUI prompts | ✓ | ✗ | **Missing** |
-| SDK (Python + TypeScript) | ✓ | ✓ | **Have it** — Python SDK |
+### Current local blockers before new implementation
+- Windows frontend build is not clean because `frontend/package.json` uses `rm -rf dist`
+- Working tree is not clean
+- Active docs still need consistency cleanup around roadmap, bugs, and readiness wording
+- Workspace-facing agent identity injection still depends on shared instruction files in the repo root
 
 ---
 
-## Implementation Phases
+## Team Model
 
-### Phase 0: Verified Baseline (Before Any New Work)
-**Priority:** GATE — No implementation starts until this passes
-**Goal:** Ensure every claim in this roadmap is factually verified against the live codebase
+GhostLink is now planned around a 5-agent operating model.
 
-**Baseline checklist:**
-- [ ] All tests pass: `backend 171+`, `frontend 49+`
-- [ ] `npm run build` clean, `npx tsc --noEmit` clean
-- [ ] Desktop TypeScript builds clean
-- [ ] Version consistent across all files (app.py, pyproject.toml, misc.py, desktop/package.json, frontend/package.json, sdk, package-lock.json files)
-- [ ] Working tree clean on master
-- [ ] All .md files (STATUS, BUGS, CHANGELOG, FEATURES, ROADMAP) reflect current v5.7.2 state
-- [ ] No stale version references in any doc
+### Control layer
+- `jeff` (`claude`): architect and spec owner
+- `coop` (`claude`): product and research owner
+- `kurt` (`claude`): QA, safety, and gate owner
 
-**Doc sync rules for future work:**
-- Every commit that changes version MUST update all 7+ version locations
-- Every new feature MUST be added to FEATURES.md
-- Every release MUST update CHANGELOG.md and STATUS.md
-- ROADMAP comparison matrix MUST be re-verified quarterly against competitor releases
+### Execution layer
+- `tyson` (`codex`): backend and platform owner
+- `ned` (`codex`): frontend plus integration/reliability owner
 
----
+### Pairings
+- `jeff` + `tyson`: identity, runtime, provider architecture
+- `coop` + `ned`: operator UX, skills, workflows, product surfaces
+- `kurt` + `ned`: smoke, stress, fail, and integration validation
 
-### Phase 1: Security & Trust Hardening
-**Priority:** CRITICAL — Biggest maturity gap vs OpenClaw
-**Effort:** 1 week
-**Goal:** Match OpenClaw's security posture
-
-#### 1.1 — Plugin Tool Allowlist
-**What:** Per-plugin tool allowlist. Each plugin declares which MCP tools it needs. Any undeclared tool call is blocked.
-**Files:** `backend/plugin_sdk.py`, `backend/plugin_loader.py`, `backend/routes/plugins.py`
-**Acceptance:** Plugin manifest includes `allowed_tools: [...]`. Unlisted tool calls rejected with clear error. UI shows allowed tools per plugin.
-
-#### 1.2 — Failed Hooks Fail Closed
-**What:** If a `before_tool_call` hook throws an exception, the tool call is blocked (not allowed through).
-**Files:** `backend/plugin_sdk.py` (HookManager), `backend/mcp_bridge.py`
-**Acceptance:** Hook error → tool call blocked → error logged → agent gets rejection message.
-
-#### 1.3 — Plugin Install Provenance
-**What:** Plugin install validates source (GitHub URL or local path), records provenance metadata (source, install date, checksum), warns on unsigned/unverified plugins.
-**Files:** `backend/plugin_loader.py`, `backend/routes/plugins.py`
-**Acceptance:** Install records provenance. UI shows verified/unverified badge. Checksum mismatch blocks install.
-
-#### 1.4 — Exec Approval Persistent Allowlist
-**What:** When user approves a command, offer "Always allow this command" option. Saved to `exec_approvals.json`. Future identical commands auto-approved.
-**Files:** `backend/mcp_bridge.py`, `backend/security.py`
-**Acceptance:** Approve with "always" → same command auto-passes next time. `/api/security/exec-approvals` CRUD endpoint. UI to manage allowlist.
-
-#### 1.5 — Agent Runtime Identity System
-**What:** Replace file-based "read these docs" identity with a server-owned, runtime-enforced agent identity system. Identity must survive long sessions, context compaction, resumes, and same-model multi-agent setups without drift.
-
-**Architecture:**
-1. **Server-owned identity record** — Immutable mapping per agent instance: stable internal ID, provider, display label, workspace, role/profile, enabled skills, identity pack path, memory namespaces. Every tool call, memory lookup, queue, and file path resolved from this server-side record, not agent self-knowledge.
-2. **Launch/resume injection** — Every spawn, reconnect, resume, and model switch re-injects the full identity context. Provider adapters (`.claude/instructions.md`, `.codex/instructions.md`, etc.) write to per-agent paths, not shared workspace root. Identity is injected, not remembered.
-3. **Per-agent isolated context** — `.ghostlink/agents/<instance-id>/IDENTITY.md`, `SOUL.md`, `NOTES.md`, `state.json`. Shared workspace files (`AGENTS.md`, `USER.md`) are coordination docs, NOT the source of truth for any agent's identity.
-4. **GhostLink behavior embedded at platform layer** — Communication model, channel/routing rules, approval behavior, skill/capability model, ownership boundaries, tool usage expectations — all injected and enforced by runtime, not described in markdown the agent might forget.
-
-**Files:** `backend/registry.py` (identity record), `backend/wrapper.py` (injection), `backend/wrapper_mcp.py` (injection), `backend/agent_memory.py` (namespaced paths), `backend/mcp_bridge.py` (identity enforcement), `backend/routes/agents.py` (identity API)
-**Acceptance:** Two same-model agents in one workspace have fully isolated identity. Agent never needs to "remember" who it is — server tells it on every interaction. Killing and restarting an agent restores the same identity. Renaming or re-labeling doesn't break identity continuity.
+### Ownership rules
+- `tyson` owns backend platform files and backend tests
+- `ned` owns frontend, Electron-adjacent operator surfaces, and build/integration UX
+- `jeff`, `coop`, and `kurt` own specs, research, validation plans, and review
+- Any cross-lane milestone must be split into explicit file ownership before implementation begins
 
 ---
 
-### Phase 2: Quick Control Wins
-**Priority:** HIGH — Fast visible product improvements
-**Effort:** 3-5 days
+## Non-Negotiable Rules
 
-#### 2.1 — Thinking Level Picker (UI)
-**What:** Per-agent thinking level selector in chat header and agent cockpit. Options: off, minimal, low, medium, high.
-**Files:** `frontend/src/App.tsx` (header), `frontend/src/components/AgentCockpit.tsx`, `frontend/src/types/index.ts`
-**Acceptance:** Picker visible in chat header. Changes apply immediately via PATCH /api/agents/{name}/config. Persists across sessions.
-**Note:** Backend already supports `thinkingLevel` on registry instances. This is UI-only work.
-
-#### 2.2 — Context Visibility Per-Channel
-**What:** Per-channel setting controlling what context agents receive: `all` (everything), `allowlist` (only from allowed senders), `allowlist_quote` (allowed senders + quoted context).
-**Files:** `backend/routes/channels.py`, `backend/mcp_bridge.py` (message filtering), `frontend/src/components/Sidebar.tsx` (channel settings)
-**Acceptance:** Channel settings include contextVisibility. MCP `chat_read` respects the filter. UI shows context mode per channel.
-
-#### 2.3 — Stop Button During Tool Execution
-**What:** UI button to cancel an in-progress agent tool call. Sends cancel signal to agent process.
-**Files:** `frontend/src/components/ChatMessage.tsx` (stop button), `backend/routes/agents.py` (cancel endpoint)
-**Acceptance:** Stop button visible during tool execution. Click cancels the operation. Agent receives cancellation signal.
-
-#### 2.4 — Live Model Switching
-**What:** Switch an agent's model without restarting it. PATCH endpoint + UI control.
-**Files:** `backend/routes/agents.py`, `backend/registry.py`, `frontend/src/components/AgentCockpit.tsx`
-**Acceptance:** Switch model mid-conversation. Agent uses new model for next response. No restart needed.
-
-#### 2.5 — Skills Center UX Overhaul
-**What:** Dedicated Skills section (not buried in agent creation or settings). Each skill gets a visual card with description, category, and enable/disable toggle. Toggle applies globally (all agents) or to specific agents. Browsable, searchable, categorized. Inspired by ClawHub's skill marketplace UX.
-**Files:** New `frontend/src/components/SkillsCenter.tsx`, `backend/skills.py` (extend), `backend/routes/plugins.py`
-**Acceptance:** Skills section accessible from sidebar or command palette. Each skill shows card with description + agent assignment. Enable "for all agents" or pick specific agents. Search/filter by category. Clean, visual layout — not a settings table.
+1. No implementation without a concrete spec from `jeff`.
+2. Every spec must include:
+   - file ownership per execution agent
+   - acceptance tests
+   - failure cases
+   - rollback path
+3. No implementation without a test plan from `kurt`.
+4. No overlapping write ownership unless it is explicitly split first.
+5. No milestone is done until the gate passes.
+6. No phase starts until prerequisite architecture is resolved.
+7. Every roadmap item must be labeled as one of:
+   - `new capability`
+   - `unification`
+   - `hardening`
+   - `UI exposure of existing backend`
 
 ---
 
-### Phase 3: Task System Unification & Operator Visibility
-**Priority:** HIGH — Structural coherence, foundation for future features
-**Effort:** 1-2 weeks
+## Fresh-Agent Read Order
 
-#### 3.1 — Unified Task Model
-**What:** Merge SQLite jobs, per-agent task queues, and scheduled tasks into one task model with unified dashboard.
-**Files:** `backend/jobs.py` (extend), `backend/routes/agents.py` (task endpoints), `frontend/src/components/JobsPanel.tsx` (unify)
-**Acceptance:** Single `/api/tasks` endpoint. Dashboard shows all tasks regardless of source. Filter by agent, status, type.
+For a fresh agent spawn, use this order:
 
-#### 3.2 — Structured Progress Events
-**What:** Agents emit structured plan/progress updates (steps, substeps, completion %) that render as step-by-step UI.
-**Files:** `backend/mcp_bridge.py` (progress tool enhancement), `frontend/src/components/ProgressCard.tsx`
-**Acceptance:** Agent progress shows as checklist in UI. Steps update in real-time. Completion percentage visible.
-
-#### 3.3 — Agent Profile & Assignment Architecture
-**What:** Introduce stable `agent/profile ID` separate from display label and model. Skills, roles, and settings follow an inheritance model: `global default → role/profile default → per-agent override`. Each agent gets an effective-state view showing what's actually applied. Provider, role, and profile are cleanly separated in config — not conflated with display name.
-**Files:** `backend/registry.py` (profile model), `backend/skills.py` (inheritance), `backend/routes/agents.py` (config endpoints), `frontend/src/components/AgentCockpit.tsx` (effective-state view), `frontend/src/components/AgentInfoPanel.tsx`
-**Acceptance:** Two Claudes with different roles/profiles show different effective skills/settings. Skills Center assignments cascade through the inheritance model. Agent config UI shows "inherited from profile" vs "overridden" clearly. Renaming an agent doesn't break its identity or skill assignments.
-**Why this matters:** Without this, Skills Center (Phase 2) and Identity Pack (Phase 1.5) are just UI on top of brittle name-based coupling. This is the structural fix that makes agent management coherent.
-
-#### 3.4 — Operator Dashboard Enhancement
-**What:** Unified view: active tasks, agent health, cache stats, recent errors. Single "control room" screen.
-**Files:** `frontend/src/components/StatsPanel.tsx` (extend), new dashboard components
-**Acceptance:** One screen shows system health at a glance. No clicking through multiple panels needed.
+1. [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md)
+2. [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md)
+3. [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md)
+4. [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md)
+5. [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md)
+6. [BUGS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md)
+7. Optional strategic context: [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md)
 
 ---
 
-### Phase 4: Provider Expansion & Caching
-**Priority:** HIGH — Competitive parity on model access
-**Effort:** 1 week
+## What The Roadmap Must Solve
 
-#### 3.1 — Provider Registry Expansion
-**What:** Add remaining providers: Amazon Bedrock, Kimi (Moonshot), Z.AI (GLM), BytePlus/Volcengine.
-**Files:** `backend/providers.py`
-**Acceptance:** All providers appear in Settings > AI. API key configuration works. Model lists accurate.
-**Note:** Qwen, Fireworks, StepFun, MiniMax already added (stashed, ready to commit).
+This roadmap is not just "add more features." It has to produce a stronger multi-agent operating layer than any single-provider tool can offer.
 
-#### 3.2 — Prompt Cache Optimization
-**What:** Deterministic MCP tool ordering in system prompts. Normalized system-prompt fingerprints. Cache-aware message history management.
-**Files:** `backend/mcp_bridge.py`, `backend/wrapper.py`
-**Acceptance:** Anthropic/OpenAI cache hit rate measurable. Tool inventory ordering is stable across requests. `/api/diagnostics` shows cache stats.
+### Core architectural goals
+- Server-owned agent identity instead of workspace-file identity
+- Provider independence across API, CLI, MCP, and local model paths
+- Rules and knowledge layering that survive long sessions and fresh spawns
+- Unified operator control plane for tasks, progress, provenance, and failure handling
+- Traceability for delegation, tool calls, approvals, and failover
+- Reliable multi-agent execution without shared-worktree collisions
 
-#### 3.3 — Provider Request Overrides
-**What:** Shared transport controls: custom headers, auth, proxy, TLS settings per provider.
-**Files:** `backend/providers.py`, `backend/routes/misc.py` (config endpoint)
-**Acceptance:** Provider config supports `overrides: { headers, proxy, tls }`. Applied to all requests for that provider.
+### Must-have roadmap additions from research
+- `AGENTS.md` support as an ingest/overlay layer, not as the source of truth
+- Background and async agents
+- Per-agent git worktree isolation
+- Per-agent cost tracking and budgets
+- Model routing and failover policy
+- Observability and tracing for multi-agent chains
+- Trust-boundary enforcement for delegation
+- Lifecycle hooks for mandatory checks
 
----
-
-### Phase 5: Media Generation
-**Priority:** MEDIUM — Differentiator but not core
-**Effort:** 1-2 weeks
-
-#### 4.1 — Video Generation Tool
-**What:** `video_generate` MCP tool. Route to provider APIs (Google Veo, xAI). Async task tracking.
-**Files:** `backend/mcp_bridge.py` (new tool), `frontend/src/components/ChatMessage.tsx` (video rendering)
-**Acceptance:** Agent can generate videos via MCP. Videos render inline in chat. Progress tracking during generation.
-
-#### 4.2 — Music Generation Tool
-**What:** `music_generate` MCP tool. Route to MiniMax or other providers. Async delivery.
-**Files:** `backend/mcp_bridge.py`, `frontend/src/components/ChatMessage.tsx` (audio player)
-**Acceptance:** Agent can generate music. Audio player renders inline. Async status tracking.
+### Should-have roadmap additions from research
+- Spec-driven development workflow
+- Arena and best-of-N competition mode
+- Plan mode before expensive execution
+- Graph-based workflow state and checkpointing
+- A2A evaluation and adoption plan
+- Review-agent surfaces and provenance UI
+- Full memory stratification beyond identity memory
 
 ---
 
-### Phase 6: Memory & Intelligence Upgrade
-**Priority:** MEDIUM — Long-term differentiator, completes identity system
-**Effort:** 2-3 weeks
+## Phase Order
 
-#### 6.1 — Memory Stratification
-**What:** Replace flat key-value memory with layered memory system:
-- **Identity memory** — who this agent is, its role, capabilities, boundaries (durable, never evicted)
-- **User/workspace memory** — who it works for, project context, team conventions (long-lived, slow decay)
-- **Task/session memory** — current tasks, recent decisions, active context (session-scoped, fast decay)
-- **Promoted long-term summaries** — compressed summaries of important interactions promoted from session memory (equivalent to OpenClaw's "dreaming" direction)
-**Files:** `backend/agent_memory.py` (layer model), `backend/mcp_bridge.py` (memory tools), `backend/routes/agents.py`
-**Acceptance:** Identity memory survives indefinitely. Session memory auto-summarized on session end. Search returns results weighted by layer + recency. Agent identity doesn't drift even after 100+ turn conversations.
+The roadmap is intentionally reordered around the dependencies that actually exist in GhostLink.
 
-#### 6.2 — Selective Identity Reinforcement
-**What:** Identity context gets reattached at key boundaries (not every call):
-- Context compaction events
-- Session resume/reconnect
-- Delegation to/from other agents
-- Task/role boundary changes
-- Context budget drops below threshold
-**Files:** `backend/mcp_bridge.py`, `backend/wrapper.py`, `backend/wrapper_mcp.py`
-**Acceptance:** After context compaction, agent still knows who it is without re-reading files. After delegation, receiving agent gets full identity context of the delegator. Measurable: identity-correct responses after compaction vs. baseline.
+### Phase 0 - Truthful Baseline
+**Type:** hardening
+**Goal:** Make the local workspace and docs honest before new feature work begins.
+**Rough effort:** 1-3 days
 
-#### 6.3 — Weighted Recall & Tagging
-**What:** Memory entries gain relevance scores (recency, access frequency, explicit importance). Tags and categories for organized retrieval.
-**Files:** `backend/agent_memory.py`, `backend/mcp_bridge.py`
-**Acceptance:** `memory_save` accepts tags + importance. `memory_search` weights by relevance. Recently accessed memories rank higher.
+Key outcomes:
+- passing Gate 0 on this machine
+- clean Windows frontend build
+- clean working tree
+- reconciled roadmap/status/bugs wording
+- version and readiness truth aligned
 
-#### 6.4 — Prompt Cache Diagnostics
-**What:** `/api/diagnostics` includes cache hit/miss rates. UI shows cache efficiency per provider.
-**Files:** `backend/routes/misc.py`, `frontend/src/components/settings/AdvancedTab.tsx`
-**Acceptance:** Cache stats visible in diagnostics. Shows hit rate, estimated savings.
+Primary owners:
+- `jeff`: freeze blocker list and readiness spec
+- `coop`: verify doc claims against code and external research
+- `kurt`: convert Gate 0 into runnable checks
+- `tyson`: backend/runtime cleanup
+- `ned`: frontend/Electron/build cleanup
+
+### Phase 1A - Stable Agent IDs And Identity Records
+**Type:** hardening
+**Goal:** Introduce persisted agent instance IDs and server-owned identity records.
+**Rough effort:** 3-5 days
+
+Key outcomes:
+- stable internal ID separate from display label
+- persisted identity record with provider, workspace, role/profile, skills, and namespaces
+- no core logic keyed only by agent display name
+
+Primary owners:
+- `jeff`: architecture and API spec
+- `tyson`: backend implementation
+- `kurt`: collision, rename, and restore tests
+- `coop`: external-pattern cross-check
+
+### Phase 1B - Runtime Identity Isolation And Reinjection
+**Type:** hardening
+**Goal:** Remove dependence on shared workspace instruction files for identity correctness.
+**Rough effort:** 4-7 days
+
+Key outcomes:
+- isolated per-agent identity storage
+- reinjection on spawn, reconnect, resume, compaction, delegation, and model switch
+- same-model agents can coexist in one repo without identity drift
+
+Primary owners:
+- `jeff`: reinjection and rollback spec
+- `tyson`: runtime injection and namespaced storage
+- `ned`: operator-facing effective-state visibility
+- `kurt`: multi-agent collision and compaction tests
+
+### Phase 2 - Profiles, Rules, And Knowledge Layering
+**Type:** unification
+**Goal:** Create the data model that makes skills, policies, and imported repo guidance coherent.
+**Rough effort:** 1-2 weeks
+
+Key outcomes:
+- `global -> profile -> agent override` inheritance
+- explicit layering for:
+  - system policy
+  - workspace policy
+  - imported repo guidance such as `AGENTS.md`
+  - user/workspace memory
+  - task/session memory
+- rename-safe skills and settings
+- explicit `AGENTS.md` ingest/overlay behavior
+- Skills Center data model support
+
+Primary owners:
+- `jeff`: inheritance and layering spec
+- `coop`: adopt/adapt/reject decisions for `AGENTS.md`, A2A, and rules UX
+- `tyson`: backend profile and resolution model
+- `ned`: effective-state and rules UI
+- `kurt`: inheritance and permission-boundary validation
+
+### Phase 3 - Operator Control Plane
+**Type:** unification
+**Goal:** Unify tasks, progress, context controls, and traceability into a single operator surface.
+**Rough effort:** 1-2 weeks
+
+Key outcomes:
+- unified task model and dashboard
+- thinking level UI
+- context visibility controls
+- stop/cancel surfaces
+- explicit Skills Center UI built on profile-aware assignment
+- progress and provenance UI
+- tracing for delegation, tool chains, approvals, reconnects, and failover
+
+Primary owners:
+- `jeff`: task/progress/control-plane spec
+- `coop`: UX refinement from competitive research
+- `tyson`: backend task/control APIs and enforcement
+- `ned`: UI and operator surfaces
+- `kurt`: stress and failure validation
+
+### Phase 4 - Provider Independence And Cost Control
+**Type:** new capability + hardening
+**Goal:** Make GhostLink resilient to provider policy, auth, and transport changes.
+**Rough effort:** 1-2 weeks
+
+Key outcomes:
+- multiple transport modes per provider
+- explicit provider capability and risk matrix
+- model routing
+- failover policy
+- per-agent cost tracking and budgets
+- degraded-mode behavior that stays operator-visible
+
+Primary owners:
+- `jeff`: backend abstraction and fallback order
+- `coop`: provider matrix and product policy
+- `tyson`: provider implementation
+- `ned`: cost/failover/operator UI
+- `kurt`: provider-failure and policy-shift tests
+
+### Phase 5 - Agent Execution Expansion
+**Type:** new capability
+**Goal:** Add the execution features that become safe only after the foundations above exist.
+**Rough effort:** 2-4 weeks
+
+Key outcomes:
+- background and async agents
+- per-agent git worktree isolation
+- four-layer memory stratification:
+  - identity memory
+  - workspace memory
+  - session/task memory
+  - promoted long-term summaries
+- lifecycle hooks
+- review-agent surfaces
+- arena and best-of-N workflows
+- spec-driven development loops
+- checkpoint and rollback surfaces
+
+### Phase 6 - Deferred Platform Expansion
+**Type:** new capability
+**Goal:** Ship lower-priority expansion after the control plane is mature.
+
+Examples:
+- Matrix and Teams bridges
+- mobile notifications
+- richer media generation
+- multilingual UI
+- platform-specific service integrations
 
 ---
 
-### Phase 7: UI & Accessibility
-**Priority:** MEDIUM — Quality of life
-**Effort:** 2-3 weeks
+## What We Already Have Versus What Needs Work
 
-#### 6.1 — Systematic Accessibility Pass
-**What:** aria-labels on ALL interactive elements. Focus traps in all modals. Keyboard navigation everywhere. Screen reader testing.
-**Files:** All 61 components
-**Acceptance:** axe-core scan: 0 critical/serious violations. Full keyboard navigation works.
+### Already present but underexposed
+- backend thinking-level support
+- per-agent task queues and task UI
+- progress cards
+- delegation
+- per-agent soul and notes storage
+- plugin tool allowlists and fail-closed pre-tool-use hooks
 
-#### 6.2 — Loading/Error/Empty States
-**What:** Skeleton loaders for all async data. Error states with retry buttons. Empty states with helpful messages.
-**Files:** All major panel components
-**Acceptance:** No blank screens during data load. Every error shows user-actionable feedback. Every empty list shows a message.
+### Structural gaps
+- stable agent IDs
+- durable profile inheritance
+- runtime identity reinjection
+- provider abstraction across multiple transport modes
+- delegation trust boundaries
+- worktree isolation
+- task/progress/tracing unification
 
-#### 6.3 — AgentCockpit Decomposition
-**What:** Split 1187-line AgentCockpit into focused sub-components.
-**Files:** `frontend/src/components/AgentCockpit.tsx` → extracted tab components
-**Acceptance:** AgentCockpit under 500 LOC. Each tab in its own file.
-
-#### 6.4 — Light Theme Completion
-**What:** All components properly styled for light mode. Currently only ~20% have light variants.
-**Files:** `frontend/src/index.css`, all components with hardcoded dark colors
-**Acceptance:** All 9 themes render correctly across every component. No hardcoded dark-mode colors.
-
----
-
-### Phase 8: Platform & Integrations (Defer)
-**Priority:** LOW — Large effort, specialized value
-**Effort:** 4+ weeks
-
-- Matrix bridge
-- MS Teams bridge
-- iOS push notifications
-- macOS LaunchAgent / Windows Task Scheduler
-- Claude CLI MCP bridge (loopback)
-- Device pairing security
-- Multilingual UI (i18n)
-- ComfyUI integration
+### UX gaps
+- thinking level picker
+- context visibility controls
+- operator control room
+- provenance and trace views
+- skill center built on stable profiles instead of agent names
 
 ---
 
-## Competitive Position (Updated 2026-04-06)
+## Competitive Position
 
-### GhostLink Unique Advantages
-- **Multi-agent chat room** — 13+ heterogeneous agents in shared channels. No competitor does this.
-- **Channel bridges** — Discord/Telegram/Slack/WhatsApp bidirectional sync
-- **Desktop app** — Electron with auto-update, 9 themes, system tray, setup wizard
-- **Full local-first** — zero telemetry, zero cloud dependency
-- **Plugin system** with AST safety scanner
-- **Ops toolkit** — diagnostics, backup/restore, server logs in UI
-- **13 AI providers** with failover and cost tracking
-- **Agent hierarchy** — manager/worker/peer roles with delegation
+GhostLink already has a defensible angle:
+- local-first multi-agent shared chat
+- channel bridges
+- desktop app
+- MCP bridge
+- heterogeneous agent collaboration
 
-### After Phase 1-4, GhostLink Will Match OpenClaw On:
-- Plugin security posture (allowlists, provenance, fail-closed hooks)
-- Agent control depth (thinking level, context visibility, model switching)
-- Provider coverage (20+ providers)
-- Prompt caching optimization
-- Task system unification
+The roadmap should strengthen that advantage instead of flattening GhostLink into a clone of one provider-specific product.
 
-### Remaining Gaps (Phase 5-8, Lower Priority):
-- Media generation (video/music)
-- Advanced memory (dreaming/weighted recall)
-- Additional channel bridges (Matrix, MS Teams)
-- Mobile push notifications
-- Multilingual UI
-- Claude CLI loopback bridge
+The target state is:
+- stronger than OpenClaw on runtime-owned identity and provider independence
+- closer to Cursor and Replit on execution ergonomics
+- closer to Claude Code and Codex on rules, hooks, and agent workflow discipline
+- closer to LangGraph and enterprise agent stacks on state, tracing, and recoverability
 
 ---
 
-## Known Issues
+## Execution Docs
 
-| ID | Severity | Status | Description |
-|----|----------|--------|-------------|
-| All BUG-001 through BUG-097 | Various | **FIXED** | See BUGS.md — all resolved |
-| ESLint `no-explicit-any` | LOW | Open | ~51 warnings (cosmetic, no runtime impact) |
-| OneDrive path EPERM | LOW | Mitigated | Auto-copy to /tmp for WSL, safePublicCopy for Vite |
+- [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md): active execution plan for Phases 0-3
+- [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md): validation gates
+- [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md): what is verified versus inferred
+- [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md): platform survey for `coop` adopt/adapt/reject decisions
 
 ---
 
-*End of Roadmap — v5.7.2 → v6.0.0*
+## OpenClaw Reference Appendix
+
+Keep this as a strategic reference, not as a source of truth over the codebase.
+
+### Worth adopting in GhostLink
+- identity reinjection at session boundaries
+- layered security and tool policy
+- task-native operator surfaces
+- provider-level transport controls
+- context visibility controls
+
+### Worth rejecting or redesigning
+- file-based identity as the runtime source of truth
+- provider-coupled architecture
+- shared workspace instruction paths for same-model agents
+
+### Current GhostLink delta
+- stronger direction on server-owned identity
+- weaker today on provider abstraction, tracing, worktree isolation, and background execution
+
+---
+
+*End of Unified Roadmap - v5.7.2 to v6.x*

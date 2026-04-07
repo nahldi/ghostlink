@@ -16,7 +16,7 @@
 - **5 channel bridges**
 - **66 React component files**
 - **28 built-in skills**
-- **220 automated tests** in the latest verified release cycle
+- **220 automated test cases** (171 backend across 17 test files + 49 frontend across 4 test files)
 
 ---
 
@@ -144,6 +144,8 @@ Shipped in the current `v5.7.x` line:
 - Rate limiting
 - Webhook signature verification
 - Approval interception and permission presets
+- Per-plugin tool allowlists
+- Fail-closed pre-tool-use hooks
 - AST-based plugin safety scanning
 - Agent token rotation and heartbeat validation
 - Audit/logging surfaces in Settings > Security and Settings > Advanced
@@ -164,9 +166,8 @@ Shipped in the current `v5.7.x` line:
 
 This file intentionally does **not** claim the following as shipped today:
 
-- Per-plugin tool allowlists
 - Plugin signing/provenance verification
-- Fail-closed hook policy
+- Durable exec approval allowlists
 - Thinking level picker in the main UI
 - Context visibility controls
 - Unified task dashboard

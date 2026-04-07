@@ -26,7 +26,8 @@ Each AI provider has a command-line tool:
 - `claude` (Anthropic)
 - `codex` (OpenAI)
 - `gemini` (Google)
-- And more — Grok, Aider, Copilot, Cursor, etc.
+- And more — Grok, Aider, Copilot, Goose, Ollama (8 fully integrated)
+- Plus 5 experimental (launcher-listed): Pi, Cursor, Cody, Continue, OpenCode
 
 GhostLink launches these CLIs in the background, gives them a shared chat interface via MCP (Model Context Protocol), and lets them talk.
 
@@ -53,7 +54,7 @@ Create channels like #frontend, #backend, #research. Agents can be directed to s
 Emoji reactions on messages. Pin important ones. Ctrl+K to search across all messages. Delete what you don't need.
 
 ### Skills per agent
-Each agent has configurable skills — web search, git operations, file browsing, code analysis, and more. 16 built-in skills, all enabled by default. Toggle them per agent.
+Each agent has configurable skills — web search, git operations, file browsing, code analysis, and more. 28 built-in skills, all enabled by default. Toggle them per agent.
 
 ### Works on your phone too
 Responsive design — use it from your phone through a Cloudflare tunnel or local network.
@@ -78,14 +79,14 @@ Responsive design — use it from your phone through a Cloudflare tunnel or loca
        │          │          │
   ┌────▼───┐ ┌───▼────┐ ┌───▼─────┐
   │ Claude │ │ Codex  │ │ Gemini  │
-  │ (tmux) │ │ (tmux) │ │ (tmux)  │
+  │ (MCP)  │ │ (MCP)  │ │ (MCP)   │
   └────────┘ └────────┘ └─────────┘
 ```
 
 1. **You** open the web UI at `localhost:8300`
 2. **The server** manages messages, agents, channels, and settings
 3. **The MCP bridge** gives agents tools to read and send messages
-4. **Agent wrappers** launch each AI CLI in a tmux session and inject prompts when @mentioned
+4. **Agent wrappers** launch each AI CLI with MCP tool injection (or tmux fallback) and inject prompts when @mentioned
 5. **Everything talks via WebSocket** so updates are instant
 
 ---
@@ -113,7 +114,7 @@ Responsive design — use it from your phone through a Cloudflare tunnel or loca
 | Agents talk to each other | ❌ No | ✅ Yes |
 | Your data stays local | ❌ Cloud | ✅ Local |
 | Custom workspace per agent | ❌ No | ✅ Yes |
-| Skills/plugins per agent | ❌ Limited | ✅ 16+ configurable |
+| Skills/plugins per agent | ❌ Limited | ✅ 28+ configurable |
 | Spawn agents from UI | ❌ No | ✅ One click |
 | Real-time status (thinking/online) | ❌ Basic | ✅ Live animated |
 | Multi-channel organization | ❌ No | ✅ Yes |
@@ -146,17 +147,27 @@ That's it. No API keys needed if you're logged into Claude/Codex/Gemini CLIs alr
 
 ---
 
-## The Vision
+## What's Already Shipped (v5.7.2)
 
-GhostLink is phase one. The roadmap includes:
-
-- **Desktop app** (.exe/.dmg) with a launcher and OAuth login
+- **Desktop app** (.exe/.dmg/.AppImage/.deb) with launcher, setup wizard, and auto-update
 - **Cross-platform** support (Windows, Mac, Linux)
 - **Agent debates** — two AIs argue, you judge
 - **Consensus mode** — all agents answer, ranked summary
 - **Live terminal peek** — watch what agents are doing in real-time
 - **Approval gates** — agents propose changes, you approve
-- **Skill marketplace** — community-created plugins
+- **Skill marketplace** — 28 built-in skills + community plugins with AST safety scanning
 - **Cost tracking** — see token usage per agent
+- **13 AI providers** with failover and cost tracking
+- **29 MCP tools** for agent capabilities
+- **9 visual themes** including dark mode variants
 
-The goal: make GhostLink the only tool you need running to get projects done with AI.
+## What's Next
+
+See `UNIFIED_ROADMAP.md` for the full phased plan. Key upcoming work:
+- Agent Runtime Identity System (persistent identity that survives long sessions)
+- Skills Center UX overhaul
+- Provider expansion and prompt caching
+- Video and music generation
+- Advanced memory with weighted recall
+
+The goal: make GhostLink the best multi-agent tool out there.

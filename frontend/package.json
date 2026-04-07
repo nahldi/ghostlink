@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "rm -rf dist && tsc -b && vite build",
+    "build": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\" && tsc -b && vite build",
     "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "preview": "vite preview",
     "test": "node ./node_modules/vitest/vitest.mjs run --pool=forks --maxWorkers=1 --no-isolate",
