@@ -8,6 +8,8 @@
 **Version target:** v5.7.2 baseline into v6.x foundations
 **Planning horizon:** first 3 phases, roughly 3-5 weeks of focused execution after baseline cleanup
 
+Phase 0 is complete locally. It stays in this document so fresh agents understand the baseline gate that must remain green while later phases land.
+
 ---
 
 ## Team
@@ -376,13 +378,12 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 
 ## What Comes Next
 
-After Part 1, continue with the strategic phases in [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md):
+After Part 1, continue with [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md) for the execution plan covering:
 - provider independence and cost control
-- worktree isolation
-- background agents
-- lifecycle hooks
-- arena/spec workflows
-- broader platform expansion
+- background agents and worktree isolation
+- lifecycle hooks, checkpointing, and review workflows
+- capability coverage against the platform survey
+- broader platform and ecosystem expansion
 
 ---
 

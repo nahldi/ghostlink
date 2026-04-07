@@ -29,9 +29,10 @@
 - Plugin safety scanning, heartbeat auth hardening, rate limiting, SSRF protections
 - Ops toolkit: health, diagnostics, backup, restore, logs
 
-### Current local blockers before new implementation
-- Working tree is not clean
-- Active docs still need consistency cleanup around roadmap, bugs, and readiness wording
+### Current local status
+- Phase 0 baseline cleanup is complete locally
+- Working tree is clean as of the latest verified roadmap pass
+- The remaining blockers are structural platform gaps, not local readiness drift
 - Workspace-facing agent identity injection still depends on shared instruction files in the repo root
 
 ---
@@ -93,6 +94,7 @@ For a fresh agent spawn, use this order:
 5. [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md)
 6. [BUGS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md)
 7. Optional strategic context: [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md)
+8. Later-phase execution detail: [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md)
 
 ---
 
@@ -279,6 +281,8 @@ Examples:
 - multilingual UI
 - platform-specific service integrations
 
+For execution-level detail for these later phases, use [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md).
+
 ---
 
 ## What We Already Have Versus What Needs Work
@@ -331,6 +335,7 @@ The target state is:
 ## Execution Docs
 
 - [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md): active execution plan for Phases 0-3
+- [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md): execution plan for Phases 4-6 and the capability coverage checklist
 - [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md): validation gates
 - [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md): what is verified versus inferred
 - [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md): platform survey for `coop` adopt/adapt/reject decisions
