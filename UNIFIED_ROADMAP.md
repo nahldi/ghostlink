@@ -80,6 +80,7 @@ GhostLink is now planned around a 5-agent operating model.
    - `unification`
    - `hardening`
    - `UI exposure of existing backend`
+   - `platform`
 
 ---
 
@@ -109,6 +110,11 @@ This roadmap is not just "add more features." It has to produce a stronger multi
 - Unified operator control plane for tasks, progress, provenance, and failure handling
 - Traceability for delegation, tool calls, approvals, and failover
 - Reliable multi-agent execution without shared-worktree collisions
+- Durable execution with checkpoint, resume, replay, and fork capabilities
+- Policy engine with enforceable sandbox tiers and circuit breakers
+- Eval framework with trace grading and regression gates
+- A2A interoperability for cross-platform agent communication
+- Agent and skill productization with versioning, rollout channels, and rollback
 
 ### Must-have roadmap additions from research
 - `AGENTS.md` support as an ingest/overlay layer, not as the source of truth
@@ -119,21 +125,30 @@ This roadmap is not just "add more features." It has to produce a stronger multi
 - Observability and tracing for multi-agent chains
 - Trust-boundary enforcement for delegation
 - Lifecycle hooks for mandatory checks
+- Checkpoint store and crash recovery for long-running tasks
+- Per-tool approval policy and risk tiers
+- Network/egress allowlists and secret scoping
+- Golden task corpus and regression suite
+- Trace graders for correctness, safety, cost, and latency
 
 ### Should-have roadmap additions from research
 - Spec-driven development workflow
 - Arena and best-of-N competition mode
 - Plan mode before expensive execution
 - Graph-based workflow state and checkpointing
-- A2A evaluation and adoption plan
+- A2A client and server implementation
 - Review-agent surfaces and provenance UI
 - Full memory stratification beyond identity memory
+- Versioned agent profiles and skills with rollout channels
+- Agent card publication and discovery
 
 ---
 
 ## Phase Order
 
 The roadmap is intentionally reordered around the dependencies that actually exist in GhostLink.
+
+`0 -> 1A -> 1B -> 2 -> 3 -> 3.5 -> 4A -> 4B -> 4.5 -> 5 -> 6 -> 7 -> 8 -> 8.5 -> 9 -> 10`
 
 ### Phase 0 - Truthful Baseline
 **Type:** hardening
@@ -154,20 +169,21 @@ Primary owners:
 - `tyson`: backend/runtime cleanup
 - `ned`: frontend/Electron/build cleanup
 
-### Phase 1A - Stable Agent IDs And Identity Records
+### Phase 1A - Stable Identity Records
 **Type:** hardening
-**Goal:** Introduce persisted agent instance IDs and server-owned identity records.
+**Goal:** Introduce persisted agent instance IDs and comprehensive server-owned identity records.
 **Rough effort:** 3-5 days
 
 Key outcomes:
 - stable internal ID separate from display label
-- persisted identity record with provider, workspace, role/profile, skills, and namespaces
+- persisted identity record with agent_id, session_id, parent_agent_id, task_id, context_id, trace_id, artifact_namespace, auth_scope, provider, workspace_id, profile_id, capabilities, transport, and immutable rename_history
 - no core logic keyed only by agent display name
+- every tool call, task, session, artifact, and audit event joinable to one identity record
 
 Primary owners:
 - `jeff`: architecture and API spec
 - `tyson`: backend implementation
-- `kurt`: collision, rename, and restore tests
+- `kurt`: collision, rename, restart, delegation, and attribution tests
 - `coop`: external-pattern cross-check
 
 ### Phase 1B - Runtime Identity Isolation And Reinjection
@@ -212,7 +228,7 @@ Primary owners:
 
 ### Phase 3 - Operator Control Plane
 **Type:** unification
-**Goal:** Unify tasks, progress, context controls, and traceability into a single operator surface.
+**Goal:** Unify tasks, progress, context controls, traceability, and enterprise auditability into a single operator surface.
 **Rough effort:** 1-2 weeks
 
 Key outcomes:
@@ -223,25 +239,68 @@ Key outcomes:
 - explicit Skills Center UI built on profile-aware assignment
 - progress and provenance UI
 - tracing for delegation, tool chains, approvals, reconnects, and failover
+- enterprise auditability: searchable history, filters, cost per session/task, provenance chain, exportable audit trail, retention controls
 
 Primary owners:
-- `jeff`: task/progress/control-plane spec
+- `jeff`: task/progress/control-plane/auditability spec
 - `coop`: UX refinement from competitive research
-- `tyson`: backend task/control APIs and enforcement
-- `ned`: UI and operator surfaces
-- `kurt`: stress and failure validation
+- `tyson`: backend task/control/audit APIs and enforcement
+- `ned`: UI, operator surfaces, audit search/filter/export
+- `kurt`: stress, failure, and audit validation
 
-### Phase 4 - Provider Independence And Cost Control
+### Phase 3.5 - Durable Execution And Replay
+**Type:** hardening + new capability
+**Goal:** Make long-running agent execution resumable, replayable, forkable, and inspectable.
+**Rough effort:** 1-2 weeks
+
+Key outcomes:
+- checkpoint store for task state
+- resume from checkpoint after crash/restart
+- replay from prior checkpoint
+- fork alternate execution branches from prior state
+- pause/resume as a first-class primitive
+- idempotent side-effect boundaries
+- artifact lineage graph tied to tasks/checkpoints
+
+Primary owners:
+- `jeff`: execution model spec, checkpoint schema, side-effect boundary definitions
+- `coop`: compare against LangGraph, Temporal, Restate patterns
+- `tyson`: checkpoint store, resume/replay engine, side-effect isolation
+- `ned`: checkpoint/replay/fork UI surfaces
+- `kurt`: replay correctness, idempotency, fork/branch, crash-resume tests
+
+### Phase 4A - Policy Engine And Sandboxing
+**Type:** hardening
+**Goal:** Make autonomous execution governable before scaling out background and multi-agent work.
+**Rough effort:** 1-2 weeks
+
+Key outcomes:
+- per-tool approval policy with risk tiers
+- network/egress allowlists and secret scoping
+- sandbox tiers: host, worktree-only, container
+- circuit breakers for destructive actions
+- hook trust/signing policy
+- webhook/notification SSRF protections
+
+Primary owners:
+- `jeff`: policy schema spec, risk tier definitions, sandbox tier architecture
+- `coop`: compare against Claude Code hooks, Codex sandboxing, Devin sandboxing
+- `tyson`: policy engine, sandbox integration, egress controls
+- `ned`: policy/sandbox visibility UI
+- `kurt`: policy bypass, SSRF, circuit breaker, sandbox isolation tests
+
+### Phase 4B - Provider Independence And Cost Control
 **Type:** new capability + hardening
 **Goal:** Make GhostLink resilient to provider policy, auth, and transport changes.
-**Rough effort:** 1-2 weeks
+**Rough effort:** 2 weeks
 
 Key outcomes:
 - multiple transport modes per provider
 - explicit provider capability and risk matrix
 - model routing
 - failover policy
-- per-agent cost tracking and budgets
+- per-agent cost tracking and budgets (integrated with 4A policy engine)
+- failover/routing events emit trace/audit events compatible with Phase 3/3.5
 - degraded-mode behavior that stays operator-visible
 
 Primary owners:
@@ -249,12 +308,36 @@ Primary owners:
 - `coop`: provider matrix and product policy
 - `tyson`: provider implementation
 - `ned`: cost/failover/operator UI
-- `kurt`: provider-failure and policy-shift tests
+- `kurt`: provider-failure, policy-shift, and trace emission tests
+
+### Phase 4.5 - Evals And Trace Grading
+**Type:** hardening
+**Goal:** Turn traces into measurable quality gates.
+**Rough effort:** 1-2 weeks
+
+Key outcomes:
+- golden task corpus for regression baseline
+- regression suite across providers, models, profiles, and agent types
+- trace graders for correctness, safety, cost, latency, unnecessary tool use
+- benchmark dashboards
+- release gates for providers, skills, hooks, and agent profiles
+- "no silent regression" merge criteria
+
+Primary owners:
+- `jeff`: eval framework spec, grading criteria definitions
+- `coop`: compare against OpenAI trace grading, LangSmith, Braintrust patterns
+- `kurt`: golden corpus, grading tests, regression suite ownership
+- `tyson`: eval runner, trace grading engine, benchmark storage
+- `ned`: benchmark dashboard UI
 
 ### Phase 5 - Agent Execution Expansion
 **Type:** new capability
 **Goal:** Add the execution features that become safe only after the foundations above exist.
-**Rough effort:** 2-4 weeks
+**Rough effort:** 2-3 weeks
+
+Prerequisites:
+- no background execution without Phase 3.5 (durable execution)
+- no broad async/arena without Phase 4A (policy) and Phase 4.5 (evals)
 
 Key outcomes:
 - background and async agents
@@ -264,24 +347,56 @@ Key outcomes:
   - workspace memory
   - session/task memory
   - promoted long-term summaries
-- lifecycle hooks
+- lifecycle hooks (integrated with 4A policy)
 - review-agent surfaces
-- arena and best-of-N workflows
+- arena and best-of-N workflows (with eval scoring from 4.5)
 - spec-driven development loops
-- checkpoint and rollback surfaces
+- collaboration patterns using artifact lineage from 3.5
 
-### Phase 6 - Deferred Platform Expansion
+### Phase 6 - Memory And Intelligence
 **Type:** new capability
-**Goal:** Ship lower-priority expansion after the control plane is mature.
+**Goal:** Give agents persistent, stratified memory with cross-agent coordination.
 
-Examples:
-- Matrix and Teams bridges
-- mobile notifications
-- richer media generation
-- multilingual UI
-- platform-specific service integrations
+### Phase 7 - Media Generation
+**Type:** new capability
+**Goal:** Add video, music, and enhanced image generation as MCP tools.
 
-For execution-level detail for these later phases, use [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md).
+### Phase 8 - A2A Interoperability
+**Type:** new capability
+**Goal:** Make GhostLink both an A2A client and server for cross-platform agent communication.
+**Rough effort:** 2-3 weeks
+
+Key outcomes:
+- A2A client support (discover and call remote A2A agents)
+- A2A server surface (expose local agents over A2A)
+- agent card publication at `/.well-known/agent-card.json`
+- SSE task streaming and push notifications for long-running tasks
+- auth/signature model for agent cards
+- identity/task/artifact mapping between GhostLink and A2A models
+- conformance/TCK plan
+
+### Phase 8.5 - Agent And Skill Productization
+**Type:** platform
+**Goal:** Make agents, profiles, and skills versioned deployable assets.
+**Rough effort:** 2-3 weeks
+
+Key outcomes:
+- versioned agent profiles and skills with compatibility metadata
+- rollout channels: private, beta, stable
+- workspace/org distribution
+- rollback and deprecation flows
+- policy approval before broad rollout
+- usage telemetry and health per version
+
+### Phase 9 - UI, Accessibility, And Platform Integrations
+**Type:** hardening + new capability
+**Goal:** Ship accessibility, platform bridges, compliance, voice, and i18n.
+
+### Phase 10 - Future Expansion
+**Type:** new capability
+**Goal:** Backlog of features with no fixed timeline.
+
+For execution-level detail for all later phases, use [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md).
 
 ---
 
@@ -303,6 +418,11 @@ For execution-level detail for these later phases, use [roadmap-pt2.md](/C:/User
 - delegation trust boundaries
 - worktree isolation
 - task/progress/tracing unification
+- checkpoint and replay for long-running tasks
+- policy engine and sandbox enforcement
+- eval framework and trace grading
+- A2A client and server
+- versioned agent/skill assets
 
 ### UX gaps
 - thinking level picker
@@ -310,6 +430,11 @@ For execution-level detail for these later phases, use [roadmap-pt2.md](/C:/User
 - operator control room
 - provenance and trace views
 - skill center built on stable profiles instead of agent names
+- checkpoint/replay/fork surfaces
+- policy and sandbox visibility
+- benchmark dashboards
+- A2A discovery and status
+- version management and rollout channels
 
 ---
 
@@ -329,13 +454,15 @@ The target state is:
 - closer to Cursor and Replit on execution ergonomics
 - closer to Claude Code and Codex on rules, hooks, and agent workflow discipline
 - closer to LangGraph and enterprise agent stacks on state, tracing, and recoverability
+- competitive on A2A interoperability as the protocol matures
+- ahead on agent/skill productization with versioning and controlled rollout
 
 ---
 
 ## Execution Docs
 
-- [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md): active execution plan for Phases 0-3
-- [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md): execution plan for Phases 4-10 with full agent assignments, file ownership, and exit gates
+- [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md): active execution plan for Phases 0-3.5
+- [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md): execution plan for Phases 4A-10 with full agent assignments, file ownership, and exit gates
 - [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md): validation gates
 - [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md): what is verified versus inferred
 - [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md): platform survey for `coop` adopt/adapt/reject decisions

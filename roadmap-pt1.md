@@ -3,10 +3,10 @@
 > Active execution roadmap for the first phases.
 > Fresh agents should start here after reading [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
 
-**Scope:** Phases 0-3
+**Scope:** Phases 0-3.5
 **Team model:** 5 agents
 **Version target:** v5.7.2 baseline into v6.x foundations
-**Planning horizon:** first 3 phases, roughly 3-5 weeks of focused execution after baseline cleanup
+**Planning horizon:** first phases, roughly 4-7 weeks of focused execution after baseline cleanup
 
 Phase 0 is complete locally. It stays in this document so fresh agents understand the baseline gate that must remain green while later phases land.
 
@@ -135,28 +135,38 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 
 ---
 
-## Phase 1A - Stable Agent IDs And Identity Records
+## Phase 1A - Stable Identity Records
 
 **Type:** hardening
-**Goal:** Stop keying the system off display names.
+**Goal:** Stop keying the system off display names. Establish a comprehensive identity record that every subsystem can join against.
 **Rough effort:** 3-5 days
 
 ### Why this comes first
 - Everything else depends on stable identity.
 - Skills, profiles, runtime injection, tracing, and trust policies all break if the system only knows names like `claude` and `claude-2`.
+- A full identity record is the foundation for auditability, artifact attribution, delegation lineage, and multi-agent tracing.
 
 ### Deliverables
 - persisted agent instance ID
 - server-owned identity record
-- identity record includes provider, workspace, role/profile, capabilities, memory namespace, transport info
+- identity record includes all required fields:
+  - `agent_id`, `session_id`, `parent_agent_id`, `task_id`, `context_id`, `trace_id`
+  - `artifact_namespace`, `auth_scope`, `provider`, `workspace_id`, `profile_id`
+  - `capabilities`, `transport`, immutable `rename_history`
 - name changes no longer break ownership or config continuity
+- every tool call, task, session, artifact, and audit event can be joined back to one identity record
+- rename preserves lineage via immutable rename_history
+- restart preserves agent_id but creates a new session_id
+- delegation records parent_agent_id
+- artifact writes are namespaced and attributable
 
 ### Agent assignments
 
 #### `jeff`
-- Write the identity record spec.
+- Write the identity record spec with all required fields.
 - Define exact storage model and API contract.
 - Define rename, restore, and rollback behavior.
+- Define the join contract: how tool calls, tasks, sessions, artifacts, and audit events reference the identity record.
 
 #### `coop`
 - Compare against Codex, Claude Code, Gemini, and OpenClaw patterns.
@@ -165,12 +175,14 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 #### `kurt`
 - Write tests for:
   - same-model multi-agent coexistence
-  - rename continuity
-  - restart continuity
+  - rename continuity and lineage preservation
+  - restart continuity (agent_id stable, session_id changes)
+  - delegation with parent_agent_id
+  - artifact namespace attribution
   - state corruption and recovery
 
 #### `tyson`
-- Implement the ID and identity record backend.
+- Implement the ID and identity record backend with all required fields.
 - Replace name-only coupling in backend platform surfaces.
 
 #### `ned`
@@ -188,7 +200,11 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 ### Exit gate
 - two same-model agents can exist without name-based collisions in backend state
 - rename does not break skills/settings/identity continuity
-- restore after restart keeps identity stable
+- rename_history is immutable and preserves full lineage
+- restore after restart keeps agent_id stable and creates a new session_id
+- delegation records parent_agent_id correctly
+- artifact writes are namespaced by agent and attributable via identity record
+- every tool call, task, session, artifact, and audit event can be joined back to one identity record
 
 ---
 
@@ -317,7 +333,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 ## Phase 3 - Operator Control Plane
 
 **Type:** unification
-**Goal:** Give the operator one coherent way to see and control the multi-agent system.
+**Goal:** Give the operator one coherent way to see and control the multi-agent system, including enterprise auditability.
 **Rough effort:** 1-2 weeks
 
 ### Deliverables
@@ -333,12 +349,20 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
   - approvals
   - reconnects
   - failover
+- enterprise auditability:
+  - searchable session/task/event history
+  - filters by agent, provider, profile, repo, time, status
+  - token/cost usage per session and task
+  - provenance chain: prompt -> tool call -> artifact -> review -> merge
+  - exportable audit trail
+  - retention policy controls
 
 ### Agent assignments
 
 #### `jeff`
 - Write control-plane and operator-surface spec.
 - Decide what is truly Phase 3 versus later expansion.
+- Write auditability spec: search schema, filter dimensions, provenance chain model, export format, retention policy schema.
 
 #### `coop`
 - Pressure-test UX against Cursor, Windsurf, Replit, Devin, Claude Code, and Codex patterns.
@@ -350,12 +374,18 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
   - reconnect
   - audit visibility
   - approval trace
+  - audit search and filter accuracy
+  - provenance chain completeness
+  - export correctness
 
 #### `tyson`
 - Implement backend task/control APIs and enforcement.
+- Implement audit search, filter, and export backend.
+- Implement retention policy engine.
 
 #### `ned`
 - Implement operator dashboard, context controls, thinking picker, stop/cancel, provenance/tracing surfaces.
+- Implement audit search/filter UI, provenance chain viewer, export controls, retention policy configuration.
 
 ### Primary file ownership
 - `tyson`
@@ -363,27 +393,111 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
   - `backend/routes/agents.py`
   - `backend/mcp_bridge.py`
   - tracing/task backend tests
+  - new `backend/audit.py` (search, filter, export, retention)
 - `ned`
   - `frontend/src/components/JobsPanel.tsx`
   - `frontend/src/components/TaskQueue.tsx`
   - new operator/progress/provenance surfaces
+  - new audit search/filter/export UI surfaces
   - header/sidebar control surfaces
 
 ### Exit gate
 - operator can see who is doing what, why, with what state
 - operator can stop, reroute, and audit work reliably
 - task/progress/provenance behavior holds up under stress
+- operator can reconstruct a task timeline from one screen
+- every mutation and approval is attributable
+- audit export works without replaying raw logs manually
+
+---
+
+## Phase 3.5 - Durable Execution And Replay
+
+**Type:** hardening + new capability
+**Goal:** Make long-running agent execution resumable, replayable, forkable, and inspectable.
+**Rough effort:** 1-2 weeks
+
+### Why this comes now
+- Phase 3 gave us the operator control plane and enterprise auditability. Durable execution extends that foundation with crash recovery, replay, and branching.
+- Without durable execution, any crash or restart during a long-running task loses all progress. Background and multi-agent execution (Phase 5) cannot be reliable without this.
+- Replay and fork capabilities give the operator power to inspect past decisions and explore alternate execution paths.
+
+### Deliverables
+- checkpoint store for task state
+- resume from checkpoint after crash/restart
+- replay from prior checkpoint
+- fork alternate execution branches from prior state
+- pause/resume as a first-class primitive
+- idempotent side-effect boundaries
+- artifact lineage graph tied to tasks/checkpoints
+
+### Agent assignments
+
+#### `jeff`
+- Write the execution model spec, checkpoint schema, and side-effect boundary definitions.
+- Define checkpoint granularity: what state is captured, how often, and what triggers a checkpoint.
+- Define the fork model: how a forked task inherits state, identity, and artifact lineage from the source checkpoint.
+- Define rollback path if checkpoint storage becomes a performance bottleneck.
+
+#### `coop`
+- Compare against LangGraph checkpoints, Temporal workflows, and Restate patterns.
+- Make adopt/adapt/reject decisions on checkpoint granularity, replay semantics, and fork UX.
+- Evaluate whether the checkpoint model should support cross-agent checkpoint dependencies.
+
+#### `kurt`
+- Write replay correctness tests: replay from checkpoint N produces the same result as the original execution for deterministic paths.
+- Write idempotency tests: replayed side-effectful operations do not duplicate external mutations.
+- Write fork/branch tests: forked task has independent state, original task is unaffected by fork.
+- Write crash-resume tests: simulate crash mid-task, verify resume from last checkpoint preserves identity and state.
+- Write pause/resume tests: paused task resumes without state loss.
+
+#### `tyson`
+- Implement checkpoint store with configurable storage backend.
+- Implement resume/replay engine that restores task state from checkpoints.
+- Implement side-effect isolation: mark side-effectful operations and prevent duplication on replay.
+- Implement fork logic: create new task from an existing checkpoint with inherited state.
+- Implement pause/resume primitives in the task executor.
+- Implement artifact lineage graph linkage to checkpoints and tasks.
+
+#### `ned`
+- Implement checkpoint timeline UI: visual timeline of checkpoints for a task with state previews.
+- Implement replay controls: select a checkpoint, trigger replay, view replayed execution alongside original.
+- Implement fork UI: select a checkpoint, fork into a new task, view forked execution.
+- Implement pause/resume controls in the operator dashboard.
+- Implement artifact lineage graph visualization tied to task/checkpoint context.
+
+### Primary file ownership
+- `tyson`
+  - new `backend/checkpoints.py` (checkpoint store, resume/replay engine, fork logic)
+  - `backend/jobs.py` (pause/resume primitives, checkpoint integration, side-effect boundaries)
+  - `backend/routes/tasks.py` (checkpoint, replay, fork, pause/resume API endpoints)
+  - backend tests for all of the above
+- `ned`
+  - new frontend checkpoint timeline, replay, fork, and artifact lineage surfaces
+
+### Exit gate
+- interrupted task resumes without losing identity or state
+- operator can replay a task from checkpoint N
+- operator can fork a task from checkpoint N into a new task
+- side-effectful operations are not duplicated on replay
+- pause/resume works without state loss
+- artifact lineage graph correctly links artifacts to the checkpoints and tasks that produced them
 
 ---
 
 ## What Comes Next
 
 After Part 1, continue with [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md) for the execution plan covering:
-- provider independence and cost control
-- background agents and worktree isolation
-- lifecycle hooks, checkpointing, and review workflows
-- capability coverage against the platform survey
-- broader platform and ecosystem expansion
+- policy engine and sandboxing (Phase 4A)
+- provider independence and cost control (Phase 4B)
+- evals and trace grading (Phase 4.5)
+- multi-agent execution with background agents and worktree isolation (Phase 5)
+- memory and intelligence (Phase 6)
+- media generation (Phase 7)
+- A2A interoperability (Phase 8)
+- agent and skill productization (Phase 8.5)
+- platform and integrations (Phase 9)
+- future expansion backlog (Phase 10)
 
 ---
 
