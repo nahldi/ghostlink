@@ -1,3 +1,4 @@
+(() => {
 /**
  * GhostLink — Launcher Window Renderer
  *
@@ -10,8 +11,8 @@
  */
 
 // contextIsolation is enabled — window.api is exposed via the preload bridge
-const api = window.api;
-if (!api) {
+const ipcBridge = window.api;
+if (!ipcBridge) {
   document.addEventListener('DOMContentLoaded', () => {
     const errDiv = document.createElement('div');
     errDiv.style.cssText = 'padding:40px;text-align:center;color:#f87171;font-family:sans-serif';
@@ -91,11 +92,11 @@ function renderConnectionsEmptyState() {
 // ── Titlebar controls ────────────────────────────────────────────────────────
 
 document.getElementById('btn-minimize').addEventListener('click', () => {
-  api.invoke('window:minimize');
+  ipcBridge.invoke('window:minimize');
 });
 
 document.getElementById('btn-close').addEventListener('click', () => {
-  api.invoke('window:close');
+  ipcBridge.invoke('window:close');
 });
 
 // ── Server controls ──────────────────────────────────────────────────────────
@@ -103,13 +104,13 @@ document.getElementById('btn-close').addEventListener('click', () => {
 $btnServer.addEventListener('click', async () => {
   if (serverRunning) {
     setServerState('stopping');
-    const result = await api.invoke('server:stop');
+    const result = await ipcBridge.invoke('server:stop');
     if (!result || !result.success) {
       setServerState('error');
     }
   } else {
     setServerState('starting');
-    const result = await api.invoke('server:start');
+    const result = await ipcBridge.invoke('server:start');
     if (!result || !result.success) {
       setServerState('error');
       $footerStatus.textContent = (result && result.error) || 'Server failed to start';
@@ -282,7 +283,7 @@ function renderProviders(statuses) {
       btn.addEventListener('click', async () => {
         btn.textContent = '...';
         btn.disabled = true;
-        await api.invoke('auth:install', s.provider);
+        await ipcBridge.invoke('auth:install', s.provider);
         setTimeout(() => refreshAuth(), 10000);
       });
       row.appendChild(dot);
@@ -399,7 +400,7 @@ function renderProviders(statuses) {
       btn.addEventListener('click', async () => {
         btn.textContent = 'Reconnecting...';
         btn.disabled = true;
-        await api.invoke('auth:login', s.provider);
+        await ipcBridge.invoke('auth:login', s.provider);
         setTimeout(() => refreshAuth(), 5000);
       });
       action.appendChild(btn);
@@ -415,7 +416,7 @@ function renderProviders(statuses) {
       btn.addEventListener('click', async () => {
         btn.textContent = 'Installing...';
         btn.disabled = true;
-        await api.invoke('auth:install', s.provider);
+        await ipcBridge.invoke('auth:install', s.provider);
         // Re-check after user finishes installing
         setTimeout(() => refreshAuth(), 10000);
       });
@@ -449,19 +450,19 @@ function renderProviders(statuses) {
         // Show inline auth status
         showAuthProgress(s, card);
         try {
-          const result = await api.invoke('auth:browser-login', s.provider);
+          const result = await ipcBridge.invoke('auth:browser-login', s.provider);
           if (result && result.success) {
             removeAuthProgress(card);
             refreshAuth();
           } else {
             // Fallback to terminal login if browser auth not supported
             removeAuthProgress(card);
-            await api.invoke('auth:login', s.provider);
+            await ipcBridge.invoke('auth:login', s.provider);
             setTimeout(() => refreshAuth(), 5000);
           }
         } catch {
           removeAuthProgress(card);
-          await api.invoke('auth:login', s.provider);
+          await ipcBridge.invoke('auth:login', s.provider);
           setTimeout(() => refreshAuth(), 5000);
         }
         loginBtn.textContent = 'Login';
@@ -509,12 +510,12 @@ function removeAuthProgress(card) {
 }
 
 // Listen for auth URL events from main process
-api.on('auth:login-url', (provider, url) => {
+ipcBridge.on('auth:login-url', (provider, url) => {
   // The main process opened the browser — no action needed from the renderer
   // The URL is shown in the browser, not in the launcher
 });
 
-api.on('auth:login-complete', (provider) => {
+ipcBridge.on('auth:login-complete', (provider) => {
   refreshAuth();
 });
 
@@ -554,7 +555,7 @@ function showApiKeyInput(provider, card) {
     saveBtn.textContent = '...';
     saveBtn.disabled = true;
     try {
-      await api.invoke('auth:save-key', provider.provider, key);
+      await ipcBridge.invoke('auth:save-key', provider.provider, key);
       row.remove();
       setTimeout(() => refreshAuth(), 1000);
     } catch (err) {
@@ -573,7 +574,7 @@ function showApiKeyInput(provider, card) {
  * Request a fresh auth check from main process.
  */
 function refreshAuth() {
-  api.invoke('auth:check-all');
+  ipcBridge.invoke('auth:check-all');
 }
 
 // ── Update UI ────────────────────────────────────────────────────────────────
@@ -621,17 +622,17 @@ function setUpdateError(info) {
 $btnUpdate.addEventListener('click', async () => {
   $btnUpdate.style.display = 'none';
   setUpdateProgress(0);
-  await api.invoke('update:download');
+  await ipcBridge.invoke('update:download');
 });
 
 $btnRestart.addEventListener('click', () => {
-  api.invoke('update:install');
+  ipcBridge.invoke('update:install');
 });
 
 // ── Event listeners (main → renderer) ────────────────────────────────────────
 
 // Server lifecycle
-api.on('server:started', (port) => {
+ipcBridge.on('server:started', (port) => {
   setServerState('running');
   if (port) $portDisplay.textContent = 'Port: ' + port;
   // Sync auth results to backend after server is fully ready (short delay for port binding)
@@ -640,7 +641,7 @@ api.on('server:started', (port) => {
   }, 1500);
   // Auto-open the chat window after a short delay
   setTimeout(async () => {
-    const result = await api.invoke('app:open-chat');
+    const result = await ipcBridge.invoke('app:open-chat');
     if (!result || !result.success) {
       setServerState('error');
       $footerStatus.textContent = (result && result.error) || 'Server started but chat could not open';
@@ -648,46 +649,46 @@ api.on('server:started', (port) => {
   }, 2000);
 });
 
-api.on('server:stopped', () => {
+ipcBridge.on('server:stopped', () => {
   setServerState('stopped');
 });
 
-api.on('server:error', (errorMsg) => {
+ipcBridge.on('server:error', (errorMsg) => {
   setServerState('error');
   $footerStatus.textContent = errorMsg || 'Server error';
 });
 
 // Auth status updates
-api.on('auth:status', (statuses) => {
+ipcBridge.on('auth:status', (statuses) => {
   renderProviders(statuses);
   // Sync connected agents to backend so the agent launcher can see them
   syncConnectedToBackend(statuses);
 });
 
 // Auto-update lifecycle
-api.on('update:available', (info) => {
+ipcBridge.on('update:available', (info) => {
   setUpdateAvailable(info.version || info);
 });
 
-api.on('update:not-available', () => {
+ipcBridge.on('update:not-available', () => {
   setUpdateUpToDate();
 });
 
-api.on('update:progress', (progress) => {
+ipcBridge.on('update:progress', (progress) => {
   const percent = typeof progress === 'number' ? progress : (progress.percent || 0);
   setUpdateProgress(percent);
 });
 
-api.on('update:downloaded', () => {
+ipcBridge.on('update:downloaded', () => {
   setUpdateDownloaded();
 });
 
-api.on('update:error', (err) => {
+ipcBridge.on('update:error', (err) => {
   setUpdateError(err);
 });
 
 // Version info
-api.on('app:version', (ver) => {
+ipcBridge.on('app:version', (ver) => {
   $version.textContent = 'v' + ver;
 });
 
@@ -761,10 +762,10 @@ if ($settingsToggle && $settingsBody && $settingsArrow) {
 const $btnPickFolder = document.getElementById('btn-pick-folder');
 if ($btnPickFolder) {
   $btnPickFolder.addEventListener('click', () => {
-    api.invoke('app:pick-folder');
+    ipcBridge.invoke('app:pick-folder');
   });
 }
-api.on('app:folder-picked', (path) => {
+ipcBridge.on('app:folder-picked', (path) => {
   const $ws = document.getElementById('setting-workspace');
   if ($ws) $ws.value = path;
 });
@@ -781,7 +782,7 @@ document.querySelectorAll('#settings-body input, #settings-body select').forEach
       autoStart: document.getElementById('setting-autostart')?.checked || false,
       updateChannel: document.getElementById('setting-update-channel')?.value || 'stable',
     };
-    api.invoke('app:save-settings', settings);
+    ipcBridge.invoke('app:save-settings', settings);
   });
 });
 
@@ -791,12 +792,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderConnectionsLoadingState();
 
   // Fetch version immediately — don't wait for slow auth checks
-  api.invoke('app:get-version').then((ver) => {
+  ipcBridge.invoke('app:get-version').then((ver) => {
     $version.textContent = ver ? ('v' + ver) : 'v?';
   }).catch(() => { $version.textContent = 'v?'; });
 
   // Server status — quick check
-  api.invoke('server:status').then((status) => {
+  ipcBridge.invoke('server:status').then((status) => {
     if (status && status.running) {
       setServerState('running');
       $portDisplay.textContent = 'Port: ' + status.port;
@@ -804,12 +805,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   }).catch((e) => console.warn('Server status fetch failed:', e));
 
   // Load saved launcher settings without waiting on auth/update checks
-  api.invoke('app:get-settings').then((settings) => {
+  ipcBridge.invoke('app:get-settings').then((settings) => {
     applySavedSettings(settings);
   }).catch((e) => console.warn('Settings fetch failed:', e));
 
   // Auth checks — can be slow, don't block other UI
-  api.invoke('auth:check-all').then((statuses) => {
+  ipcBridge.invoke('auth:check-all').then((statuses) => {
     if (Array.isArray(statuses) && statuses.length > 0) {
       renderProviders(statuses);
     } else {
@@ -821,7 +822,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Update check — fire and forget
-  api.invoke('update:check').catch((e) => {
+  ipcBridge.invoke('update:check').catch((e) => {
     console.warn('Update check failed:', e);
     setUpdateError(e);
   });
@@ -850,8 +851,9 @@ if ($btnCheckUpdate) {
     $updateStatus.textContent = 'Checking...';
     $updateStatus.className = '';
     try {
-      await api.invoke('update:check');
+      await ipcBridge.invoke('update:check');
     } catch {}
     setTimeout(() => $btnCheckUpdate.classList.remove('spinning'), 1000);
   });
 }
+})();

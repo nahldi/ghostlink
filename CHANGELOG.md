@@ -1,5 +1,12 @@
 # GhostLink Changelog
 
+## v6.0.3 — 2026-04-08
+### Critical Launcher Fix
+- **Fix launcher crash** — `contextBridge` binding conflict caused `SyntaxError: Identifier 'api' has already been declared`, killing all launcher buttons (Start Server, minimize, close, updates)
+- **Fix WSL backend copy crash** — `execFileSync` null return handling prevents silent failure on WSL startup path
+- **Add error overlay** — launcher footer now shows renderer errors instead of silently dying
+- Affects: launcher.js, wizard.js, server.ts, launcher.html
+
 ## v6.0.2 — 2026-04-08
 ### macOS Fix
 - **macOS Python detection** — fix Finder-launched app failing to detect Python. Added explicit paths: `/opt/homebrew/bin/python3`, `/usr/local/bin/python3`, `/Library/Frameworks/Python.framework/Versions/Current/bin/python3`

@@ -156,6 +156,7 @@
     <span id="footer-status">Ready</span>
   </div>
 
+  <script>window.onerror = function(msg, src, line, col, err) { document.getElementById('footer-status').textContent = msg + ' (line ' + line + ')'; document.getElementById('footer-status').style.color = '#f87171'; };</script>
   <script src="launcher.js"></script>
 </body>
 </html>

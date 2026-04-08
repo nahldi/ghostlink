@@ -1,10 +1,11 @@
+(() => {
 /**
  * GhostLink — Setup Wizard Renderer
  */
 
 // contextIsolation is enabled — window.api is exposed via the preload bridge
-const api = window.api;
-if (!api) {
+const ipcBridge = window.api;
+if (!ipcBridge) {
   document.addEventListener('DOMContentLoaded', () => {
     const errDiv = document.createElement('div');
     errDiv.style.cssText = 'padding:40px;text-align:center;color:#f87171;font-family:sans-serif';
@@ -47,11 +48,11 @@ const $dots = document.querySelectorAll('.step-dot');
 // ── Titlebar controls ────────────────────────────────────────────────────────
 
 document.getElementById('btn-minimize')?.addEventListener('click', () => {
-  api.invoke('window:minimize');
+  ipcBridge.invoke('window:minimize');
 });
 
 document.getElementById('btn-close')?.addEventListener('click', () => {
-  api.invoke('window:close');
+  ipcBridge.invoke('window:close');
 });
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -122,7 +123,7 @@ document.getElementById('btn-welcome-next')?.addEventListener('click', () => {
 
 async function detectPlatform() {
   try {
-    const result = await api.invoke('wizard:detect-platform');
+    const result = await ipcBridge.invoke('wizard:detect-platform');
     if (result && result.platform) {
       // Pre-select the detected platform
       const radio = document.querySelector(`input[name="platform"][value="${result.platform}"]`);
@@ -222,7 +223,7 @@ async function runPythonCheck() {
   pythonOk = false;
 
   try {
-    const result = await api.invoke('wizard:detect-python', settings.platform);
+    const result = await ipcBridge.invoke('wizard:detect-python', settings.platform);
 
     if (result && result.found) {
       settings.pythonPath = result.pythonPath || 'python';
@@ -250,7 +251,7 @@ async function runPythonCheck() {
         $depsStatus.style.display = '';
         $depsProgress.style.display = '';
 
-        const installResult = await api.invoke('wizard:install-deps', settings.platform);
+        const installResult = await ipcBridge.invoke('wizard:install-deps', settings.platform);
         if (installResult && installResult.success) {
           $depsStatus.innerHTML = '<span style="color:#4ade80;font-size:16px;">&#10003;</span><span>Dependencies installed</span>';
           $depsStatus.className = 'check-status success';
@@ -283,7 +284,7 @@ async function runPythonCheck() {
 }
 
 // Listen for install progress updates
-api.on('wizard:deps-progress', (percent) => {
+ipcBridge.on('wizard:deps-progress', (percent) => {
   $depsProgressFill.style.width = percent + '%';
   $depsProgressText.textContent = Math.round(percent) + '%';
 });
@@ -308,7 +309,7 @@ function checkWorkspacePath(folderPath) {
 }
 
 document.getElementById('btn-browse')?.addEventListener('click', async () => {
-  const folder = await api.invoke('wizard:pick-folder');
+  const folder = await ipcBridge.invoke('wizard:pick-folder');
   if (folder) {
     $workspacePath.value = folder;
     settings.workspace = folder;
@@ -322,7 +323,7 @@ $workspacePath?.addEventListener('input', () => {
 });
 
 // Listen for folder picked event
-api.on('wizard:folder-picked', (path) => {
+ipcBridge.on('wizard:folder-picked', (path) => {
   $workspacePath.value = path;
   settings.workspace = path;
   checkWorkspacePath(path);
@@ -395,7 +396,7 @@ document.getElementById('btn-finish')?.addEventListener('click', async () => {
   $btn.disabled = true;
 
   try {
-    const result = await api.invoke('wizard:complete', settings);
+    const result = await ipcBridge.invoke('wizard:complete', settings);
     if (!result || !result.success) {
       throw new Error((result && result.error) || 'GhostLink could not finish setup');
     }
@@ -419,3 +420,4 @@ function escapeHtml(str) {
 window.addEventListener('DOMContentLoaded', () => {
   goToStep(0);
 });
+})();

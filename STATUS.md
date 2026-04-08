@@ -1,7 +1,7 @@
 # GhostLink — Project Status
 
 **Last updated:** 2026-04-08
-**Version:** v6.0.2
+**Version:** v6.0.3
 **License:** MIT
 
 ---
