@@ -13,6 +13,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import aiosqlite
     from a2a_bridge import A2ABridge
     from auth import UserManager
     from automations import AutomationManager
@@ -66,6 +67,7 @@ autonomous_manager: AutonomousManager | None = None  # v4.5.0
 memory_graph: MemoryGraph | None = None  # v4.5.0
 specialization: SpecializationEngine | None = None  # v4.5.0
 rag_pipeline: RAGPipeline | None = None  # v4.5.0
+runtime_db: aiosqlite.Connection | None = None
 
 # ── Process tracking (set by spawn/register routes) ──────────────────
 

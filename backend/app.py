@@ -48,7 +48,7 @@ from bridges import BridgeManager
 from jobs import JobStore
 from plugin_sdk import HookManager, Marketplace, SafetyScanner, event_bus
 from providers import ProviderRegistry
-from registry import AgentRegistry
+from registry import AgentRegistry, init_registry_db, load_persisted_agents
 from router import MessageRouter
 from rules import RuleStore
 from schedules import ScheduleStore, cron_matches
@@ -342,6 +342,8 @@ async def lifespan(_app: FastAPI):
     db.row_factory = aiosqlite.Row
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA busy_timeout=5000")  # 5s retry on lock
+    await init_registry_db(db)
+    registry.load_persisted(await load_persisted_agents(db))
     job_store = JobStore(db)
     await job_store.init()
     rule_store = RuleStore(db)
@@ -369,6 +371,7 @@ async def lifespan(_app: FastAPI):
 
     # Publish all stores into deps so route modules can access them
     deps.store = store
+    deps.runtime_db = db
     deps.job_store = job_store
     deps.rule_store = rule_store
     deps.schedule_store = schedule_store

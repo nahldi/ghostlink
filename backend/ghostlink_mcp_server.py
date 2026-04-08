@@ -47,7 +47,7 @@ async def init_core_services(data_dir: Path, port: int = 8300):
 
     import deps
     from jobs import JobStore
-    from registry import AgentRegistry
+    from registry import AgentRegistry, init_registry_db, load_persisted_agents
     from router import MessageRouter
     from rules import RuleStore
     from schedules import ScheduleStore
@@ -65,6 +65,7 @@ async def init_core_services(data_dir: Path, port: int = 8300):
     db.row_factory = aiosqlite.Row
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA busy_timeout=5000")
+    await init_registry_db(db)
     job_store = JobStore(db)
     await job_store.init()
     rule_store = RuleStore(db)
@@ -74,6 +75,7 @@ async def init_core_services(data_dir: Path, port: int = 8300):
 
     # Core registries
     registry = AgentRegistry()
+    registry.load_persisted(await load_persisted_agents(db))
     router = MessageRouter()
 
     # Load settings
@@ -89,6 +91,7 @@ async def init_core_services(data_dir: Path, port: int = 8300):
     deps.DATA_DIR = data_dir
     deps.BASE_DIR = data_dir.parent
     deps.store = store
+    deps.runtime_db = db
     deps.job_store = job_store
     deps.rule_store = rule_store
     deps.schedule_store = schedule_store

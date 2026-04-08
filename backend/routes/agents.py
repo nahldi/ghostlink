@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 import deps
 from plugin_sdk import event_bus
+from registry import persist_agent
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -69,6 +70,17 @@ _KNOWN_MODEL_FLAGS: dict[str, str] = {
     "grok": "--model",
     "aider": "--model",
 }
+
+
+def _resolve_agent(identifier: str):
+    return deps.registry.resolve(identifier) if deps.registry else None
+
+
+def _resolved_agent_key(identifier: str) -> tuple[object | None, str]:
+    inst = _resolve_agent(identifier)
+    if inst is None:
+        return None, identifier
+    return inst, inst.agent_id
 
 
 def _expanded_cli_path(path_value: str | None = None) -> str:
@@ -533,6 +545,8 @@ async def register_agent(request: Request):
                 proc = deps._pending_spawns.pop(pid_int, None)
                 if proc is not None:
                     deps._agent_processes[inst.name] = proc
+    if deps.runtime_db is not None:
+        await persist_agent(deps.runtime_db, inst)
     asyncio.create_task(_post_register_setup(inst.name))
     return inst.to_dict()
 
@@ -540,26 +554,32 @@ async def register_agent(request: Request):
 @router.post("/api/deregister/{name}")
 async def deregister_agent(name: str):
     import mcp_bridge
+    inst = _resolve_agent(name)
+    if inst is None:
+        return {"ok": False}
+    resolved_name = inst.name
     if hasattr(deps, "worktree_manager") and deps.worktree_manager:
-        deps.worktree_manager.merge_changes(name)
-        deps.worktree_manager.remove_worktree(name)
+        deps.worktree_manager.merge_changes(resolved_name)
+        deps.worktree_manager.remove_worktree(resolved_name)
     else:
-        _warn_missing_worktree_manager("deregister", name)
-    ok = deps.registry.deregister(name)
-    if ok:
-        mcp_bridge.cleanup_agent(name)
-        deps.cleanup_agent_state(name)
-        deps._thinking_buffers.pop(name, None)
+        _warn_missing_worktree_manager("deregister", resolved_name)
+    removed = deps.registry.deregister(resolved_name)
+    if removed:
+        if deps.runtime_db is not None:
+            await persist_agent(deps.runtime_db, removed)
+        mcp_bridge.cleanup_agent(resolved_name)
+        deps.cleanup_agent_state(resolved_name)
+        deps._thinking_buffers.pop(resolved_name, None)
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
-        await _record_activity("agent_leave", f"{name} disconnected", agent=name)
-        await add_replay_event(name, "agent_leave", title="Agent disconnected", detail="Session ended", surface="session")
-        await set_agent_presence(name, surface="session", status="Disconnected", detail="Agent offline", state="offline")
-        event_bus.emit("on_agent_leave", {"agent": name})
+        await _record_activity("agent_leave", f"{resolved_name} disconnected", agent=resolved_name)
+        await add_replay_event(resolved_name, "agent_leave", title="Agent disconnected", detail="Session ended", surface="session")
+        await set_agent_presence(resolved_name, surface="session", status="Disconnected", detail="Agent offline", state="offline")
+        event_bus.emit("on_agent_leave", {"agent": resolved_name})
         if getattr(deps, "automation_manager", None):
-            await deps.automation_manager.process_trigger("event", {"event": "agent_leave", "agent": name, "status": "offline"})
-            await deps.automation_manager.process_trigger("agent_status", {"agent": name, "status": "offline"})
-    return {"ok": ok}
+            await deps.automation_manager.process_trigger("event", {"event": "agent_leave", "agent": resolved_name, "status": "offline"})
+            await deps.automation_manager.process_trigger("agent_status", {"agent": resolved_name, "status": "offline"})
+    return {"ok": removed is not None}
 
 
 @router.get("/api/agent-templates")
@@ -999,7 +1019,7 @@ async def shutdown_server():
 
 @router.post("/api/heartbeat/{agent_name}")
 async def heartbeat(agent_name: str, request: Request):
-    inst = deps.registry.get(agent_name)
+    inst = _resolve_agent(agent_name)
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
 
@@ -1012,7 +1032,7 @@ async def heartbeat(agent_name: str, request: Request):
     if not token or not secrets.compare_digest(token, inst.token):
         return JSONResponse({"error": "unauthorized"}, 401)
 
-    deps._last_heartbeats[agent_name] = time.time()
+    deps._last_heartbeats[inst.name] = time.time()
     old_state = inst.state
     was_triggered = getattr(inst, '_was_triggered', False)
     if was_triggered:
@@ -1042,7 +1062,7 @@ async def heartbeat(agent_name: str, request: Request):
         await deps.broadcast("status", {"agents": get_full_agent_list()})
         state_detail = "Processing requests" if inst.state == "thinking" else "Connected"
         await set_agent_presence(
-            agent_name,
+            inst.name,
             surface="thinking" if inst.state == "thinking" else "session",
             status=inst.state.capitalize(),
             detail=state_detail,
@@ -1051,6 +1071,8 @@ async def heartbeat(agent_name: str, request: Request):
     result: dict = {"ok": True, "name": inst.name}
     if inst.is_token_expired():
         result["token"] = inst.rotate_token()
+    if deps.runtime_db is not None:
+        await persist_agent(deps.runtime_db, inst)
     return result
 
 
@@ -1183,10 +1205,12 @@ async def respond_approval(request: Request):
 
 @router.post("/api/agents/{name}/pause")
 async def pause_agent(name: str):
-    inst = deps.registry.get(name)
+    inst = _resolve_agent(name)
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
     inst.state = "paused"
+    if deps.runtime_db is not None:
+        await persist_agent(deps.runtime_db, inst)
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("message", f"{inst.label or name} paused", agent=name)
@@ -1197,10 +1221,12 @@ async def pause_agent(name: str):
 
 @router.post("/api/agents/{name}/resume")
 async def resume_agent(name: str):
-    inst = deps.registry.get(name)
+    inst = _resolve_agent(name)
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
     inst.state = "active"
+    if deps.runtime_db is not None:
+        await persist_agent(deps.runtime_db, inst)
     from app_helpers import get_full_agent_list
     await deps.broadcast("status", {"agents": get_full_agent_list()})
     await _record_activity("message", f"{inst.label or name} resumed", agent=name)
@@ -1256,20 +1282,20 @@ from agent_memory import get_agent_memory, get_notes, get_soul, set_notes, set_s
 async def api_get_soul(name: str):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
-    agent_dir = deps.DATA_DIR / "agents"
-    return {"soul": get_soul(agent_dir, name)}
+    _inst, agent_key = _resolved_agent_key(name)
+    return {"soul": get_soul(deps.DATA_DIR, agent_key)}
 
 
 @router.post("/api/agents/{name}/soul")
 async def api_set_soul(name: str, request: Request):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
+    _inst, agent_key = _resolved_agent_key(name)
     body = await request.json()
-    agent_dir = deps.DATA_DIR / "agents"
     content = body.get("content")
     if content is None:
         content = body.get("soul", "")
-    set_soul(agent_dir, name, content)
+    set_soul(deps.DATA_DIR, agent_key, content)
     return {"ok": True}
 
 
@@ -1277,23 +1303,23 @@ async def api_set_soul(name: str, request: Request):
 async def api_get_notes(name: str):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
-    agent_dir = deps.DATA_DIR / "agents"
-    return {"notes": get_notes(agent_dir, name)}
+    _inst, agent_key = _resolved_agent_key(name)
+    return {"notes": get_notes(deps.DATA_DIR, agent_key)}
 
 
 @router.post("/api/agents/{name}/notes")
 async def api_set_notes(name: str, request: Request):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
+    _inst, agent_key = _resolved_agent_key(name)
     body = await request.json()
-    agent_dir = deps.DATA_DIR / "agents"
-    set_notes(agent_dir, name, body.get("content", ""))
+    set_notes(deps.DATA_DIR, agent_key, body.get("content", ""))
     return {"ok": True}
 
 
 @router.get("/api/agents/{name}/health")
 async def agent_health(name: str):
-    inst = deps.registry.get(name)
+    inst = _resolve_agent(name)
     if not inst:
         return JSONResponse({"error": "not found", "healthy": False}, 404)
     is_alive = inst.state in ("active", "thinking", "idle", "paused")
@@ -1302,7 +1328,7 @@ async def agent_health(name: str):
 
 @router.get("/api/agents/{name}/config")
 async def get_agent_config(name: str):
-    inst = deps.registry.get(name)
+    inst = _resolve_agent(name)
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
     return {
@@ -1324,7 +1350,7 @@ async def get_agent_config(name: str):
 
 @router.post("/api/agents/{name}/config")
 async def set_agent_config(name: str, request: Request):
-    inst = deps.registry.get(name)
+    inst = _resolve_agent(name)
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
     body = await request.json()
@@ -1344,6 +1370,8 @@ async def set_agent_config(name: str, request: Request):
             if not validator(body[key]):
                 return JSONResponse({"error": f"invalid value for {key}"}, 400)
             setattr(inst, key, body[key])
+    if deps.runtime_db is not None:
+        await persist_agent(deps.runtime_db, inst)
     if any(k in body for k in ("role", "responseMode", "thinkingLevel", "model", "autoApprove")):
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})
@@ -1354,8 +1382,8 @@ async def set_agent_config(name: str, request: Request):
 async def list_agent_memories(name: str):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
-    agent_dir = deps.DATA_DIR / "agents"
-    mem = get_agent_memory(agent_dir, name)
+    _inst, agent_key = _resolved_agent_key(name)
+    mem = get_agent_memory(deps.DATA_DIR, agent_key)
     return {"memories": mem.list_all()}
 
 
@@ -1363,8 +1391,8 @@ async def list_agent_memories(name: str):
 async def api_get_agent_memory(name: str, key: str):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
-    agent_dir = deps.DATA_DIR / "agents"
-    mem = get_agent_memory(agent_dir, name)
+    _inst, agent_key = _resolved_agent_key(name)
+    mem = get_agent_memory(deps.DATA_DIR, agent_key)
     val = mem.load(key)
     if val is None:
         return JSONResponse({"error": "not found"}, 404)
@@ -1375,8 +1403,8 @@ async def api_get_agent_memory(name: str, key: str):
 async def api_delete_agent_memory(name: str, key: str):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
-    agent_dir = deps.DATA_DIR / "agents"
-    mem = get_agent_memory(agent_dir, name)
+    _inst, agent_key = _resolved_agent_key(name)
+    mem = get_agent_memory(deps.DATA_DIR, agent_key)
     ok = mem.delete(key)
     return {"ok": ok}
 
@@ -1402,8 +1430,8 @@ async def agent_feedback(name: str, request: Request):
         if row:
             msg_text = row["text"][:200]
 
-    agent_dir = deps.DATA_DIR / "agents"
-    mem = get_agent_memory(agent_dir, name)
+    _inst, agent_key = _resolved_agent_key(name)
+    mem = get_agent_memory(deps.DATA_DIR, agent_key)
     feedback_key = "_feedback"
     existing = mem.load(feedback_key)
     feedback_list = []

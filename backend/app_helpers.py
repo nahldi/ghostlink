@@ -30,6 +30,7 @@ def save_settings():
 def get_full_agent_list() -> list[dict]:
     """Get ALL agents — live from registry + offline from config. Never loses agents."""
     live = deps.registry.get_public_list()
+    persisted = deps.registry.get_persisted_public_list() if deps.registry else []
     live_names = {a["name"] for a in live}
     live_bases = {a["base"] for a in live}
     agents_cfg = deps.CONFIG.get("agents", {})
@@ -69,6 +70,9 @@ def get_full_agent_list() -> list[dict]:
                 "command": cfg.get("command", name),
                 "args": cfg.get("args", []),
             })
+    for agent in persisted:
+        if agent["name"] not in live_names:
+            live.append(agent)
     return live
 
 
