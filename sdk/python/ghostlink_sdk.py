@@ -18,7 +18,7 @@ from typing import Any
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-__version__ = "5.7.2"
+__version__ = "6.0.0"
 
 
 class GhostLinkError(Exception):

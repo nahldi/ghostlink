@@ -31,6 +31,10 @@ memory/
 *.pem
 *.p12
 
+# Source maps (not shipped in releases)
+desktop/main/*.map
+desktop/main/**/*.map
+
 # OS/editor
 .DS_Store
 *.log
