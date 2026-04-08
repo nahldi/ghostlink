@@ -45,6 +45,7 @@ desktop/main/**/*.map
 ghostlink-*.png
 ghostlink-*.docx
 *-audit.docx
+audit-*.png
 
 # Build artifacts
 *.tsbuildinfo

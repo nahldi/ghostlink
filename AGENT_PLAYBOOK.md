@@ -233,10 +233,6 @@ This is the hard boundary. No agent writes to another agent's files without jeff
 | Path | Owner | Notes |
 |------|-------|-------|
 | `sdk/` | tyson | SDK implementation |
-| `start.sh` | tyson | Server startup |
-| `start_agent.sh` | tyson | Agent startup |
-| `start_claude.sh` | tyson | Claude agent startup |
-| `start_codex.sh` | tyson | Codex agent startup |
 | `Dockerfile` | tyson | Container build |
 | `docker-compose.yml` | tyson | Container orchestration |
 | `LICENSE` | jeff | Do not modify without discussion |
