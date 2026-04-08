@@ -39,10 +39,11 @@ export function ContextModeSelector() {
     <div className="flex items-center gap-2">
       <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-surface-container-high/30 border border-outline-variant/10">
         <span className="material-symbols-outlined text-[14px] text-secondary/70">visibility</span>
-        <span className="text-[10px] uppercase tracking-wider text-on-surface-variant/45 font-semibold">Context</span>
+        <span className="text-[10px] uppercase tracking-wider text-on-surface-variant/45 font-semibold" title="Controls how much chat history agents can see">Chat Memory</span>
         <select
           value={current.mode}
           disabled={loading}
+          title="Choose what agents see in this channel"
           onChange={async (e) => {
             const mode = e.target.value as ChannelContextSettings['mode'];
             const next: ChannelContextSettings = {
@@ -60,11 +61,11 @@ export function ContextModeSelector() {
               setLoading(false);
             }
           }}
-          className="bg-transparent text-[11px] text-on-surface outline-none"
+          className="bg-transparent text-[11px] text-on-surface outline-none cursor-pointer"
         >
-          <option value="full" className="bg-surface text-on-surface">Full</option>
-          <option value="mentions_only" className="bg-surface text-on-surface">Mentions</option>
-          <option value="recent" className="bg-surface text-on-surface">Recent</option>
+          <option value="full" className="bg-surface text-on-surface">All Messages</option>
+          <option value="mentions_only" className="bg-surface text-on-surface">Mentions Only</option>
+          <option value="recent" className="bg-surface text-on-surface">Recent Only</option>
           <option value="filtered" className="bg-surface text-on-surface">Filtered</option>
         </select>
       </label>

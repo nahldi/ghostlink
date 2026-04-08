@@ -65,3 +65,12 @@ backend/.ghostlink-context.md
 backend/.ghostlink-worktrees/
 backend/config.toml.bak
 backend/INSTRUCTIONS.md
+
+# Agent workspace directories (local only)
+jeff/
+coop/
+tyson/
+ned/
+
+# Temporary audit artifacts
+audit-*.png

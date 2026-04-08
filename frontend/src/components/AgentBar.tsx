@@ -11,8 +11,8 @@ import type { Agent } from '../types';
 const chipSpring = { type: 'spring' as const, stiffness: 400, damping: 30 };
 const statusColors: Record<string, string> = {
   active: '#4ade80',
-  idle: '#4ade80',
-  thinking: '',  // uses agent.color
+  idle: '#60a5fa',   // blue — ready but not working
+  thinking: '',      // uses agent.color
   paused: '#fb923c',
   offline: 'rgba(255,255,255,0.15)',
 };
@@ -113,17 +113,19 @@ function AgentChip({ agent }: { agent: Agent }) {
             )}
           </div>
           <div className={`text-[10px] leading-tight truncate font-medium ${
-            isPaused ? 'text-orange-400' : isOnline && !isThinking ? 'text-green-400/70' : isOffline ? 'text-on-surface-variant/60' : ''
+            isPaused ? 'text-orange-400' : agent.state === 'active' ? 'text-green-400/70' : agent.state === 'idle' ? 'text-blue-400/70' : isOffline ? 'text-on-surface-variant/60' : ''
           }`} style={isThinking ? { color: agent.color, opacity: 0.85 } : undefined}>
             {hasDrift
               ? 'Identity drift detected'
               : isThinking
                 ? 'Thinking...'
-                : isPaused
-                  ? 'Paused'
-                  : isOffline
-                    ? 'Offline'
-                    : 'Online'}
+                : agent.state === 'active'
+                  ? 'Working'
+                  : isPaused
+                    ? 'Paused'
+                    : isOffline
+                      ? 'Offline'
+                      : 'Ready'}
           </div>
         </div>
 

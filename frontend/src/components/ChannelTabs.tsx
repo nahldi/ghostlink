@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import { ChannelSummary } from './ChannelSummary';
-import { ContextModeSelector } from './ContextModeSelector';
 
 export function ChannelTabs() {
   const channels = useChatStore((s) => s.channels);
@@ -36,7 +35,6 @@ export function ChannelTabs() {
         ))}
       </div>
       <div className="ml-auto flex items-center gap-2 shrink-0">
-        <ContextModeSelector />
         <button
           onClick={() => setShowSummary(!showSummary)}
           className={`p-1 rounded-md transition-colors shrink-0 ${
