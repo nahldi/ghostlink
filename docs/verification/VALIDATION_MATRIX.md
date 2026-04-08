@@ -48,6 +48,19 @@ Windows note:
 
 ---
 
+## Patch Gate: v6.0.1 Introspection Commands
+
+Run Gate 0, plus:
+
+- [ ] `docs/verification/V6_0_1_INTROSPECTION_TEST_PLAN.md` requirements are satisfied
+- [ ] `/api/introspect/memory` returns summary-safe metadata only, not raw secret-bearing memory bodies
+- [ ] `/api/introspect/tools` returns inventory and aggregates only, not raw args/results
+- [ ] `/api/introspect/stats` returns aggregate operational stats only
+- [ ] New frontend slash commands do not collide with existing local `/stats`
+- [ ] Redaction tests cover fake API keys, bearer tokens, cookies, and connection strings
+
+---
+
 ## Gate 1A: Post-Identity Foundation (After Phase 1A)
 
 Everything in Gate 0, plus:
