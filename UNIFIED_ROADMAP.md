@@ -415,62 +415,66 @@ For execution-level detail for all later phases, use [roadmap-pt2.md](/C:/Users/
 
 ---
 
-## What We Already Have Versus What Needs Work
+## What v6.0.0 Shipped (Summary)
 
-### Already present but underexposed
-- backend thinking-level support
-- per-agent task queues and task UI
-- progress cards
-- delegation
-- per-agent soul and notes storage
-- plugin tool allowlists and fail-closed pre-tool-use hooks
+All structural and UX gaps from the original roadmap have been addressed in v6.0.0:
 
-### Structural gaps
-- stable agent IDs
-- durable profile inheritance
-- runtime identity reinjection
-- provider abstraction across multiple transport modes
-- delegation trust boundaries
-- worktree isolation
-- task/progress/tracing unification
-- checkpoint and replay for long-running tasks
-- policy engine and sandbox enforcement
-- eval framework and trace grading
-- A2A client and server
-- versioned agent/skill assets
+### Infrastructure shipped
+- Stable agent IDs with SQLite persistence and dual name/ID lookup
+- Durable profile inheritance (4-layer: global → profile → agent override)
+- Runtime identity reinjection across spawn, reconnect, resume, compaction, delegation, model switch
+- Provider abstraction across 21 providers with multiple transport modes
+- Worktree isolation with per-agent git worktrees
+- Checkpoint/replay/fork for durable execution
+- Policy engine with tool/task/agent/provider/profile/workspace scoping
+- Eval framework with arena mode and 8-dimension trace grading
+- A2A client and server with agent card publishing
+- Versioned agent/skill assets with rollout channels
 
-### UX gaps
-- thinking level picker
-- context visibility controls
-- operator control room
-- provenance and trace views
-- skill center built on stable profiles instead of agent names
-- checkpoint/replay/fork surfaces
-- policy and sandbox visibility
-- benchmark dashboards
-- A2A discovery and status
-- version management and rollout channels
+### UX shipped
+- Thinking level picker
+- Context visibility controls and effective-state viewer
+- Operator control room (Agent Cockpit with status bar, task panel, tools panel, memory panel)
+- Checkpoint/replay/fork UI surfaces
+- Policy and sandbox visibility
+- Benchmark dashboards (arena mode)
+- A2A discovery panel
+- Profile manager and persona marketplace
+
+### Still underexposed (shipped but could be promoted better)
+- Per-agent task queues and task UI
+- Progress cards with real-time streaming
+- Delegation with trust boundaries
+- Plugin tool allowlists and fail-closed pre-tool-use hooks
 
 ---
 
-## Competitive Position
+## Competitive Position (2026-04-08)
 
-GhostLink already has a defensible angle:
-- local-first multi-agent shared chat
-- channel bridges
-- desktop app
-- MCP bridge
-- heterogeneous agent collaboration
+### Where GhostLink leads
+- Multi-agent shared workspace with real-time collaboration — unique
+- 4-layer memory stratification with weighted recall — deepest in field
+- Channel bridges (Discord/Telegram/Slack/WhatsApp) — unique
+- Durable execution with fork from checkpoint — unique
+- A2A interoperability — first mover
+- 21-provider independence — broadest in field
+- Policy engine at MCP/shell choke points — most granular
+- Arena mode with eval grading — unique at agent level
+- Self-hostable with zero telemetry — unique positioning
+- Local-first desktop app — unique combination
 
-The roadmap should strengthen that advantage instead of flattening GhostLink into a clone of one provider-specific product.
+### At parity
+- Background execution with isolation (matches Cursor cloud VMs, Codex sandbox)
+- Cost tracking and budgets (matches Devin per-task caps)
+- Plugin system (matches ecosystem patterns)
 
-The target state is:
-- stronger than OpenClaw on runtime-owned identity and provider independence
-- closer to Cursor and Replit on execution ergonomics
-- closer to Claude Code and Codex on rules, hooks, and agent workflow discipline
-- closer to LangGraph and enterprise agent stacks on state, tracing, and recoverability
-- competitive on A2A interoperability as the protocol matures
-- ahead on agent/skill productization with versioning and controlled rollout
+### Gaps to close (see Phase 10 backlog below)
+- Container/VM sandbox (P0)
+- IDE integration (P0)
+- Cloud/remote execution option (P1)
+- Web browsing agent (P1)
+
+The roadmap should strengthen GhostLink's unique advantages (depth, bridges, A2A, local-first) while selectively closing breadth gaps that block adoption.
 
 ---
 
@@ -510,9 +514,45 @@ Keep this as a strategic reference, not as a source of truth over the codebase.
 - provider-coupled architecture
 - shared workspace instruction paths for same-model agents
 
-### Current GhostLink delta
-- stronger direction on server-owned identity
-- weaker today on provider abstraction, tracing, worktree isolation, and background execution
+### Current GhostLink delta (updated 2026-04-08)
+- ahead on multi-agent orchestration, memory depth, policy engine, A2A, channel bridges, durable execution, evals, cost tracking, provider independence
+- at parity on background execution with isolation, plugin system
+- weak on container/VM sandbox, IDE integration, cloud/remote execution
+
+---
+
+## Phase 10 — Competitive Gap Backlog
+
+Items identified through deep competitive research (2026-04-08). Not scheduled — prioritize based on user demand and strategic value.
+
+### P0 — Critical gaps (would make users say "not on par")
+
+1. **Container/VM sandbox** — OpenHands, Codex, Cursor, Devin all have OS-level or container isolation. Current ExecPolicy blocklists are not equivalent. Needs: Docker-based sandbox spec with mount policy, network rules, timeout, resource limits.
+2. **IDE integration (VS Code extension)** — Developers live in VS Code/JetBrains. Electron + CLI is a separate workflow. Cursor, Copilot, Windsurf are native IDE experiences.
+
+### P1 — Significant gaps
+
+3. **Cloud/remote execution option** — Cursor, Codex, Devin, Copilot, Replit all support cloud agents. GhostLink is local-first by design, but an optional cloud execution mode would broaden reach.
+4. **Web browsing agent** — Devin has built-in browser, Cursor VMs have browser + video recording. GhostLink has browser_snapshot MCP tool but not a full browsing agent.
+5. **Issue-to-PR workflow** — Copilot assigns from GitHub issues and auto-creates PRs with security scanning. Medium effort, high visibility feature.
+6. **Operator introspection commands** — Chat-accessible /memory, /stats, /tools commands. Quick win.
+7. **Hook policy snapshots at session start** — Prevents policy drift mid-session. Medium effort.
+8. **Team topology modes** — Explicit parallel/selector/swarm orchestration patterns (AutoGen, CrewAI have this). Medium effort.
+
+### P2 — Future-proofing
+
+9. **OpenTelemetry GenAI Semantic Conventions** — Agent spans, tool-call traces, token metrics. Industry converging on this standard.
+10. **Security scanning pipeline** — SAST/dependency checks before PRs (Copilot pattern).
+11. **Mobile/external triggers** — Mobile agent kickoff capability.
+12. **Memory namespace scoping** — Explicit shared vs private memory at creation time.
+13. **Automatic memory extraction/summarization** — Prevent unbounded memory growth and noisy recall.
+
+### Emerging standards to monitor
+
+- **ACP** (Agent Communication Protocol, IBM/Linux Foundation) — watch alongside A2A
+- **ANP** (Agent Network Protocol) — decentralized agent discovery with DID identity
+- **Docker Sandboxes API** — standardized container isolation for agents
+- **OpenTelemetry GenAI Semantic Conventions** — spans, traces, token metrics
 
 ---
 
