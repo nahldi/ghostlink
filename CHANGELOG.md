@@ -1,5 +1,13 @@
 # GhostLink Changelog
 
+## v6.0.5 — 2026-04-08
+### Settings Cleanup & Repo Hygiene
+- **Experience mode gating** — Security/policy/debug sections hidden from Beginner/Standard users (Advanced only)
+- **Jargon cleanup** — "Debug Mode" → "Developer Mode", "Server Config" → "Server Settings", "Policy Engine" → "Policy Rules", "Circuit Breaker" → "Rate Protection", "Egress Controls" → "Outbound Access Rules"
+- **Context dropdown removed** from chat header (confusing, half-functional)
+- **Repo cleanup** — removed 5 stale root scripts, old branding asset, duplicate kurt/ directory
+- **Agent status colors** — active=green, idle=blue (no more identical green for both)
+
 ## v6.0.4 — 2026-04-08
 ### Launcher UX Improvements
 - **Pricing badges in Supported Agents** — Paid/Free Tier/Local/Free + Setup badges visible before installing
