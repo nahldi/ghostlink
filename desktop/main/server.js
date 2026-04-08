@@ -74,7 +74,13 @@ class ServerManager {
             windowsHide: true,
             ...options,
         });
-        return typeof result === 'string' ? result : result.toString('utf-8');
+        if (typeof result === 'string') {
+            return result;
+        }
+        if (Buffer.isBuffer(result)) {
+            return result.toString('utf-8');
+        }
+        return '';
     }
     tryExec(command, args, options = {}) {
         try {
