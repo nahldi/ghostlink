@@ -17,12 +17,12 @@ export function AdvancedTab({
 }) {
   return (
     <>
-      <Section title="Debug" icon="bug_report" defaultOpen>
-        <Toggle label="Debug Mode" description="Show raw message data and WebSocket events"
+      <Section title="Developer Mode" icon="bug_report" defaultOpen>
+        <Toggle label="Developer Mode" description="Show technical details and WebSocket events"
           checked={!!display.debugMode} onChange={() => applyInstant({ debugMode: !settings.debugMode })} activeColor="bg-yellow-500/80" />
       </Section>
 
-      <Section title="Server Config" icon="dns">
+      <Section title="Server Settings" icon="dns">
         <ServerConfigSection />
       </Section>
 

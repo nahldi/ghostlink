@@ -152,7 +152,7 @@ export function SettingsPanel() {
         </>)}
         {tab === 'advanced' && (<>
           <ReviewRulesEditor />
-          <SecurityTab />
+          <SecurityTab experienceMode={settings.experienceMode} />
           <AdvancedTab display={display} applyInstant={applyInstant} settings={settings} />
         </>)}
         </motion.div>

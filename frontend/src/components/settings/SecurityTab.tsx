@@ -11,42 +11,51 @@ import type {
   SecretScope,
 } from '../../types';
 
-export function SecurityTab() {
+export function SecurityTab({ experienceMode }: { experienceMode?: string }) {
+  const isAdvanced = experienceMode === 'advanced';
+
   return (
     <>
-      <Section title="Policy Engine" icon="policy" defaultOpen>
-        <PolicyRulesSection />
-      </Section>
-      <Section title="Approval and Circuit State" icon="shield_lock">
-        <CircuitEventsSection />
-      </Section>
-      <Section title="Egress Controls" icon="language">
-        <EgressRulesSection />
-      </Section>
-      <Section title="Secrets" icon="key">
+      {/* Secrets and Data Management visible to all users */}
+      <Section title="Secrets" icon="key" defaultOpen>
         <SecretsSection />
-      </Section>
-      <Section title="Secret Scopes" icon="lock_person">
-        <SecretScopesSection />
-      </Section>
-      <Section title="Trusted Hooks" icon="verified_user">
-        <TrustedHooksSection />
-      </Section>
-      <Section title="Permission Presets" icon="shield">
-        <PermissionPresetsSection />
-      </Section>
-      <Section title="Tool Usage Log" icon="build">
-        <ToolLogSection />
-      </Section>
-      <Section title="Data Retention" icon="schedule">
-        <RetentionSection />
       </Section>
       <Section title="Data Management" icon="database">
         <DataManagementSection />
       </Section>
-      <Section title="Audit Log" icon="history">
-        <AuditLogSection />
-      </Section>
+
+      {/* Everything below is Advanced-only */}
+      {isAdvanced && (
+        <>
+          <Section title="Policy Rules" icon="policy">
+            <PolicyRulesSection />
+          </Section>
+          <Section title="Rate Protection" icon="shield_lock">
+            <CircuitEventsSection />
+          </Section>
+          <Section title="Outbound Access Rules" icon="language">
+            <EgressRulesSection />
+          </Section>
+          <Section title="Secret Scopes" icon="lock_person">
+            <SecretScopesSection />
+          </Section>
+          <Section title="Trusted Hooks" icon="verified_user">
+            <TrustedHooksSection />
+          </Section>
+          <Section title="Permission Presets" icon="shield">
+            <PermissionPresetsSection />
+          </Section>
+          <Section title="Tool Usage Log" icon="build">
+            <ToolLogSection />
+          </Section>
+          <Section title="Data Retention" icon="schedule">
+            <RetentionSection />
+          </Section>
+          <Section title="Audit Log" icon="history">
+            <AuditLogSection />
+          </Section>
+        </>
+      )}
     </>
   );
 }
