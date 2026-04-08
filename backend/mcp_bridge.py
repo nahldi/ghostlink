@@ -2422,6 +2422,21 @@ def _wrap_tool_with_hooks(func):
     import functools
     tool_name = func.__name__
 
+    def _record_tool_stat(success: bool) -> None:
+        try:
+            import deps as _deps
+            stats = getattr(_deps, "_mcp_tool_stats", None)
+            if stats is None:
+                return
+            current = dict(stats.get(tool_name, {}) or {})
+            current["invocation_count"] = int(current.get("invocation_count", 0) or 0) + 1
+            key = "success_count" if success else "failure_count"
+            current[key] = int(current.get(key, 0) or 0) + 1
+            current["last_used"] = time.time()
+            stats[tool_name] = current
+        except Exception:
+            log.debug("tool stat record failed for %s", tool_name, exc_info=True)
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # Extract agent identity from first arg (most tools have sender as first param)
@@ -2502,6 +2517,7 @@ def _wrap_tool_with_hooks(func):
         try:
             result = func(*args, **kwargs)
         except Exception as e:
+            _record_tool_stat(False)
             log.error("MCP tool %s failed for agent %s: %s", tool_name, agent, e)
             try:
                 import deps as _deps
@@ -2519,6 +2535,7 @@ def _wrap_tool_with_hooks(func):
             except Exception:
                 pass
             return f"Error: tool '{tool_name}' failed: {e}"
+        _record_tool_stat(True)
 
         # Fire post_tool_use hook + audit trail
         try:

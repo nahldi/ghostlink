@@ -1165,6 +1165,7 @@ from routes import audit as _r_audit
 from routes import bridges as _r_bridges
 from routes import channels as _r_channels
 from routes import evals as _r_evals
+from routes import introspect as _r_introspect
 from routes import jobs as _r_jobs
 from routes import messages as _r_messages
 from routes import misc as _r_misc
@@ -1197,6 +1198,7 @@ app.include_router(_r_plugins.router)
 app.include_router(_r_providers.router)
 app.include_router(_r_review.router)
 app.include_router(_r_misc.router)
+app.include_router(_r_introspect.router)
 app.include_router(_r_phase4_7.router)
 
 

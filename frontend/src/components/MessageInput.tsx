@@ -297,6 +297,72 @@ export function MessageInput() {
       },
     },
     {
+      name: '/inspect memory',
+      description: 'Show memory summary across all agents',
+      execute: async () => {
+        try {
+          const res = await fetch('/api/introspect/memory');
+          if (!res.ok) throw new Error(`API ${res.status}`);
+          const data = await res.json();
+          const lines: string[] = [`Memory: ${data.totals.entries} entries across ${data.totals.agents} agents (~${data.totals.tokens} tokens)`];
+          for (const agent of data.agents || []) {
+            const layers = Object.entries(agent.layers || {}).map(([k, v]: [string, any]) => `${k}:${v.entry_count}`).join(', ');
+            lines.push(`  ${agent.agent_name} — ${agent.total_entries} entries (${layers})${agent.has_conflicts ? ' [conflicts]' : ''}`);
+          }
+          if (!data.agents?.length) lines.push('  No agents with memory data');
+          addMessage({ id: Date.now(), uid: 'cmd-' + Date.now(), sender: 'system', text: lines.join('\n'), type: 'system', timestamp: Date.now() / 1000, time: new Date().toLocaleTimeString(), channel: activeChannel });
+        } catch (e: any) {
+          addMessage({ id: Date.now(), uid: 'cmd-' + Date.now(), sender: 'system', text: `Failed to fetch memory summary: ${e.message || 'unknown error'}`, type: 'system', timestamp: Date.now() / 1000, time: new Date().toLocaleTimeString(), channel: activeChannel });
+        }
+      },
+    },
+    {
+      name: '/inspect tools',
+      description: 'Show tool inventory with policy and usage',
+      execute: async () => {
+        try {
+          const res = await fetch('/api/introspect/tools');
+          if (!res.ok) throw new Error(`API ${res.status}`);
+          const data = await res.json();
+          const lines: string[] = [`Tools: ${data.totals.tools} registered, ${data.totals.total_invocations} total invocations`];
+          for (const tool of data.tools || []) {
+            const usage = tool.invocation_count > 0 ? ` (${tool.invocation_count} calls, ${tool.success_count} ok, ${tool.failure_count} fail)` : '';
+            lines.push(`  ${tool.name} [${tool.category}] — ${tool.policy_mode}, risk:${tool.risk_tier}${usage}`);
+          }
+          if (!data.tools?.length) lines.push('  No tools registered');
+          addMessage({ id: Date.now(), uid: 'cmd-' + Date.now(), sender: 'system', text: lines.join('\n'), type: 'system', timestamp: Date.now() / 1000, time: new Date().toLocaleTimeString(), channel: activeChannel });
+        } catch (e: any) {
+          addMessage({ id: Date.now(), uid: 'cmd-' + Date.now(), sender: 'system', text: `Failed to fetch tool inventory: ${e.message || 'unknown error'}`, type: 'system', timestamp: Date.now() / 1000, time: new Date().toLocaleTimeString(), channel: activeChannel });
+        }
+      },
+    },
+    {
+      name: '/inspect stats',
+      description: 'Show system stats',
+      execute: async () => {
+        try {
+          const res = await fetch('/api/introspect/stats');
+          if (!res.ok) throw new Error(`API ${res.status}`);
+          const data = await res.json();
+          const uptime = data.uptime_seconds > 3600 ? `${(data.uptime_seconds / 3600).toFixed(1)}h` : `${Math.round(data.uptime_seconds / 60)}m`;
+          const lines = [
+            `GhostLink v${data.version} — up ${uptime}`,
+            `Agents: ${data.agents.active}/${data.agents.total} active`,
+            `Tasks: ${data.tasks.total} total (${data.tasks.running} running, ${data.tasks.completed} done, ${data.tasks.failed} failed)`,
+            `Messages: ${data.messages.total}`,
+            `Routes: ${data.routes.endpoints} endpoints across ${data.routes.modules} modules`,
+            `Tools: ${data.tools.mcp_tools} MCP tools`,
+            `Providers: ${data.providers.configured}/${data.providers.total} configured`,
+            `Skills: ${data.skills.total} | Personas: ${data.personas.total}`,
+            `Error rate (1h): ${data.errors.rate_1h}/min`,
+          ];
+          addMessage({ id: Date.now(), uid: 'cmd-' + Date.now(), sender: 'system', text: lines.join('\n'), type: 'system', timestamp: Date.now() / 1000, time: new Date().toLocaleTimeString(), channel: activeChannel });
+        } catch (e: any) {
+          addMessage({ id: Date.now(), uid: 'cmd-' + Date.now(), sender: 'system', text: `Failed to fetch system stats: ${e.message || 'unknown error'}`, type: 'system', timestamp: Date.now() / 1000, time: new Date().toLocaleTimeString(), channel: activeChannel });
+        }
+      },
+    },
+    {
       name: '/role',
       description: 'Set agent role: /role [agent] [manager|worker|peer]',
       execute: () => {
@@ -347,6 +413,9 @@ export function MessageInput() {
           '/unmute — unmute notifications',
           '/agents — list agents with details',
           '/stats — show session statistics',
+          '/inspect memory — show memory summary across all agents',
+          '/inspect tools — show tool inventory with policy and usage',
+          '/inspect stats — show system stats (version, uptime, counts)',
           '/role [agent] [role] — set agent role',
           '/spawn [base] [label] — launch agent',
           '/kill [agent] — stop agent',
@@ -375,9 +444,9 @@ export function MessageInput() {
     },
   ], [agents, activeChannel, messages, addMessage, setMessages]);
 
-  const slashQuery = text.startsWith('/') && !text.includes(' ') ? text.toLowerCase() : '';
+  const slashQuery = text.startsWith('/') ? text.toLowerCase().trim() : '';
   const filteredCommands = slashQuery
-    ? slashCommands.filter(c => c.name.startsWith(slashQuery))
+    ? slashCommands.filter(c => c.name.startsWith(slashQuery) || slashQuery.startsWith(c.name))
     : [];
   const showSlash = filteredCommands.length > 0 && slashQuery.length > 0;
 
@@ -448,10 +517,11 @@ export function MessageInput() {
     if (trimmed.startsWith('/')) {
       const parts = trimmed.split(/\s+/);
       const cmdName = parts[0].toLowerCase();
+      const trimmedLower = trimmed.toLowerCase();
 
-      // Exact match for simple commands
-      const cmd = slashCommands.find(c => c.name === trimmed || c.name === cmdName);
-      if (cmd && parts.length === 1) {
+      // Exact match for simple and multi-word commands (e.g. /inspect memory)
+      const cmd = slashCommands.find(c => c.name === trimmedLower || c.name === cmdName);
+      if (cmd && (parts.length === 1 || cmd.name === trimmedLower)) {
         cmd.execute();
         setText('');
         if (textareaRef.current) textareaRef.current.style.height = 'auto';

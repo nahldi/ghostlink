@@ -338,6 +338,7 @@ _agent_presence: dict[str, dict] = {}
 _agent_browser_state: dict[str, dict] = {}
 _terminal_streams: dict[str, dict] = {}
 _mcp_invocation_logs: dict[str, collections.deque] = {}  # per-agent MCP invocation logs
+_mcp_tool_stats: dict[str, dict] = {}
 _MCP_LOG_MAXLEN = 200  # max entries per agent
 _MCP_LOG_MAX_AGENTS = 50  # max agents tracked
 _workspace_changes: collections.deque[dict] = collections.deque(maxlen=500)
