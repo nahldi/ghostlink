@@ -737,6 +737,7 @@ def main():
         sys.exit(1)
 
     assigned_name = registration["name"]
+    assigned_agent_id = registration.get("agent_id", assigned_name)
     assigned_token = registration.get("token", "")
     print(f"  Registered as: {assigned_name} (slot {registration.get('slot', '?')})")
 
@@ -897,6 +898,8 @@ def main():
     strip_vars = {"CLAUDECODE"} | set(agent_cfg.get("strip_env", []))
     env = {k: v for k, v in os.environ.items() if k not in strip_vars}
     env["PATH"] = cli_path
+    env["GHOSTLINK_AGENT_ID"] = assigned_agent_id
+    env["GHOSTLINK_DATA_DIR"] = str(data_dir)
 
     mcp_args, inject_env, mcp_settings_path = _apply_mcp_inject(
         inject_cfg, assigned_name, data_dir, proxy_url,
@@ -916,6 +919,7 @@ def main():
     # ── v2.5.0: Agent identity injection ──────────────────────────────
     # Write context files so agents know who they are and what GhostLink is
     from agent_memory import generate_agent_context, set_soul
+    from identity_inject import inject_identity
     try:
         # Use label and role from spawn (env vars set by routes/agents.py)
         agent_label = os.environ.get("GHOSTLINK_AGENT_LABEL", "") or label or assigned_name
@@ -993,6 +997,20 @@ def main():
             if not instructions_file.exists() or instructions_file.read_text("utf-8").startswith("# GhostLink Agent Context"):
                 instructions_file.write_text(context_content, "utf-8")
                 print(f"  Generic instructions: {instructions_file}")
+
+        inject_result = inject_identity(
+            agent_id=assigned_agent_id,
+            agent_name=assigned_name,
+            agent_base=agent,
+            label=agent_label,
+            role=agent_role_desc or "",
+            data_dir=data_dir,
+            project_dir=project_dir,
+            mcp_settings_path=mcp_settings_path,
+            trigger="spawn",
+        )
+        if inject_result.get("degraded"):
+            print(f"  Identity isolation degraded: {inject_result.get('degraded_reason')}")
 
     except Exception as e:
         print(f"  Warning: identity injection failed: {e}")

@@ -18,6 +18,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 import deps
+from identity_inject import get_effective_state, mark_identity_drift, write_effective_state
 from plugin_sdk import event_bus
 from registry import persist_agent
 
@@ -81,6 +82,20 @@ def _resolved_agent_key(identifier: str) -> tuple[object | None, str]:
     if inst is None:
         return None, identifier
     return inst, inst.agent_id
+
+
+def _effective_identity_payload(identifier: str) -> dict:
+    inst, agent_key = _resolved_agent_key(identifier)
+    state = get_effective_state(deps.DATA_DIR, agent_key)
+    if inst is not None:
+        state["agent_id"] = getattr(inst, "agent_id", agent_key)
+        state["display_name"] = inst.name
+        state["base"] = inst.base
+        state["provider"] = inst.base
+        state["workspace_id"] = getattr(inst, "workspace", state.get("workspace_id", ""))
+        state["runner"] = getattr(inst, "runner", "")
+        state["state"] = getattr(inst, "state", "")
+    return state
 
 
 def _expanded_cli_path(path_value: str | None = None) -> str:
@@ -1032,7 +1047,9 @@ async def heartbeat(agent_name: str, request: Request):
     if not token or not secrets.compare_digest(token, inst.token):
         return JSONResponse({"error": "unauthorized"}, 401)
 
-    deps._last_heartbeats[inst.name] = time.time()
+    now = time.time()
+    previous_heartbeat = deps._last_heartbeats.get(inst.name, 0)
+    deps._last_heartbeats[inst.name] = now
     old_state = inst.state
     was_triggered = getattr(inst, '_was_triggered', False)
     if was_triggered:
@@ -1073,6 +1090,15 @@ async def heartbeat(agent_name: str, request: Request):
         result["token"] = inst.rotate_token()
     if deps.runtime_db is not None:
         await persist_agent(deps.runtime_db, inst)
+    state = _effective_identity_payload(inst.name)
+    state["last_heartbeat_at"] = now
+    if previous_heartbeat and now - previous_heartbeat > 30:
+        if inst.base in ("codex", "gemini", "ollama"):
+            state["last_inject_trigger"] = "reconnect"
+        else:
+            state["drift_detected"] = True
+            state["reason"] = "persistent_provider_reconnect_gap"
+    write_effective_state(deps.DATA_DIR, inst.agent_id, state)
     return result
 
 
@@ -1232,6 +1258,12 @@ async def resume_agent(name: str):
     await _record_activity("message", f"{inst.label or name} resumed", agent=name)
     await add_replay_event(name, "resume", title="Agent resumed", detail="Work resumed", surface="session")
     await set_agent_presence(name, surface="session", status="Active", detail="Ready", state="active")
+    if inst.base in ("claude", "aider", "grok"):
+        state = mark_identity_drift(deps.DATA_DIR, inst.agent_id, reason="resume_requires_restart_if_identity_changed")
+        await deps.broadcast(
+            "identity_drift",
+            {"agent": inst.name, "agent_id": state.get("agent_id", inst.agent_id), "reason": state.get("reason", "")},
+        )
     return {"ok": True, "state": "active"}
 
 
@@ -1284,6 +1316,27 @@ async def api_get_soul(name: str):
         return JSONResponse({"error": "invalid agent name"}, 400)
     _inst, agent_key = _resolved_agent_key(name)
     return {"soul": get_soul(deps.DATA_DIR, agent_key)}
+
+
+@router.get("/api/agents/{name}/effective-state")
+async def api_get_effective_state(name: str):
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    return _effective_identity_payload(name)
+
+
+@router.post("/api/agents/{name}/identity-drift")
+async def api_identity_drift(name: str, request: Request):
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    body = await request.json()
+    reason = body.get("reason", "identity_drift")
+    inst, agent_key = _resolved_agent_key(name)
+    state = mark_identity_drift(deps.DATA_DIR, agent_key, reason=reason)
+    if inst is not None:
+        setattr(inst, "drift_detected", True)
+    await deps.broadcast("identity_drift", {"agent": name, "agent_id": state.get("agent_id", agent_key), "reason": reason})
+    return {"ok": True, "reason": reason}
 
 
 @router.post("/api/agents/{name}/soul")
@@ -1354,6 +1407,7 @@ async def set_agent_config(name: str, request: Request):
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
     body = await request.json()
+    old_model = getattr(inst, "model", "")
     _CONFIG_VALIDATORS = {
         "label": lambda v: isinstance(v, str) and 0 < len(v) <= 50,
         "color": lambda v: isinstance(v, str) and len(v) <= 20,
@@ -1372,6 +1426,12 @@ async def set_agent_config(name: str, request: Request):
             setattr(inst, key, body[key])
     if deps.runtime_db is not None:
         await persist_agent(deps.runtime_db, inst)
+    if "model" in body and body.get("model") != old_model and inst.base in ("claude", "aider", "grok"):
+        mark_identity_drift(deps.DATA_DIR, inst.agent_id, reason="model_switch_requires_restart")
+        await deps.broadcast(
+            "identity_drift",
+            {"agent": inst.name, "agent_id": inst.agent_id, "reason": "model_switch_requires_restart"},
+        )
     if any(k in body for k in ("role", "responseMode", "thinkingLevel", "model", "autoApprove")):
         from app_helpers import get_full_agent_list
         await deps.broadcast("status", {"agents": get_full_agent_list()})

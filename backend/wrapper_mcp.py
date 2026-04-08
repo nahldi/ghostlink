@@ -27,6 +27,7 @@ import logging
 import subprocess
 import threading
 import time
+import urllib.request
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -40,6 +41,39 @@ TURN_TIMEOUT = 300
 STARTUP_TIMEOUT = 30
 # Max invocations to keep in the log ring buffer
 MAX_LOG_ENTRIES = 100
+
+
+def _load_identity_context(env: dict[str, str], agent_name: str) -> str:
+    data_dir = env.get("GHOSTLINK_DATA_DIR", "")
+    agent_id = env.get("GHOSTLINK_AGENT_ID", agent_name)
+    if not data_dir:
+        return ""
+    context_path = Path(data_dir) / "agents" / agent_id / "injection" / "context.md"
+    try:
+        return context_path.read_text("utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _compose_exec_prompt(env: dict[str, str], agent_name: str, prompt: str) -> str:
+    identity_context = _load_identity_context(env, agent_name)
+    if not identity_context:
+        return prompt
+    return f"{identity_context}\n\n## Runtime Trigger\n{prompt}"
+
+
+def _post_identity_drift(server_port: int, agent_name: str, reason: str) -> None:
+    body = json.dumps({"reason": reason}).encode()
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{server_port}/api/agents/{agent_name}/identity-drift",
+        method="POST",
+        data=body,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as exc:
+        log.debug("Failed to post identity drift for %s: %s", agent_name, exc)
 
 
 class MCPAgentProcess:
@@ -231,6 +265,7 @@ class MCPAgentProcess:
         First call: `codex exec --json "prompt"` (creates new session)
         Subsequent calls: `codex exec resume <session_id> --json "prompt"` (resumes context)
         """
+        content = _compose_exec_prompt(self.env, self.agent_name, content)
         if self._codex_session_id:
             # Resume existing session for context continuity
             cmd = [self.command, "exec", "resume", self._codex_session_id, "--json"]
@@ -284,6 +319,7 @@ class MCPAgentProcess:
         First call: `gemini --prompt "text" --output-format json`
         Subsequent calls: `gemini --resume <session_id> --prompt "text" --output-format json`
         """
+        content = _compose_exec_prompt(self.env, self.agent_name, content)
         if self._gemini_session_id:
             cmd = [self.command, "--resume", self._gemini_session_id]
             for arg in self.extra_args:
@@ -444,6 +480,9 @@ class MCPAgentProcess:
                     self.on_assistant_message(msg)
                 except Exception as e:
                     log.error("on_assistant_message callback error: %s", e)
+            text = json.dumps(msg).lower()
+            if "compact" in text or "compaction" in text:
+                _post_identity_drift(self.server_port, self.agent_name, "compaction_detected")
             # Post thinking/output to terminal stream
             self._post_terminal_output(msg)
 
@@ -460,6 +499,9 @@ class MCPAgentProcess:
                     self.on_stream_event(msg)
                 except Exception as e:
                     log.debug("on_stream_event callback error: %s", e)
+            text = json.dumps(msg).lower()
+            if "compact" in text or "compaction" in text:
+                _post_identity_drift(self.server_port, self.agent_name, "compaction_detected")
 
         elif msg_type == "result":
             self._last_result = msg

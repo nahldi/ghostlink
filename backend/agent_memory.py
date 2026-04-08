@@ -65,6 +65,28 @@ def _resolve_agent_dirs(data_dir: Path, agent_identifier: str) -> tuple[Path, li
     return canonical_dir, legacy_dirs
 
 
+def resolve_agent_dir(data_dir: Path, agent_identifier: str) -> Path:
+    canonical_dir, legacy_dirs = _resolve_agent_dirs(data_dir, agent_identifier)
+    canonical_dir.mkdir(parents=True, exist_ok=True)
+    for legacy_dir in legacy_dirs:
+        if not legacy_dir.exists():
+            continue
+        legacy_soul = legacy_dir / "soul.txt"
+        legacy_notes = legacy_dir / "notes.txt"
+        if legacy_soul.exists() and not (canonical_dir / "SOUL.md").exists():
+            soul_content = legacy_soul.read_text("utf-8")
+            (canonical_dir / "SOUL.md").write_text(soul_content, "utf-8")
+            (canonical_dir / "soul.txt").write_text(soul_content, "utf-8")
+            legacy_soul.unlink(missing_ok=True)
+        if legacy_notes.exists() and not (canonical_dir / "NOTES.md").exists():
+            notes_content = legacy_notes.read_text("utf-8")
+            (canonical_dir / "NOTES.md").write_text(notes_content, "utf-8")
+            (canonical_dir / "notes.txt").write_text(notes_content, "utf-8")
+            legacy_notes.unlink(missing_ok=True)
+        _cleanup_legacy_agent_dir(legacy_dir)
+    return canonical_dir
+
+
 def _cleanup_legacy_agent_dir(agent_dir: Path) -> None:
     try:
         if agent_dir.is_dir() and not any(agent_dir.iterdir()):
@@ -374,8 +396,13 @@ def generate_agent_context(agent_name: str, soul: str = "") -> str:
 def get_soul(data_dir: Path, agent_name: str) -> str:
     agent_name = _sanitize_agent_name(agent_name)
     try:
+        canonical_dir = resolve_agent_dir(data_dir, agent_name)
+        soul_md = canonical_dir / "SOUL.md"
+        if soul_md.exists():
+            return soul_md.read_text("utf-8").strip()
         content = _read_text_with_migration(data_dir, agent_name, "soul.txt")
         if content is not None:
+            soul_md.write_text(content, "utf-8")
             return content.strip()
     except Exception:
         canonical_dir, _ = _resolve_agent_dirs(data_dir, agent_name)
@@ -390,14 +417,23 @@ def get_soul(data_dir: Path, agent_name: str) -> str:
 
 def set_soul(data_dir: Path, agent_name: str, soul: str) -> str:
     agent_name = _sanitize_agent_name(agent_name)
-    return _write_agent_text(data_dir, agent_name, "soul.txt", soul.strip()).strip()
+    canonical_dir = resolve_agent_dir(data_dir, agent_name)
+    canonical = soul.strip()
+    (canonical_dir / "SOUL.md").write_text(canonical, "utf-8")
+    _write_agent_text(data_dir, agent_name, "soul.txt", canonical)
+    return canonical
 
 
 def get_notes(data_dir: Path, agent_name: str) -> str:
     agent_name = _sanitize_agent_name(agent_name)
     try:
+        canonical_dir = resolve_agent_dir(data_dir, agent_name)
+        notes_md = canonical_dir / "NOTES.md"
+        if notes_md.exists():
+            return notes_md.read_text("utf-8")
         content = _read_text_with_migration(data_dir, agent_name, "notes.txt")
         if content is not None:
+            notes_md.write_text(content, "utf-8")
             return content
     except Exception:
         canonical_dir, _ = _resolve_agent_dirs(data_dir, agent_name)
@@ -412,4 +448,6 @@ def get_notes(data_dir: Path, agent_name: str) -> str:
 
 def set_notes(data_dir: Path, agent_name: str, content: str) -> str:
     agent_name = _sanitize_agent_name(agent_name)
+    canonical_dir = resolve_agent_dir(data_dir, agent_name)
+    (canonical_dir / "NOTES.md").write_text(content, "utf-8")
     return _write_agent_text(data_dir, agent_name, "notes.txt", content)
