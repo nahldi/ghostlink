@@ -24,6 +24,7 @@ router = APIRouter()
 
 _EXPORT_PAGE_DEFAULT = 1000
 _EXPORT_PAGE_MAX = 1000
+_RUNTIME_DB_NAME = "ghostlink_v2.db"
 
 # ── Image upload helpers ──────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ async def diagnostics():
                     "detail": py_ver, "required": "3.10+"})
 
     # Database integrity
-    db_path = data_dir / "ghostlink.db"
+    db_path = data_dir / _RUNTIME_DB_NAME
     if db_path.exists():
         try:
             conn = sqlite3.connect(str(db_path))
@@ -242,9 +243,9 @@ async def create_backup():
         zf.writestr("settings.json", json.dumps(deps._settings, indent=2, default=str))
 
         # Database
-        db_path = data_dir / "ghostlink.db"
+        db_path = data_dir / _RUNTIME_DB_NAME
         if db_path.exists():
-            zf.write(str(db_path), "ghostlink.db")
+            zf.write(str(db_path), _RUNTIME_DB_NAME)
 
         # Config files
         for name in ("config.toml", "personas.json", "hooks.json"):
@@ -252,12 +253,19 @@ async def create_backup():
             if cfg.exists():
                 zf.write(str(cfg), name)
 
-        # Agent memory files
+        # Legacy memory files
         mem_dir = data_dir / "memory"
         if mem_dir.is_dir():
             for f in mem_dir.rglob("*"):
                 if f.is_file() and f.stat().st_size < 10_000_000:
                     zf.write(str(f), f"memory/{f.relative_to(mem_dir)}")
+
+        # Canonical agent data files
+        agents_dir = data_dir / "agents"
+        if agents_dir.is_dir():
+            for f in agents_dir.rglob("*"):
+                if f.is_file() and f.stat().st_size < 10_000_000:
+                    zf.write(str(f), f"agents/{f.relative_to(agents_dir)}")
 
         # Uploads (images, attachments)
         upload_dir = data_dir / "uploads"
@@ -292,8 +300,8 @@ async def restore_backup(file: UploadFile = File(...)):
         return JSONResponse({"error": "Invalid ZIP file"}, 400)
 
     # Validate: only allow known safe file paths from our backup format
-    allowed_prefixes = ("settings.json", "ghostlink.db", "config.toml",
-                        "personas.json", "hooks.json", "memory/", "uploads/")
+    allowed_prefixes = ("settings.json", _RUNTIME_DB_NAME, "config.toml",
+                        "personas.json", "hooks.json", "memory/", "agents/", "uploads/")
     for name in zf.namelist():
         if not any(name == prefix or name.startswith(prefix) for prefix in allowed_prefixes):
             return JSONResponse({"error": f"Unexpected file in backup: {name}"}, 400)
@@ -306,7 +314,7 @@ async def restore_backup(file: UploadFile = File(...)):
     # Create backup of current state before overwriting
     backup_dir = data_dir / ".pre-restore-backup"
     backup_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("ghostlink.db", "config.toml", "personas.json", "hooks.json"):
+    for name in (_RUNTIME_DB_NAME, "config.toml", "personas.json", "hooks.json"):
         src = data_dir / name
         if src.exists():
             shutil.copy2(str(src), str(backup_dir / name))
@@ -328,10 +336,10 @@ async def restore_backup(file: UploadFile = File(...)):
                 restored.append("settings")
             except Exception:
                 pass
-        elif name == "ghostlink.db":
+        elif name == _RUNTIME_DB_NAME:
             dest.write_bytes(zf.read(name))
             restored.append("database")
-        elif name.startswith("memory/") or name.startswith("uploads/"):
+        elif name.startswith("memory/") or name.startswith("agents/") or name.startswith("uploads/"):
             dest.write_bytes(zf.read(name))
             restored.append(name)
         else:

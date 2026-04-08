@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+from migrations import apply_migrations
 
 MsgCallback = Callable[[dict], Awaitable[None]]
 
@@ -62,6 +63,15 @@ ALTER TABLE messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '{}';
 """
 
 
+async def _migration_add_reactions(db: aiosqlite.Connection) -> None:
+    await db.execute(MIGRATION_REACTIONS)
+
+
+STORE_MIGRATIONS = [
+    ("20260408_add_reactions_column", _migration_add_reactions),
+]
+
+
 class MessageStore:
     def __init__(self, db_path: str | Path):
         self.db_path = str(db_path)
@@ -103,12 +113,7 @@ class MessageStore:
         await self._db.execute("PRAGMA busy_timeout=5000")  # 5s retry on lock
         await self._db.executescript(DB_SCHEMA)
         await self._db.commit()
-        # Migrate: add reactions column if missing
-        try:
-            await self._db.executescript(MIGRATION_REACTIONS)
-            await self._db.commit()
-        except Exception:
-            pass  # Column already exists — expected on subsequent runs
+        await apply_migrations(self._db, STORE_MIGRATIONS)
         # FTS5 full-text search index
         try:
             await self._db.executescript(FTS_SCHEMA)

@@ -1,6 +1,6 @@
 """Agent Memory System — persistent per-agent memory stored as JSON files.
 
-Each agent gets its own directory under data/{agent_name}/memory/
+Each agent gets its own directory under data/agents/{agent_name}/memory/
 with individual JSON files for each memory key.
 """
 
@@ -30,9 +30,28 @@ class AgentMemory:
 
     def __init__(self, data_dir: Path, agent_name: str):
         self.agent_name = _sanitize_agent_name(agent_name)
-        self.memory_dir = data_dir / self.agent_name / "memory"
+        self.agent_dir, self._legacy_agent_dir = _resolve_agent_dirs(data_dir, self.agent_name)
+        self.memory_dir = self.agent_dir / "memory"
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        self._migrate_legacy_memory_dir()
+
+    def _migrate_legacy_memory_dir(self) -> None:
+        if not self._legacy_agent_dir:
+            return
+        legacy_memory_dir = self._legacy_agent_dir / "memory"
+        if not legacy_memory_dir.is_dir():
+            return
+        for legacy_file in legacy_memory_dir.glob("*.json"):
+            target = self.memory_dir / legacy_file.name
+            if not target.exists():
+                target.write_bytes(legacy_file.read_bytes())
+            legacy_file.unlink(missing_ok=True)
+        try:
+            legacy_memory_dir.rmdir()
+        except OSError:
+            pass
+        _cleanup_legacy_agent_dir(self._legacy_agent_dir)
 
     @staticmethod
     def _sanitize_key(key: str) -> str:
@@ -185,6 +204,68 @@ _memory_cache: dict[str, tuple[AgentMemory, float]] = {}
 _MEMORY_CACHE_TTL = 300.0  # 5 minutes
 
 
+def _resolve_agent_dirs(data_dir: Path, agent_name: str) -> tuple[Path, Path | None]:
+    base_dir = Path(data_dir)
+    if base_dir.name == "agents":
+        canonical_root = base_dir
+        legacy_root = base_dir.parent
+    else:
+        canonical_root = base_dir / "agents"
+        legacy_root = base_dir
+    canonical_dir = canonical_root / agent_name
+    legacy_dir = legacy_root / agent_name
+    if canonical_dir == legacy_dir:
+        legacy_dir = None
+    return canonical_dir, legacy_dir
+
+
+def _cleanup_legacy_agent_dir(agent_dir: Path | None) -> None:
+    if agent_dir is None:
+        return
+    try:
+        if agent_dir.is_dir() and not any(agent_dir.iterdir()):
+            agent_dir.rmdir()
+    except OSError:
+        pass
+
+
+def _read_text_with_migration(
+    data_dir: Path,
+    agent_name: str,
+    filename: str,
+) -> str | None:
+    canonical_dir, legacy_dir = _resolve_agent_dirs(data_dir, agent_name)
+    canonical_path = canonical_dir / filename
+    if canonical_path.exists():
+        return canonical_path.read_text("utf-8")
+
+    if legacy_dir is None:
+        return None
+
+    legacy_path = legacy_dir / filename
+    if not legacy_path.exists():
+        return None
+
+    canonical_dir.mkdir(parents=True, exist_ok=True)
+    content = legacy_path.read_text("utf-8")
+    canonical_path.write_text(content, "utf-8")
+    legacy_path.unlink(missing_ok=True)
+    _cleanup_legacy_agent_dir(legacy_dir)
+    return content
+
+
+def _write_agent_text(data_dir: Path, agent_name: str, filename: str, content: str) -> str:
+    canonical_dir, legacy_dir = _resolve_agent_dirs(data_dir, agent_name)
+    canonical_dir.mkdir(parents=True, exist_ok=True)
+    target_path = canonical_dir / filename
+    target_path.write_text(content, "utf-8")
+    if legacy_dir is not None:
+        legacy_path = legacy_dir / filename
+        legacy_path.unlink(missing_ok=True)
+        _cleanup_legacy_agent_dir(legacy_dir)
+    return content
+
+
 def search_all_memories(data_dir: Path, query: str, limit: int = 20) -> list[dict]:
     """Search across ALL agents' memories for a keyword (cross-session recall).
 
@@ -192,29 +273,39 @@ def search_all_memories(data_dir: Path, query: str, limit: int = 20) -> list[dic
     """
     query_lower = query.lower()
     results: list[dict] = []
-    agents_dir = data_dir
-    if not agents_dir.exists():
-        return results
-    for agent_dir in sorted(agents_dir.iterdir()):
-        memory_dir = agent_dir / "memory"
-        if not agent_dir.is_dir() or not memory_dir.exists():
-            continue
-        agent_name = agent_dir.name
-        for f in sorted(memory_dir.glob("*.json")):
-            try:
-                data = json.loads(f.read_text("utf-8"))
-                key = data.get("key", f.stem)
-                content = data.get("content", "")
-                if query_lower in key.lower() or query_lower in content.lower():
-                    preview = content[:200] + ("..." if len(content) > 200 else "")
-                    results.append({
-                        "agent": agent_name,
-                        "key": key,
-                        "preview": preview,
-                        "updated_at": data.get("updated_at", 0),
-                    })
-            except Exception:
-                log.debug("Skipping corrupt memory file during cross-agent search: %s", f)
+    canonical_agents_dir = data_dir / "agents" if Path(data_dir).name != "agents" else Path(data_dir)
+    candidate_dirs: list[Path] = []
+    if canonical_agents_dir.exists():
+        candidate_dirs.append(canonical_agents_dir)
+    legacy_agents_dir = Path(data_dir)
+    if legacy_agents_dir != canonical_agents_dir and legacy_agents_dir.exists():
+        candidate_dirs.append(legacy_agents_dir)
+
+    seen_agents: set[str] = set()
+    for agents_dir in candidate_dirs:
+        for agent_dir in sorted(agents_dir.iterdir()):
+            memory_dir = agent_dir / "memory"
+            if not agent_dir.is_dir() or not memory_dir.exists():
+                continue
+            agent_name = agent_dir.name
+            if agent_name == "agents" or agent_name in seen_agents:
+                continue
+            seen_agents.add(agent_name)
+            for f in sorted(memory_dir.glob("*.json")):
+                try:
+                    data = json.loads(f.read_text("utf-8"))
+                    key = data.get("key", f.stem)
+                    content = data.get("content", "")
+                    if query_lower in key.lower() or query_lower in content.lower():
+                        preview = content[:200] + ("..." if len(content) > 200 else "")
+                        results.append({
+                            "agent": agent_name,
+                            "key": key,
+                            "preview": preview,
+                            "updated_at": data.get("updated_at", 0),
+                        })
+                except Exception:
+                    log.debug("Skipping corrupt memory file during cross-agent search: %s", f)
     # Sort by most recently updated first
     results.sort(key=lambda r: r.get("updated_at", 0), reverse=True)
     return results[:limit]
@@ -297,23 +388,25 @@ def generate_agent_context(agent_name: str, soul: str = "") -> str:
 def get_soul(data_dir: Path, agent_name: str) -> str:
     """Load the agent's soul/identity prompt."""
     agent_name = _sanitize_agent_name(agent_name)
-    soul_path = data_dir / agent_name / "soul.txt"
-    if soul_path.exists():
-        try:
-            return soul_path.read_text("utf-8").strip()
-        except Exception:
-            log.warning("Failed to read soul file for %s: %s", agent_name, soul_path, exc_info=True)
+    try:
+        content = _read_text_with_migration(data_dir, agent_name, "soul.txt")
+        if content is not None:
+            return content.strip()
+    except Exception:
+        canonical_dir, _ = _resolve_agent_dirs(data_dir, agent_name)
+        log.warning(
+            "Failed to read soul file for %s: %s",
+            agent_name,
+            canonical_dir / "soul.txt",
+            exc_info=True,
+        )
     return _DEFAULT_SOUL.format(name=agent_name)
 
 
 def set_soul(data_dir: Path, agent_name: str, soul: str) -> str:
     """Save the agent's soul/identity prompt."""
     agent_name = _sanitize_agent_name(agent_name)
-    agent_dir = data_dir / agent_name
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    soul_path = agent_dir / "soul.txt"
-    soul_path.write_text(soul.strip(), "utf-8")
-    return soul.strip()
+    return _write_agent_text(data_dir, agent_name, "soul.txt", soul.strip()).strip()
 
 
 # ── Notes/Scratch Pad helpers ────────────────────────────────────
@@ -321,20 +414,22 @@ def set_soul(data_dir: Path, agent_name: str, soul: str) -> str:
 def get_notes(data_dir: Path, agent_name: str) -> str:
     """Load the agent's working notes."""
     agent_name = _sanitize_agent_name(agent_name)
-    notes_path = data_dir / agent_name / "notes.txt"
-    if notes_path.exists():
-        try:
-            return notes_path.read_text("utf-8")
-        except Exception:
-            log.warning("Failed to read notes for %s: %s", agent_name, notes_path, exc_info=True)
+    try:
+        content = _read_text_with_migration(data_dir, agent_name, "notes.txt")
+        if content is not None:
+            return content
+    except Exception:
+        canonical_dir, _ = _resolve_agent_dirs(data_dir, agent_name)
+        log.warning(
+            "Failed to read notes for %s: %s",
+            agent_name,
+            canonical_dir / "notes.txt",
+            exc_info=True,
+        )
     return ""
 
 
 def set_notes(data_dir: Path, agent_name: str, content: str) -> str:
     """Save the agent's working notes."""
     agent_name = _sanitize_agent_name(agent_name)
-    agent_dir = data_dir / agent_name
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    notes_path = agent_dir / "notes.txt"
-    notes_path.write_text(content, "utf-8")
-    return content
+    return _write_agent_text(data_dir, agent_name, "notes.txt", content)

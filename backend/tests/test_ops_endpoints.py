@@ -70,7 +70,7 @@ async def test_diagnostics_reports_missing_db(ops_env):
 @pytest.mark.asyncio
 async def test_diagnostics_reports_existing_db(ops_env):
     import sqlite3
-    db_path = ops_env["data_dir"] / "ghostlink.db"
+    db_path = ops_env["data_dir"] / "ghostlink_v2.db"
     conn = sqlite3.connect(str(db_path))
     conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
     conn.close()
@@ -116,7 +116,7 @@ async def test_backup_creates_valid_zip(ops_env):
 @pytest.mark.asyncio
 async def test_backup_includes_database(ops_env):
     import sqlite3
-    db_path = ops_env["data_dir"] / "ghostlink.db"
+    db_path = ops_env["data_dir"] / "ghostlink_v2.db"
     conn = sqlite3.connect(str(db_path))
     conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
     conn.close()
@@ -129,7 +129,24 @@ async def test_backup_includes_database(ops_env):
     body = b"".join(body_chunks)
 
     zf = zipfile.ZipFile(io.BytesIO(body))
-    assert "ghostlink.db" in zf.namelist()
+    assert "ghostlink_v2.db" in zf.namelist()
+
+
+@pytest.mark.asyncio
+async def test_backup_includes_agent_data(ops_env):
+    agents_dir = ops_env["data_dir"] / "agents" / "codex"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "soul.txt").write_text("You are a reviewer.", encoding="utf-8")
+
+    from routes.misc import create_backup
+    response = await create_backup()
+    body_chunks = []
+    async for chunk in response.body_iterator:
+        body_chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode())
+    body = b"".join(body_chunks)
+
+    zf = zipfile.ZipFile(io.BytesIO(body))
+    assert "agents/codex/soul.txt" in zf.namelist()
 
 
 # ── /api/restore ─────────────────────────────────────────────────────
@@ -186,6 +203,7 @@ async def test_restore_valid_backup(ops_env):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("settings.json", json.dumps({"theme": "cyberpunk", "username": "Restored"}))
+        zf.writestr("agents/codex/notes.txt", "remember this")
     buf.seek(0)
 
     from routes.misc import restore_backup
@@ -196,6 +214,7 @@ async def test_restore_valid_backup(ops_env):
     # Verify settings were actually merged
     assert deps._settings.get("theme") == "cyberpunk"
     assert deps._settings.get("username") == "Restored"
+    assert (ops_env["data_dir"] / "agents" / "codex" / "notes.txt").read_text(encoding="utf-8") == "remember this"
 
 
 @pytest.mark.asyncio

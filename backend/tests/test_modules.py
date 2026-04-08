@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+import aiosqlite
 
 # ── MessageStore ──────────────────────────────────────────────────────
 
@@ -490,3 +491,80 @@ def test_agent_memory_isolation(tmp_path: Path):
     mem_b = AgentMemory(tmp_path, "gemini-1")
     mem_a.save("private", "only for claude")
     assert mem_b.load("private") is None
+
+
+def test_soul_and_notes_use_canonical_agents_path(tmp_path: Path):
+    """Soul and notes writes land under data/agents/{name}."""
+    from agent_memory import get_notes, get_soul, set_notes, set_soul
+
+    root = tmp_path
+    set_soul(root, "codex", "You are a reviewer.")
+    set_notes(root, "codex", "ship it")
+
+    assert (root / "agents" / "codex" / "soul.txt").read_text(encoding="utf-8") == "You are a reviewer."
+    assert (root / "agents" / "codex" / "notes.txt").read_text(encoding="utf-8") == "ship it"
+    assert get_soul(root / "agents", "codex") == "You are a reviewer."
+    assert get_notes(root / "agents", "codex") == "ship it"
+
+
+def test_soul_and_notes_migrate_legacy_paths(tmp_path: Path):
+    """Legacy top-level soul/notes files are migrated into data/agents/{name}."""
+    from agent_memory import get_notes, get_soul
+
+    legacy_dir = tmp_path / "codex"
+    legacy_dir.mkdir(parents=True)
+    (legacy_dir / "soul.txt").write_text("legacy soul", encoding="utf-8")
+    (legacy_dir / "notes.txt").write_text("legacy notes", encoding="utf-8")
+
+    assert get_soul(tmp_path, "codex") == "legacy soul"
+    assert get_notes(tmp_path, "codex") == "legacy notes"
+    assert (tmp_path / "agents" / "codex" / "soul.txt").read_text(encoding="utf-8") == "legacy soul"
+    assert (tmp_path / "agents" / "codex" / "notes.txt").read_text(encoding="utf-8") == "legacy notes"
+    assert not (legacy_dir / "soul.txt").exists()
+    assert not (legacy_dir / "notes.txt").exists()
+
+
+@pytest.mark.asyncio
+async def test_migration_runner_records_and_is_idempotent(tmp_path: Path):
+    """Applied migrations are recorded once and skipped on subsequent runs."""
+    from migrations import apply_migrations, get_applied_migrations
+
+    db = await aiosqlite.connect(str(tmp_path / "migrations.db"))
+    try:
+        async def create_table(conn):
+            await conn.execute("CREATE TABLE example (id INTEGER PRIMARY KEY)")
+
+        applied = await apply_migrations(db, [("001_create_example", create_table)])
+        assert applied == ["001_create_example"]
+        assert "001_create_example" in await get_applied_migrations(db)
+
+        applied_again = await apply_migrations(db, [("001_create_example", create_table)])
+        assert applied_again == []
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_migration_runner_rolls_back_failed_migration(tmp_path: Path):
+    """Failed migrations do not leave partial state or applied markers behind."""
+    from migrations import apply_migrations, get_applied_migrations
+
+    db = await aiosqlite.connect(str(tmp_path / "rollback.db"))
+    try:
+        async def broken(conn):
+            await conn.execute("CREATE TABLE broken_table (id INTEGER PRIMARY KEY)")
+            raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            await apply_migrations(db, [("002_broken", broken)])
+
+        assert "002_broken" not in await get_applied_migrations(db)
+        cursor = await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='broken_table'"
+        )
+        try:
+            assert await cursor.fetchone() is None
+        finally:
+            await cursor.close()
+    finally:
+        await db.close()
