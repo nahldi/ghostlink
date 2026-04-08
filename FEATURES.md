@@ -1,7 +1,7 @@
 # GhostLink — Feature Reference
 
-**Last updated:** 2026-04-07  
-**Version:** v5.7.2
+**Last updated:** 2026-04-08  
+**Version:** v6.0.0
 
 > This file lists features that are actually shipped in the current codebase. Planned work belongs in `UNIFIED_ROADMAP.md`, not here.
 
@@ -9,14 +9,14 @@
 
 ## Current Verified Counts
 
-- **217 API/websocket endpoints**
-- **29 MCP tools**
-- **13 API providers**
+- **323 API/websocket endpoints** across **19 route modules**
+- **32 MCP tools**
+- **21 API providers**
 - **8 integrated CLI agents** + 5 experimental (launcher-listed but not MCP-connected)
 - **5 channel bridges**
-- **66 React component files**
+- **90 React component files**
 - **28 built-in skills**
-- **220 automated test cases** (171 backend across 17 test files + 49 frontend across 4 test files)
+- **389 automated test cases** (277 backend across 35 test files + 112 frontend across 15 test files)
 
 ---
 
@@ -44,7 +44,7 @@
 
 ## MCP and Runtime
 
-- 29 built-in MCP tools across chat, memory, web, AI/media, agent control, and streaming
+- 32 built-in MCP tools across chat, memory, web, AI/media, agent control, and streaming
 - MCP exposed over:
   - streamable HTTP on `:8200`
   - SSE on `:8201`
@@ -56,8 +56,8 @@ Current shipped MCP tools:
 
 - Chat: `chat_send`, `chat_read`, `chat_join`, `chat_who`, `chat_channels`, `chat_rules`, `chat_progress`, `chat_propose_job`, `chat_react`, `chat_claim`
 - Memory: `memory_save`, `memory_get`, `memory_list`, `memory_search`, `memory_search_all`
-- Web: `web_fetch`, `web_search`, `browser_snapshot`, `image_generate`
-- AI/media: `gemini_image`, `gemini_video`, `text_to_speech`, `speech_to_text`, `code_execute`
+- Web: `web_fetch`, `web_search`, `browser_snapshot`, `image_generate`, `image_edit`
+- AI/media: `gemini_image`, `gemini_video`, `generate_video`, `generate_music`, `text_to_speech`, `speech_to_text`, `code_execute`
 - Agent/runtime: `set_thinking`, `sessions_list`, `sessions_send`, `delegate`
 - Streaming: `chat_stream_token`
 
@@ -65,7 +65,7 @@ Current shipped MCP tools:
 
 ## Providers and Models
 
-Current API providers:
+Current API providers (21):
 
 - Anthropic
 - OpenAI
@@ -80,6 +80,14 @@ Current API providers:
 - DeepSeek
 - Perplexity
 - Cohere
+- Bedrock
+- Moonshot
+- Z.AI
+- BytePlus
+- Qwen
+- Fireworks
+- StepFun
+- Minimax
 
 Provider/runtime features:
 
@@ -104,7 +112,7 @@ Provider/runtime features:
 
 ## Ops and Reliability
 
-Shipped in the current `v5.7.x` line:
+Shipped through the current `v6.0.0` release:
 
 - `/api/health`
 - `/api/diagnostics`
@@ -162,18 +170,31 @@ Shipped in the current `v5.7.x` line:
 
 ---
 
+## Identity and Orchestration (v6.0.0)
+
+- Stable `agent_id` with SQLite persistence and dual name/ID lookup
+- Runtime identity isolation and drift detection
+- 4-layer profile inheritance (`global -> profile -> agent override`)
+- Unified task model with structured progress tracking
+- Durable execution with auto-checkpoints, tool-call journal replay, fork from checkpoint, pause/resume
+- Artifact lineage graph tied to tasks and checkpoints
+- Policy engine at MCP/shell choke points with approval tiers
+- Egress/SSRF protection, secret redaction, circuit breakers, hook signing
+- Transport abstraction layer with cost tracking, budget enforcement, failover routing
+- Golden task corpus with 8-dimension trace grading and CI regression gates
+- Per-agent worktree isolation with background executor and process isolation
+- Arena mode and collaboration patterns (handoffs, debates, consensus)
+- 4-layer memory stratification with weighted recall and conflict detection
+- A2A interoperability: agent card publication, remote discovery, cross-platform task delegation
+- Versioned profiles/skills with rollout channels and policy-gated promotion
+
 ## What This File Does Not Claim
 
 This file intentionally does **not** claim the following as shipped today:
 
-- Plugin signing/provenance verification
-- Durable exec approval allowlists
-- Thinking level picker in the main UI
-- Context visibility controls
-- Unified task dashboard
-- Prompt cache optimization
-- Video/music generation beyond the current shipped media tools
-- Advanced dreaming-style memory
-- Full accessibility/systematic loading-state pass
+- Full plugin provenance verification and signing
+- Mobile push notifications
+- Broad multilingual translation coverage
+- Matrix / Teams bridge expansion
 
-Those belong to [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md).
+Those belong to [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md) Phase 10 backlog.

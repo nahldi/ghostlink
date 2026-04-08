@@ -3,12 +3,12 @@
 > Active execution roadmap for the first phases.
 > Fresh agents should start here after reading [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md), [AGENT_PLAYBOOK.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENT_PLAYBOOK.md), and [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
 
-**Scope:** Phases 0-3.5
-**Team model:** 5 agents
-**Version target:** v5.7.2 baseline into v6.x foundations
-**Planning horizon:** first phases, roughly 4-7 weeks of focused execution after baseline cleanup
+**Scope:** Phases 0-3.5 (all shipped in v6.0.0)
+**Team model:** 4 agents
+**Version:** v6.0.0
+**Status:** All phases in this document are complete and validated.
 
-Phase 0 is complete locally. It stays in this document so fresh agents understand the baseline gate that must remain green while later phases land.
+These phases stay in this document so fresh agents understand the baseline gates and what was built.
 
 ---
 
@@ -21,19 +21,19 @@ Phase 0 is complete locally. It stays in this document so fresh agents understan
 
 ### Execution layer
 - `tyson` (`codex`): backend and platform owner
-- `ned` (`codex`): frontend plus integration/reliability owner
+- Frontend/desktop execution: temporarily unassigned (jeff coordinates)
 
 ### Pairings
 - `jeff` + `tyson`: identity, runtime, providers
-- `coop` + `ned`: operator UX, workflows, skills, product surfaces
-- `kurt` + `ned`: smoke/stress/fail testing on integration and operator surfaces
+- `coop` + `jeff`: operator UX, workflows, skills, product surfaces
+- `kurt` + `tyson`: smoke/stress/fail testing on integration and operator surfaces
 
 ### File ownership
 - `tyson`
   - `backend/`
   - backend tests
   - backend-side wrapper/runtime/provider contracts
-- `ned`
+- Frontend/desktop (unassigned — jeff coordinates)
   - `frontend/src/`
   - Electron-adjacent operator UX
   - frontend build and integration surfaces
@@ -119,7 +119,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 - Handle backend-side doc and readiness cleanup.
 - Fix version-sync drift risks and backend readiness issues.
 
-#### `ned`
+#### Frontend (unassigned)
 - Fix frontend/Electron/build blockers.
 - Own frontend/Electron/build readiness follow-through after the Windows build fix.
 
@@ -128,7 +128,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 - `coop`: research/supporting docs only
 - `kurt`: validation docs and scripts
 - `tyson`: backend readiness files
-- `ned`: frontend/Electron/build files
+- frontend (unassigned): frontend/Electron/build files
 
 ### Exit gate
 - backend tests pass
@@ -190,7 +190,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 - Implement the narrowed backend identity foundation.
 - Replace only the backend name-only coupling needed for persistence and path unification.
 
-#### `ned`
+#### Frontend (unassigned)
 - No required implementation work in Phase 1A unless jeff explicitly splits a separate compatibility surface.
 
 ### Primary file ownership
@@ -253,7 +253,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 #### `tyson`
 - Implement runtime injection, storage isolation, and backend enforcement.
 
-#### `ned`
+#### Frontend (unassigned)
 - Expose operator visibility for identity/effective-state/trust status if needed.
 
 ### Primary file ownership
@@ -263,7 +263,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
   - `backend/agent_memory.py`
   - `backend/mcp_bridge.py`
   - `backend/routes/agents.py`
-- `ned`
+- frontend (unassigned)
   - operator surfaces that show reinjection/effective-state status
 
 ### Exit gate
@@ -313,7 +313,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 #### `tyson`
 - Implement backend profile model and effective-state resolution.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement effective-state UI and profile-aware surfaces.
 
 ### Primary file ownership
@@ -322,7 +322,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
   - `backend/skills.py`
   - `backend/routes/agents.py`
   - backend tests for inheritance
-- `ned`
+- frontend (unassigned)
   - `frontend/src/components/AgentCockpit.tsx`
   - `frontend/src/components/AgentInfoPanel.tsx`
   - new profile/rules UI surfaces
@@ -387,7 +387,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 - Implement audit search, filter, and export backend.
 - Implement retention policy engine.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement operator dashboard, context controls, thinking picker, stop/cancel, provenance/tracing surfaces.
 - Implement audit search/filter UI, provenance chain viewer, export controls, retention policy configuration.
 
@@ -398,7 +398,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
   - `backend/mcp_bridge.py`
   - tracing/task backend tests
   - new `backend/audit.py` (search, filter, export, retention)
-- `ned`
+- frontend (unassigned)
   - `frontend/src/components/JobsPanel.tsx`
   - `frontend/src/components/TaskQueue.tsx`
   - new operator/progress/provenance surfaces
@@ -463,7 +463,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 - Implement pause/resume primitives in the task executor.
 - Implement artifact lineage graph linkage to checkpoints and tasks.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement checkpoint timeline UI: visual timeline of checkpoints for a task with state previews.
 - Implement replay controls: select a checkpoint, trigger replay, view replayed execution alongside original.
 - Implement fork UI: select a checkpoint, fork into a new task, view forked execution.
@@ -476,7 +476,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
   - `backend/jobs.py` (pause/resume primitives, checkpoint integration, side-effect boundaries)
   - `backend/routes/tasks.py` (checkpoint, replay, fork, pause/resume API endpoints)
   - backend tests for all of the above
-- `ned`
+- frontend (unassigned)
   - new frontend checkpoint timeline, replay, fork, and artifact lineage surfaces
 
 ### Exit gate

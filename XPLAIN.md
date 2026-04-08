@@ -147,7 +147,7 @@ That's it. No API keys needed if you're logged into Claude/Codex/Gemini CLIs alr
 
 ---
 
-## What's Already Shipped (v5.7.2)
+## What's Shipped (v6.0.0)
 
 - **Desktop app** (.exe/.dmg/.AppImage/.deb) with launcher, setup wizard, and auto-update
 - **Cross-platform** support (Windows, Mac, Linux)
@@ -156,18 +156,25 @@ That's it. No API keys needed if you're logged into Claude/Codex/Gemini CLIs alr
 - **Live terminal peek** — watch what agents are doing in real-time
 - **Approval gates** — agents propose changes, you approve
 - **Skill marketplace** — 28 built-in skills + community plugins with AST safety scanning
-- **Cost tracking** — see token usage per agent
-- **13 AI providers** with failover and cost tracking
-- **29 MCP tools** for agent capabilities
+- **Cost tracking** — per-agent token usage with budget enforcement and failover routing
+- **21 AI providers** with transport abstraction and automatic failover
+- **32 MCP tools** for agent capabilities
 - **9 visual themes** including dark mode variants
+- **Stable agent identity** — persistent IDs, runtime isolation, drift detection
+- **Durable execution** — auto-checkpoints, replay, fork, pause/resume
+- **Policy engine** — approval tiers, egress controls, secret redaction, circuit breakers
+- **4-layer memory** — identity, workspace, session, and promoted long-term memory
+- **A2A interoperability** — agent card publication, remote discovery, cross-platform delegation
+- **Arena mode** — agents compete, best response wins
+- **Media generation** — video, music, and image-edit MCP tools
+- **389 automated tests** (277 backend + 112 frontend)
 
 ## What's Next
 
-See `UNIFIED_ROADMAP.md` for the full phased plan. Key upcoming work:
-- Agent Runtime Identity System (persistent identity that survives long sessions)
-- Skills Center UX overhaul
-- Provider expansion and prompt caching
-- Video and music generation
-- Advanced memory with weighted recall
+See `UNIFIED_ROADMAP.md` for Phase 10 backlog. Key future work:
+- Full plugin provenance verification and signing
+- Mobile push notifications
+- Broader multilingual translation coverage
+- Matrix / Teams bridge expansion
 
 The goal: make GhostLink the best multi-agent tool out there.

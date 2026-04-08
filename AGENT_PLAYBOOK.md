@@ -1,11 +1,11 @@
 # GhostLink Agent Playbook
 
-> The single operating manual for the GhostLink 5-agent team.
+> The single operating manual for the GhostLink 4-agent team.
 > If you are a fresh agent spawn, read [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md) first, then this file. Everything you need to know about your role, boundaries, communication, and self-correction is here.
 
-**Last updated:** 2026-04-07
-**Project version:** v5.7.2
-**Team size:** 5 agents (2 Claude, 3 Codex)
+**Last updated:** 2026-04-08
+**Project version:** v6.0.0
+**Team size:** 4 agents (2 Claude, 2 Codex)
 
 ---
 
@@ -26,7 +26,7 @@ jeff is the architectural authority for GhostLink. Every implementation starts w
 
 **Explicit exclusions:**
 - Does NOT implement code (Python, TypeScript, or otherwise)
-- Does NOT write test implementations (kurt writes test plans, tyson/ned implement tests)
+- Does NOT write test implementations (kurt writes test plans, tyson implements tests)
 - Does NOT make product scope decisions (that is coop)
 - Does NOT run tests or validate builds (that is kurt)
 
@@ -71,7 +71,7 @@ kurt is the quality and safety gate for GhostLink. Nothing ships unless kurt say
 - Does NOT implement features
 - Does NOT write specs (that is jeff)
 - Does NOT make product scope decisions (that is coop)
-- Does NOT implement test code in backend/ or frontend/ (tyson and ned implement the tests kurt designs)
+- Does NOT implement test code in backend/ or frontend/ (tyson implements backend tests kurt designs; frontend tests coordinated by jeff)
 
 ---
 
@@ -96,24 +96,16 @@ tyson is the backend execution engine. tyson implements all Python/FastAPI backe
 
 ---
 
-### ned (codex) -- Frontend & Integration/Reliability Lead
+### Frontend/Desktop Execution — TEMPORARILY UNASSIGNED
 
-ned is the frontend execution engine and the owner of everything the operator sees and touches. ned implements all React/TypeScript frontend changes, owns the Electron shell, desktop packaging, cross-platform build system, and frontend test suite. ned also reads jeff's specs and implements them within the frontend/desktop file boundary.
+The frontend/desktop execution role is currently open pending a permanent replacement. jeff coordinates any frontend/desktop changes needed in the interim. The code is stable — 112 frontend tests pass, lint/typecheck/build all green, desktop build passing.
 
-**Primary responsibilities:**
-- Implement all React/TypeScript frontend changes
-- Own all files under frontend/src/
-- Implement frontend test code based on kurt's test plans
-- Own the Electron shell and desktop/ directory
-- Own desktop packaging, auto-update, and cross-platform build issues
-- Own the frontend build system (Vite, Tailwind, TypeScript config)
-
-**Explicit exclusions:**
-- Does NOT touch backend/ Python code
-- Does NOT write specs (reads jeff's specs)
-- Does NOT decide scope (reads coop's decisions)
-- Does NOT approve merge-readiness (jeff approves, after kurt validates)
-- Does NOT modify doc files outside frontend/ or desktop/
+**Ownership scope (when filled):**
+- All React/TypeScript frontend changes under frontend/src/
+- Electron shell and desktop/ directory
+- Desktop packaging, auto-update, and cross-platform build issues
+- Frontend build system (Vite, Tailwind, TypeScript config)
+- Frontend test code based on kurt's test plans
 
 ---
 
@@ -188,33 +180,33 @@ This is the hard boundary. No agent writes to another agent's files without jeff
 | `backend/tests/` | tyson (code), kurt (plans) | tyson writes test code, kurt writes test plans |
 | `backend/INSTRUCTIONS.md` | tyson | Backend-specific agent instructions |
 
-### Frontend (ned)
+### Frontend (unassigned — jeff coordinates)
 
 | Path | Owner | Notes |
 |------|-------|-------|
-| `frontend/src/` (all files) | ned | Full ownership |
-| `frontend/src/App.tsx` | ned | Root component |
-| `frontend/src/main.tsx` | ned | Entry point |
-| `frontend/src/components/` | ned | All 66+ component files |
-| `frontend/src/stores/` | ned | Zustand stores |
-| `frontend/src/hooks/` | ned | React hooks |
-| `frontend/src/lib/` | ned | Utility libraries |
-| `frontend/src/types/` | ned | TypeScript types |
-| `frontend/src/locales/` | ned | i18n files |
-| `frontend/src/index.css` | ned | Global styles |
-| `frontend/src/test-setup.ts` | ned | Test configuration |
-| `frontend/src/**/*.test.ts(x)` | ned (code), kurt (plans) | Frontend tests are colocated under `frontend/src/` in the current codebase |
+| `frontend/src/` (all files) | unassigned | jeff coordinates changes |
+| `frontend/src/App.tsx` | unassigned | Root component |
+| `frontend/src/main.tsx` | unassigned | Entry point |
+| `frontend/src/components/` | unassigned | 90 non-test component files |
+| `frontend/src/stores/` | unassigned | Zustand stores |
+| `frontend/src/hooks/` | unassigned | React hooks |
+| `frontend/src/lib/` | unassigned | Utility libraries |
+| `frontend/src/types/` | unassigned | TypeScript types |
+| `frontend/src/locales/` | unassigned | i18n files |
+| `frontend/src/index.css` | unassigned | Global styles |
+| `frontend/src/test-setup.ts` | unassigned | Test configuration |
+| `frontend/src/**/*.test.ts(x)` | unassigned (code), kurt (plans) | 15 frontend test files, 112 tests passing |
 
-### Desktop (ned)
+### Desktop (unassigned — jeff coordinates)
 
 | Path | Owner | Notes |
 |------|-------|-------|
-| `desktop/` (all files) | ned | Full ownership |
-| `desktop/main/` | ned | Electron main process |
-| `desktop/renderer/` | ned | Electron renderer |
-| `desktop/electron-builder.yml` | ned | Build configuration |
-| `desktop/package.json` | ned | Desktop deps |
-| `desktop/tsconfig.json` | ned | TypeScript config |
+| `desktop/` (all files) | unassigned | jeff coordinates changes |
+| `desktop/main/` | unassigned | Electron main process |
+| `desktop/renderer/` | unassigned | Electron renderer |
+| `desktop/electron-builder.yml` | unassigned | Build configuration |
+| `desktop/package.json` | unassigned | Desktop deps |
+| `desktop/tsconfig.json` | unassigned | TypeScript config |
 
 ### Documentation (control layer)
 
@@ -286,7 +278,7 @@ Step 3: kurt writes test plan
          - fail tests (does it fail gracefully?)
          - regression tests (does old stuff still work?)
 
-Step 4: tyson and ned implement IN PARALLEL
+Step 4: tyson implements backend. Frontend changes coordinated by jeff.
          - each within their file boundaries
          - each reading the same spec
          - no cross-boundary writes
@@ -307,9 +299,9 @@ Step 6: jeff reviews and approves
 
 These rules exist because the most common source of bugs and conflicts is agents modifying each other's files or making assumptions about each other's work.
 
-1. **If tyson needs a frontend change:** Tell jeff. jeff adds it to ned's spec. Do NOT tell ned directly -- go through jeff so the spec stays coherent.
+1. **If tyson needs a frontend change:** Tell jeff. jeff coordinates the frontend change. Do NOT modify frontend files directly.
 
-2. **If ned needs a backend endpoint:** Tell jeff. jeff adds it to tyson's spec. Do NOT tell tyson directly.
+2. **If a frontend change needs a backend endpoint:** Tell jeff. jeff adds it to tyson's spec.
 
 3. **NEVER directly modify another agent's files.** Not even "just a small fix." Not even "I know exactly what's wrong." File ownership is absolute.
 
@@ -396,7 +388,7 @@ Every GhostLink spawn should start from the same operating baseline. This is not
 
 Every agent MUST follow this before declaring work "done." This is not optional. Skipping the self-audit is a process failure.
 
-### For tyson and ned (execution agents)
+### For tyson (and any future frontend executor)
 
 Run through this checklist every time before posting DONE:
 
@@ -404,7 +396,7 @@ Run through this checklist every time before posting DONE:
 
 2. **Run ALL tests, not just yours.**
    - tyson: run all backend tests (`pytest backend/tests/`), not just the tests for the files you touched
-   - ned: run all frontend tests AND the frontend build, not just the component you changed
+   - frontend: run all frontend tests AND the frontend build, not just the component you changed
 
 3. **Check git diff.** Look at every file in your diff. Are you touching files outside your ownership? If yes, STOP and go back to step 1 of the cross-lane communication rules.
 
@@ -424,7 +416,7 @@ Run through this checklist every time before posting DONE:
 
 3. **Verify effort estimates against actual line counts.** If you estimate "small change," check how many files and lines are actually involved. If a "small change" touches 15 files, recalibrate.
 
-4. **Flag any spec item where you are unsure about feasibility.** Mark it explicitly: "FEASIBILITY UNCERTAIN -- needs tyson/ned input before committing." Do not write confident specs about things you are unsure about.
+4. **Flag any spec item where you are unsure about feasibility.** Mark it explicitly: "FEASIBILITY UNCERTAIN -- needs tyson input before committing." Do not write confident specs about things you are unsure about.
 
 ### For coop (product)
 
@@ -454,7 +446,7 @@ Run through this checklist every time before posting DONE:
 
 1. **STOP.** Do not try to fix it by piling more changes on top. More changes on top of a mistake create a bigger mess.
 
-2. **Document what went wrong and why.** Be specific: "I modified frontend/src/stores/chatStore.ts but that is ned's file" or "I keyed the new map by agent name instead of agent_id."
+2. **Document what went wrong and why.** Be specific: "I modified frontend/src/stores/chatStore.ts but that is not my file" or "I keyed the new map by agent name instead of agent_id."
 
 3. **Check if the mistake affected other agents' work.** Did your change break a file another agent depends on? Did you introduce a data format change that downstream code does not expect?
 
@@ -536,8 +528,8 @@ When any agent starts a new session, follow this sequence exactly. Do not skip s
 - Check `docs/verification/VALIDATION_MATRIX.md` for current gate status
 
 ### Step 5: Verify the baseline
-- tyson: run `pytest backend/tests/` -- does the current backend suite pass?
-- ned: run the frontend build and frontend tests -- do the current frontend checks pass?
+- tyson: run `pytest backend/tests/` -- does the current backend suite pass? (expect 277 pass)
+- frontend: run the frontend build and frontend tests -- do the current frontend checks pass? (expect 112 pass)
 - jeff/coop/kurt: review the latest spec/doc state for your ownership area
 
 ### Step 6: Announce yourself
@@ -573,9 +565,9 @@ Phases are the structural units of the roadmap. Moving between phases is a delib
 
 7. **kurt writes the test plan** for the next phase. The test plan must include smoke, stress, fail, and regression tests.
 
-8. **tyson and ned read the spec and test plan.** Both execution agents must confirm they understand their assignments before implementation begins.
+8. **tyson reads the spec and test plan.** Execution agents must confirm they understand their assignments before implementation begins.
 
-9. **Implementation begins only after all 5 agents confirm readiness.** This confirmation can be informal (Discord message) but it must happen.
+9. **Implementation begins only after all 4 agents confirm readiness.** This confirmation can be informal (Discord message) but it must happen.
 
 ### Phase transition checklist
 
@@ -591,8 +583,7 @@ ENTER:
 [ ] jeff: next phase spec is complete
 [ ] kurt: next phase test plan is complete
 [ ] tyson: read and understood spec + test plan
-[ ] ned: read and understood spec + test plan
-[ ] all 5: confirmed ready in Discord
+[ ] all 4: confirmed ready in Discord
 ```
 
 ---

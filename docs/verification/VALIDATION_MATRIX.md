@@ -2,13 +2,16 @@
 
 **Purpose:** Repeatable test gates for every implementation phase. Run the relevant gate checklist BEFORE and AFTER each phase. Any AI picking up this project should use this matrix to verify health.
 
-**Last updated:** 2026-04-07
+**Last updated:** 2026-04-08
 
 ---
 
 ## Gate 0: Baseline Health (Run Before ANY Phase)
 
 These must all pass before starting implementation on any phase.
+
+Windows note:
+- If PowerShell execution policy blocks `npx` or `npm` shims, run the same commands through `cmd /c`.
 
 ### Backend
 - [ ] `cd backend && python -m pytest tests/ -q` - backend test suite passes
@@ -35,8 +38,9 @@ These must all pass before starting implementation on any phase.
 
 ### Docs Consistency
 - [ ] STATUS.md version header matches current release
-- [ ] FEATURES.md agent count says "8 integrated + 5 experimental"
-- [ ] UNIFIED_ROADMAP.md comparison matrix reflects implemented features correctly
+- [ ] STATUS.md core counts match the verified `v6.0.0` baseline: `323` endpoints, `19` route modules, `32` MCP tools, `21` API providers, `90` React component files, `28` built-in skills
+- [ ] FEATURES.md version/counts match the verified `v6.0.0` baseline: `323` endpoints, `32` MCP tools, `21` API providers, `90` React component files, `389` tests
+- [ ] UNIFIED_ROADMAP.md and roadmap docs reflect shipped phase status truthfully
 - [ ] No stale version references in any root .md file
 
 ### Working Tree

@@ -3,22 +3,22 @@
 > Strategic source of truth for GhostLink development.
 > Fresh agents should read [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md) first, then [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md) for active execution work.
 
-**Last updated:** 2026-04-07
-**Current version:** v5.7.2
+**Last updated:** 2026-04-08
+**Current version:** v6.0.0
 **Comparison target:** OpenClaw v2026.4.5
-**Operating model:** 5-agent team
+**Operating model:** 4-agent team
 
 ---
 
 ## Current Reality
 
 ### Verified product baseline
-- 217 API/websocket endpoints across 14 route modules
-- 29 MCP tools
-- 13 API providers
+- 323 API/websocket endpoints across 19 route modules
+- 32 MCP tools
+- 21 API providers
 - 8 integrated CLI agents plus 5 experimental launcher-listed agents
-- 66 React component files
-- 220 automated test cases
+- 90 React component files
+- 389 automated test cases (277 backend + 112 frontend)
 - Desktop app with launcher, setup wizard, auto-update, and system tray
 
 ### Verified strengths
@@ -30,35 +30,36 @@
 - Ops toolkit: health, diagnostics, backup, restore, logs
 
 ### Current local status
-- Phase 0 baseline cleanup is complete locally
-- Working tree is clean as of the latest verified roadmap pass
-- The remaining blockers are structural platform gaps, not local readiness drift
-- Workspace-facing agent identity injection still depends on shared instruction files in the repo root
+- All phases 0-9 shipped and validated in v6.0.0
+- Working tree is clean and synced with origin/master
+- Identity isolation, durable execution, policy engine, evals, A2A, and productization are all shipped
+- Remaining work is Phase 10 backlog items
 
 ---
 
 ## Team Model
 
-GhostLink is now planned around a 5-agent operating model.
+GhostLink operates with a 4-agent team.
 
 ### Control layer
-- `jeff` (`claude`): architect and spec owner
+- `jeff` (`claude`): architect, spec owner, and frontend/desktop oversight (temporary)
 - `coop` (`claude`): product and research owner
 - `kurt` (`codex`): QA, safety, and gate owner
 
 ### Execution layer
 - `tyson` (`codex`): backend and platform owner
-- `ned` (`codex`): frontend plus integration/reliability owner
+
+Frontend/desktop execution is temporarily unassigned. jeff coordinates any frontend/desktop changes needed in the interim.
 
 ### Pairings
 - `jeff` + `tyson`: identity, runtime, provider architecture
-- `coop` + `ned`: operator UX, skills, workflows, product surfaces
-- `kurt` + `ned`: smoke, stress, fail, and integration validation
+- `coop` + `jeff`: operator UX, skills, workflows, product surfaces
+- `kurt` + `tyson`: smoke, stress, fail, and integration validation
 
 ### Ownership rules
 - `tyson` owns backend platform files and backend tests
-- `ned` owns frontend, Electron-adjacent operator surfaces, and build/integration UX
 - `jeff`, `coop`, and `kurt` own specs, research, validation plans, and review
+- Frontend/desktop files are team-coordinated through jeff until a permanent owner is assigned
 - Any cross-lane milestone must be split into explicit file ownership before implementation begins
 
 ---
@@ -172,7 +173,7 @@ Primary owners:
 - `coop`: verify doc claims against code and external research
 - `kurt`: convert Gate 0 into runnable checks
 - `tyson`: backend/runtime cleanup
-- `ned`: frontend/Electron/build cleanup
+- frontend/Electron/build cleanup (unassigned — jeff coordinates)
 
 ### Phase 1A - Stable Identity Records
 **Type:** hardening
@@ -213,7 +214,7 @@ Key outcomes:
 Primary owners:
 - `jeff`: reinjection and rollback spec
 - `tyson`: runtime injection and namespaced storage
-- `ned`: operator-facing effective-state visibility
+- operator-facing effective-state visibility (frontend — unassigned)
 - `kurt`: multi-agent collision and compaction tests
 
 ### Phase 2 - Profiles, Rules, And Knowledge Layering
@@ -237,7 +238,7 @@ Primary owners:
 - `jeff`: inheritance and layering spec
 - `coop`: adopt/adapt/reject decisions for `AGENTS.md`, A2A, and rules UX
 - `tyson`: backend profile and resolution model
-- `ned`: effective-state and rules UI
+- effective-state and rules UI (frontend — unassigned)
 - `kurt`: inheritance and permission-boundary validation
 
 ### Phase 3 - Operator Control Plane
@@ -259,7 +260,7 @@ Primary owners:
 - `jeff`: task/progress/control-plane/auditability spec
 - `coop`: UX refinement from competitive research
 - `tyson`: backend task/control/audit APIs and enforcement
-- `ned`: UI, operator surfaces, audit search/filter/export
+- UI, operator surfaces, audit search/filter/export (frontend — unassigned)
 - `kurt`: stress, failure, and audit validation
 
 ### Phase 3.5 - Durable Execution And Replay
@@ -280,7 +281,7 @@ Primary owners:
 - `jeff`: execution model spec, checkpoint schema, side-effect boundary definitions
 - `coop`: compare against LangGraph, Temporal, Restate patterns
 - `tyson`: checkpoint store, resume/replay engine, side-effect isolation
-- `ned`: checkpoint/replay/fork UI surfaces
+- checkpoint/replay/fork UI surfaces (frontend — unassigned)
 - `kurt`: replay correctness, idempotency, fork/branch, crash-resume tests
 
 ### Phase 4A - Policy Engine And Sandboxing
@@ -300,7 +301,7 @@ Primary owners:
 - `jeff`: policy schema spec, risk tier definitions, sandbox tier architecture
 - `coop`: compare against Claude Code hooks, Codex sandboxing, Devin sandboxing
 - `tyson`: policy engine, sandbox integration, egress controls
-- `ned`: policy/sandbox visibility UI
+- policy/sandbox visibility UI (frontend — unassigned)
 - `kurt`: policy bypass, SSRF, circuit breaker, sandbox isolation tests
 
 ### Phase 4B - Provider Independence And Cost Control
@@ -321,7 +322,7 @@ Primary owners:
 - `jeff`: backend abstraction and fallback order
 - `coop`: provider matrix and product policy
 - `tyson`: provider implementation
-- `ned`: cost/failover/operator UI
+- cost/failover/operator UI (frontend — unassigned)
 - `kurt`: provider-failure, policy-shift, and trace emission tests
 
 ### Phase 4.5 - Evals And Trace Grading
@@ -342,7 +343,7 @@ Primary owners:
 - `coop`: compare against OpenAI trace grading, LangSmith, Braintrust patterns
 - `kurt`: golden corpus, grading tests, regression suite ownership
 - `tyson`: eval runner, trace grading engine, benchmark storage
-- `ned`: benchmark dashboard UI
+- benchmark dashboard UI (frontend — unassigned)
 
 ### Phase 5 - Multi-Agent Execution
 **Type:** new capability
@@ -515,4 +516,4 @@ Keep this as a strategic reference, not as a source of truth over the codebase.
 
 ---
 
-*End of Unified Roadmap - v5.7.2 to v6.x*
+*End of Unified Roadmap - v6.0.0*

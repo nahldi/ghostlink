@@ -1,6 +1,6 @@
 # GhostLink Verification Ledger
 
-**Last updated:** 2026-04-07
+**Last updated:** 2026-04-08
 **Purpose:** Local fact ledger for product research, code-grounded verification, provider/runtime capability checks, and release-gate evidence.
 
 ---
@@ -17,16 +17,16 @@
 
 ## Current Verified Product Baseline
 
-These items are verified against the current repository state as of 2026-04-07.
+These items are verified against the current repository state as of 2026-04-08.
 
-- Version: `v5.7.2`
-- API/websocket endpoints: `217`
+- Version: `v6.0.0`
+- API/websocket endpoints: `323`
   - Source: route decorator count across `backend/app.py` and `backend/routes/*.py`
-- Route modules: `14`
+- Route modules: `19`
   - Source: files under `backend/routes/` excluding `__init__.py`
-- MCP tools: `29`
+- MCP tools: `32`
   - Source: `_ALL_TOOLS` in `backend/mcp_bridge.py`
-- API providers: `13`
+- API providers: `21`
   - Source: `PROVIDERS` in `backend/providers.py`
 - Supported CLI agents: `13` (8 integrated with MCP injection + 5 experimental/launcher-only)
   - Integrated: Claude, Codex, Gemini, Grok, Aider, Goose, Copilot, Ollama
@@ -36,12 +36,12 @@ These items are verified against the current repository state as of 2026-04-07.
   - Source: `BUILTIN_SKILLS` in `backend/skills.py`
 - Built-in personas: `14`
   - Source: `BUILTIN_PERSONAS` in `frontend/src/components/PersonaMarketplace.tsx`
-- React component files: `66`
+- React component files: `90`
   - Source: `frontend/src/components/**/*.tsx`
-- Latest verified release-cycle tests: `220`
-  - Backend: `171`
-  - Frontend: `49`
-  - Source: release verification notes and local test inventory
+- Latest verified release-cycle tests: `389`
+  - Backend: `277`
+  - Frontend: `112`
+  - Source: local verification run on 2026-04-08
 
 ---
 
@@ -76,11 +76,32 @@ These items are verified against the current repository state as of 2026-04-07.
 - GhostLink still has a hybrid tmux + MCP-native runtime story.
   - Source: `backend/wrapper.py`, `backend/wrapper_mcp.py`
 
+### Release-grade validation
+
+- Backend tests re-run clean: `python -m pytest tests -q` -> `277 passed`
+  - Source: local verification run on 2026-04-08
+- Backend runtime version re-verified: `python -c "import app; print(app.__version__)"` -> `6.0.0`
+  - Source: local verification run on 2026-04-08
+- Frontend tests re-run clean: `cmd /c npx vitest run` -> `15 files passed, 112 tests passed`
+  - Source: local verification run on 2026-04-08
+- Frontend typecheck re-run clean: `cmd /c npx tsc --noEmit`
+  - Source: local verification run on 2026-04-08
+- Frontend build re-run clean: `cmd /c npm run build`
+  - Source: local verification run on 2026-04-08
+- Frontend lint re-run clean: `cmd /c npm run lint`
+  - Source: local verification run on 2026-04-08
+- Desktop typecheck re-run clean: `cmd /c npx tsc --noEmit`
+  - Source: local verification run on 2026-04-08
+- Desktop build re-run clean: `cmd /c npm run build`
+  - Source: local verification run on 2026-04-08
+- Git working tree was clean before doc-truth sync began
+  - Source: local `git status --short --branch` verification on 2026-04-08
+
 ---
 
 ## Documentation Corrections Already Identified
 
-- Active docs previously overstated API provider count as `17`; source code currently ships `13`.
+- Active docs previously understated the shipped `v6.0.0` surface area and still described pre-release `v5.7.2` truth.
 - Historical bug archaeology had drifted into active docs and needed to be separated from current risks.
 - Agent identity work had to be reframed from "extra markdown files" to "runtime identity architecture."
 
@@ -108,13 +129,8 @@ These still need a deeper pass before implementation resumes.
 - Verify all 29 tool names, scope, auth behavior, and real side effects
 - Mark any tools that are implemented but not surfaced well in the UI
 
-### Release-grade validation
+### Release-grade runtime flows
 
-- Full backend tests
-- Full frontend tests
-- Frontend lint
-- Frontend build
-- Desktop TypeScript build
 - Smoke flow: wizard -> launcher -> server start -> chat open
 - Stress flow: reconnect, multi-agent approvals, export/share pagination, bridge message handling
 

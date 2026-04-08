@@ -14,13 +14,13 @@ GhostLink is a local-first multi-agent AI chat platform. It provides a shared ch
 
 ## Verified Baseline
 
-This is the current verified baseline for `v5.7.2`:
+This is the current verified baseline for `v6.0.0`:
 
-- Latest release line is `v5.7.0`, `v5.7.1`, `v5.7.2`
-- Latest verified automated test baseline: **220 test cases** total
-  - Backend: **171 cases** across 17 test files
-  - Frontend: **49 cases** across 4 test files
-- Frontend lint/build and desktop TypeScript build were re-verified during the `v5.7.2` release cycle
+- Latest release: `v6.0.0` (2026-04-08) — complete multi-agent orchestration platform, all phases 0-9 shipped
+- Latest verified automated test baseline: **389 test cases** total
+  - Backend: **277 cases** across 35 test files
+  - Frontend: **112 cases** across 15 test files
+- Frontend lint/build and desktop TypeScript build were re-verified during the `v6.0.0` release cycle
 - No tracked runtime data, local settings, API keys, or local databases are included in git
 - Release/install defaults remain neutral for new users
 
@@ -42,12 +42,12 @@ Runtime and local-only paths intentionally stay out of git:
 
 ### Core counts
 
-- **217 API/websocket endpoints** across `backend/app.py` and **14 route modules**
-- **29 MCP tools**
-- **13 API providers**
+- **323 API/websocket endpoints** across `backend/app.py` and **19 route modules**
+- **32 MCP tools**
+- **21 API providers**
 - **8 integrated CLI agents** + 5 experimental
 - **5 channel bridges**
-- **66 React component files**
+- **90 React component files**
 - **28 built-in skills**
 - **9 themes**
 
@@ -66,7 +66,7 @@ Runtime and local-only paths intentionally stay out of git:
 
 ### Current providers
 
-Anthropic, OpenAI, Google, xAI, Groq, Together, Hugging Face, Ollama, Mistral, OpenRouter, DeepSeek, Perplexity, Cohere.
+Anthropic, OpenAI, Google, xAI, Groq, Together, Hugging Face, Ollama, Mistral, OpenRouter, DeepSeek, Perplexity, Cohere, Bedrock, Moonshot, Z.AI, BytePlus, Qwen, Fireworks, StepFun, Minimax.
 
 ### Current agent CLIs
 
@@ -77,6 +77,7 @@ Anthropic, OpenAI, Google, xAI, Groq, Together, Hugging Face, Ollama, Mistral, O
 
 ## Recent Releases
 
+- **v6.0.0** — complete multi-agent orchestration platform: identity/profiles, operator control plane, durable execution, policy engine, provider independence (21 providers), evals/trace grading, multi-agent execution, memory stratification, media generation, A2A interoperability, productization. 389 tests (277 backend + 112 frontend).
 - **v5.7.2** — launcher/wizard reliability fixes, backend memory safety, export/share pagination, process reaping, reconnect throttling, streaming perf, component decomposition cleanup
 - **v5.7.1** — safe dependency refresh and version sync
 - **v5.7.0** — health/diagnostics/backup/restore, updater reliability, visual reset, test expansion
@@ -104,7 +105,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for release-by-release detail.
 
 ### Tools and runtime
 
-- 29 MCP tools spanning chat, memory, web, AI/media, agent control, and streaming
+- 32 MCP tools spanning chat, memory, web, AI/media, agent control, and streaming
 - MCP bridge exposed over streamable HTTP and SSE
 - Terminal peek, cockpit/workspace visibility, file change feed, session replay, snapshots
 
@@ -129,17 +130,13 @@ See [CHANGELOG.md](./CHANGELOG.md) for release-by-release detail.
 
 ## Active Gaps
 
-These are current, real gaps. They are tracked in [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md), not historical bug archaeology:
+These are current, real gaps after v6.0.0. Many former gaps were resolved in this release:
 
-- Plugin trust model is still incomplete: per-plugin tool allowlists and fail-closed hooks now exist, but provenance/signing, owner-managed trust controls, and durable exec approval allowlists are still missing
-- Workspace-facing agent identity is still too loose: per-agent memory exists, but shared instruction files can still be overwritten by another agent in the same workspace
-- Thinking level picker exists in backend concepts but not in the main UI
-- Context visibility controls are missing
-- Tasking is split across jobs, agent task JSON, and separate UI surfaces
-- Prompt caching and provider transport override controls are missing
-- Video/music generation is not implemented
-- Memory remains basic compared with the roadmap target
-- Accessibility, loading states, empty states, and broader UI polish still need a systematic pass
+- Plugin trust model has improved (hook signing, policy snapshots) but still lacks full provenance verification and owner-managed trust controls
+- Prompt caching diagnostics exist but advanced prompt-cache fingerprinting is not yet production-hardened
+- Mobile push notifications are not implemented
+- Multilingual UI has i18n framework but limited translation coverage
+- Matrix / Teams bridge expansion is deferred
 
 ---
 
@@ -163,7 +160,7 @@ These are current, real gaps. They are tracked in [UNIFIED_ROADMAP.md](./UNIFIED
 - [BUGS.md](./BUGS.md): active risks and known gaps
 
 ### Roadmap & Operations
-- [AGENT_PLAYBOOK.md](./AGENT_PLAYBOOK.md): 5-agent operating manual (start here for fresh agents)
+- [AGENT_PLAYBOOK.md](./AGENT_PLAYBOOK.md): agent operating manual (start here for fresh agents)
 - [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md): strategic phased execution plan
 - [roadmap-pt1.md](./roadmap-pt1.md): operational roadmap, Phases 0-3.5
 - [roadmap-pt2.md](./roadmap-pt2.md): operational roadmap, Phases 4A-10

@@ -28,7 +28,7 @@ GhostLink puts all your AI agents in one shared chat room. They talk to each oth
 - **Works with free AI** — Gemini free tier, Ollama local models, Groq, Together AI, Hugging Face
 - **Desktop app** — one installer, setup wizard, auto-updates
 - **Channel bridges** — connect to Discord, Telegram, Slack, WhatsApp, or any webhook platform
-- **MCP server** — expose 29 tools to any MCP client (Claude Code, Codex, Cursor, etc.)
+- **MCP server** — expose 32 tools to any MCP client (Claude Code, Codex, Cursor, etc.)
 - **Headless daemon** — run as a background service without a desktop (`ghostlink-server --daemon`)
 - **Always-on mode** — agents keep working in the system tray even when the GUI is closed
 - **Persona marketplace + presets** — 14 built-in personas plus custom persona support
@@ -59,9 +59,9 @@ You don't need all of them. Start with just one — even a free option like Gemi
 
 ---
 
-## API Providers (13)
+## API Providers (21)
 
-Separate from CLI agents, GhostLink can route requests to 13 API providers for chat, image generation, TTS, and more. Configure these in Settings > AI.
+Separate from CLI agents, GhostLink can route requests to 21 API providers for chat, image generation, TTS, and more. Configure these in Settings > AI.
 
 | Provider | Capabilities | Free Tier |
 |----------|-------------|-----------|
@@ -74,12 +74,20 @@ Separate from CLI agents, GhostLink can route requests to 13 API providers for c
 | Perplexity | Chat, Search | No |
 | Cohere | Chat, Embedding | No |
 | OpenRouter | Chat, Code, Vision, Image (200+ models) | No |
+| Bedrock | Chat, Code | No |
+| Moonshot | Chat | No |
+| Z.AI | Chat | No |
+| BytePlus | Chat | No |
+| Qwen | Chat, Code | No |
+| Fireworks | Chat, Code | No |
+| StepFun | Chat | No |
+| Minimax | Chat | No |
 | Groq | Chat, STT | **Yes** |
 | Together AI | Chat, Image | **Yes** |
 | Hugging Face | Chat, Image, STT | **Yes** |
 | Ollama | Chat, Code, Embedding | **Yes** (local) |
 
-Paste an API key or use a free provider — GhostLink auto-detects capabilities and routes to the best available provider. Model failover is automatic — if one provider returns an error, GhostLink switches to the next available.
+Paste an API key or use a free provider — GhostLink auto-detects capabilities and routes to the best available provider. Model failover is automatic with cost tracking and budget enforcement — if one provider returns an error, GhostLink switches to the next available.
 
 ---
 
@@ -155,13 +163,13 @@ Paste an API key or use a free provider — GhostLink auto-detects capabilities 
 - Plugin system with auto-discovery and manifest tracking
 
 ### MCP Server
-- **Standalone MCP server** — expose GhostLink's 29 tools to any MCP client
+- **Standalone MCP server** — expose GhostLink's 32 tools to any MCP client
 - Three transports: stdio (Claude Code, Codex), HTTP, SSE (Gemini CLI)
 - Add to your AI tool's config:
   ```json
   {"mcpServers": {"ghostlink": {"command": "python", "args": ["ghostlink_mcp_server.py"]}}}
   ```
-- Tools: chat_send, chat_read, memory_save, web_search, image_generate, and 24 more
+- Tools: chat_send, chat_read, memory_save, web_search, image_generate, and 27 more
 
 ### Headless / Daemon Mode
 - Run GhostLink without Electron: `ghostlink-server`
@@ -276,14 +284,14 @@ Hybrid agent runtimes (tmux + MCP-native wrappers)
 
 | | Count |
 |---|---|
-| React component files | 66 |
-| API/websocket endpoints | 217 |
-| MCP tools | 29 |
+| React component files | 90 |
+| API/websocket endpoints | 323 |
+| MCP tools | 32 |
 | Built-in skills | 28 |
-| AI providers | 13 |
+| AI providers | 21 |
 | Channel bridges | 5 |
 | Themes | 9 |
-| Slash commands | 23 |
+| Automated tests | 389 |
 
 ---
 

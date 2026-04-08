@@ -4,11 +4,10 @@
 > Strategic context lives in [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md).
 > Competitive research lives in [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md).
 
-**Scope:** Phases 4A-10
-**Team model:** 5 agents (same as Part 1)
-**Version target:** v6.x into v7.x
-**Planning horizon:** roughly 16-22 weeks of focused execution after Part 1 gates pass
-**Prerequisite:** All Part 1 exit gates must pass before Phase 4A begins. Phase 3.5's durable execution is the foundation everything here builds on.
+**Scope:** Phases 4A-9 (shipped in v6.0.0), Phase 10 (backlog)
+**Team model:** 4 agents
+**Version:** v6.0.0
+**Status:** Phases 4A-9 are complete and validated. Phase 10 is backlog.
 
 ---
 
@@ -21,19 +20,19 @@
 
 ### Execution layer
 - `tyson` (`codex`): backend and platform owner
-- `ned` (`codex`): frontend plus integration/reliability owner
+- Frontend/desktop execution: temporarily unassigned (jeff coordinates)
 
 ### Pairings
 - `jeff` + `tyson`: provider abstraction, transport, cost engine, memory architecture, worktree isolation, policy engine, evals, A2A
-- `coop` + `ned`: operator UX for cost, arena, media, accessibility, platform integrations, productization
-- `kurt` + `ned`: smoke/stress/fail testing on all new surfaces and failure modes
+- `coop` + `jeff`: operator UX for cost, arena, media, accessibility, platform integrations, productization
+- `kurt` + `tyson`: smoke/stress/fail testing on all new surfaces and failure modes
 
 ### File ownership
 - `tyson`
   - `backend/`
   - backend tests
   - backend-side provider/transport/memory/worktree/policy/eval contracts
-- `ned`
+- Frontend/desktop (unassigned — jeff coordinates)
   - `frontend/src/`
   - Electron-adjacent operator UX
   - frontend build and integration surfaces
@@ -134,7 +133,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement hook trust/signing verification.
 - Implement webhook/notification SSRF validation.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement policy configuration UI: tool approval rules editor, risk tier assignment, egress allowlist editor.
 - Implement sandbox status display: per-task sandbox tier indicator, escalation controls.
 - Implement circuit breaker status and notification surfaces.
@@ -146,7 +145,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - new `backend/policy.py` (policy engine, approval rules, risk tiers, sandbox tier enforcement)
   - `backend/mcp_bridge.py` (policy evaluation hooks at tool-call time)
   - backend tests for all of the above
-- `ned`
+- frontend (unassigned)
   - new frontend policy configuration, sandbox status, and circuit breaker surfaces
 
 ### Exit gate
@@ -254,7 +253,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement policy-risk flag storage and provider record schema.
 - Implement trace/audit event emission for failover and routing decisions.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement cost dashboard in operator control plane: per-agent cost breakdown, session cost, daily/weekly aggregates, budget usage bars.
 - Implement provider management UI: transport status, capability flags, policy-risk flags, failover log.
 - Implement model routing configuration UI: rule editor, complexity tier mapping, override controls.
@@ -269,7 +268,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - new `backend/cost.py` (cost tracking engine, budget enforcement, policy integration)
   - new `backend/routing.py` (model routing engine)
   - backend tests for all of the above
-- `ned`
+- frontend (unassigned)
   - new `frontend/src/components/CostDashboard.tsx`
   - new `frontend/src/components/ProviderManager.tsx`
   - new `frontend/src/components/RoutingConfig.tsx`
@@ -336,7 +335,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement benchmark storage: persist scores over time with metadata (provider, model, profile, commit hash).
 - Implement release gate checks: integrate with CI or pre-merge flow to block regressions.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement the benchmark dashboard UI: per-provider and per-model score charts over time, regression alerts, drill-down into individual task results.
 - Implement the release gate status display: which gates are passing, which are failing, what changed.
 
@@ -345,7 +344,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - new `backend/evals.py` (eval runner, trace grading engine, benchmark storage)
   - new `backend/routes/evals.py` (eval API endpoints, release gate status)
   - backend tests for eval runner and grading engine
-- `ned`
+- frontend (unassigned)
   - new frontend benchmark dashboard and release gate status surfaces
 - `kurt`
   - `test/golden/` corpus files (golden tasks, expected outputs, grading rubrics)
@@ -470,7 +469,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement spec storage and progress tracking backend.
 - Implement supervisor collaboration pattern with artifact lineage integration.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement worktree status panel in operator dashboard: active worktrees, branches, merge/discard controls.
 - Implement background task UI: progress bars, step descriptions, notification center, cancel button.
 - Implement hooks configuration UI: hook list, trigger point selection, command editor, failure behavior selector.
@@ -489,7 +488,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - `backend/mcp_bridge.py` (hook injection into tool calls)
   - `backend/routes/agents.py` (arena, spec, worktree endpoints)
   - backend tests for all of the above
-- `ned`
+- frontend (unassigned)
   - new `frontend/src/components/WorktreePanel.tsx`
   - new `frontend/src/components/ArenaView.tsx`
   - new `frontend/src/components/SpecEditor.tsx`
@@ -606,7 +605,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement cross-agent memory coordination: namespaced writes, shared reads, promotion, conflict detection.
 - Implement prompt cache diagnostics collection and aggregation.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement memory inspector UI: browse memory items by layer, view metadata, edit importance scores, delete items, review observational memories.
 - Implement identity drift indicator in agent status display.
 - Implement prompt cache diagnostics dashboard: hit rate charts, cost savings, per-provider breakdown, alert configuration.
@@ -620,7 +619,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - `backend/routes/agents.py` (memory and diagnostics API endpoints)
   - new `backend/memory_coordination.py` (cross-agent namespace, promotion, conflict detection)
   - backend tests for all of the above
-- `ned`
+- frontend (unassigned)
   - new `frontend/src/components/MemoryInspector.tsx`
   - new `frontend/src/components/CacheDiagnostics.tsx`
   - integration into existing agent info and operator dashboard surfaces
@@ -698,7 +697,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Expand image generation tool with new providers and editing capabilities.
 - Integrate media generation costs into the Phase 4B cost engine.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement inline video player component for chat rendering.
 - Implement inline audio player component for chat rendering.
 - Implement image editing UI: source image selection, edit prompt input, result preview.
@@ -709,7 +708,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - `backend/mcp_bridge.py` (new MCP tools, provider routing for media)
   - `backend/providers.py` (media provider registration)
   - backend tests for media generation tools
-- `ned`
+- frontend (unassigned)
   - new `frontend/src/components/VideoPlayer.tsx`
   - new `frontend/src/components/AudioPlayer.tsx`
   - `frontend/src/components/ChatMessage.tsx` or equivalent (inline media rendering)
@@ -776,7 +775,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement identity/task/artifact mapping between GhostLink and A2A models.
 - Implement auth and signature verification for agent cards and notifications.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement A2A discovery UI: browse discovered remote agents, view agent cards, invoke remote agents.
 - Implement A2A status display: which local agents are exposed over A2A, connection status, active cross-platform tasks.
 - Implement A2A task progress display: streamed progress for inbound and outbound A2A tasks.
@@ -786,7 +785,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - `backend/a2a_bridge.py` (A2A client/server, agent card generation, SSE streaming, push notifications)
   - new `backend/routes/a2a.py` (A2A API endpoints, agent card serving, well-known endpoint)
   - backend tests for A2A client, server, streaming, auth, and identity mapping
-- `ned`
+- frontend (unassigned)
   - new frontend A2A discovery, status, and task progress surfaces
 
 ### Rollback considerations
@@ -852,7 +851,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement rollout channel logic: private/beta/stable promotion with policy approval integration.
 - Implement usage telemetry collection per version: error rates, cost aggregation, eval score linkage.
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement version management UI: version list, changelog viewer, compatibility display.
 - Implement rollout channel controls: promote between channels, view channel membership, approval workflow.
 - Implement rollback UI: version history, one-click rollback, rollback confirmation.
@@ -865,7 +864,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - `backend/registry.py` (profile versioning, distribution, rollback)
   - new `backend/versioning.py` (version resolution, deprecation, rollout channel logic)
   - backend tests for versioning, rollback, distribution, and deprecation
-- `ned`
+- frontend (unassigned)
   - new frontend version management, rollout channel, rollback, and health dashboard surfaces
 
 ### Rollback considerations
@@ -915,7 +914,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 #### 9.3: AgentCockpit decomposition
 - Split the current 1187-line `AgentCockpit.tsx` into focused sub-components.
 - Target: no single component file exceeds 500 LOC.
-- Suggested decomposition (exact split decided by `ned` during implementation):
+- Suggested decomposition (exact split decided by frontend executor during implementation):
   - `AgentCockpitHeader.tsx` (agent name, status, controls)
   - `AgentCockpitChat.tsx` (message list, input)
   - `AgentCockpitTools.tsx` (tool call display, tool results)
@@ -1060,7 +1059,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - Implement EU AI Act audit logging, hash chain, approval gates, retention, and export (9.14).
 - Implement local-first data storage and cloud fallback logic (9.15).
 
-#### `ned`
+#### Frontend (unassigned)
 - Implement all accessibility fixes (9.1): aria-labels, roles, focus traps, keyboard navigation, contrast fixes.
 - Implement all loading/error/empty states (9.2).
 - Decompose AgentCockpit (9.3).
@@ -1090,7 +1089,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
   - `backend/audit.py` (EU AI Act compliance extensions)
   - `backend/providers.py` (local-first fallback logic)
   - backend tests for all of the above
-- `ned`
+- frontend (unassigned)
   - `frontend/src/components/AgentCockpit.tsx` (decomposition)
   - new `frontend/src/components/AgentCockpitHeader.tsx`
   - new `frontend/src/components/AgentCockpitChat.tsx`
@@ -1108,7 +1107,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 
 ### Rollback considerations
 - Accessibility changes are additive (adding attributes) and have near-zero risk.
-- AgentCockpit decomposition is a refactor. If it introduces regressions, `ned` can revert to the monolithic component. All changes must pass existing tests before merge.
+- AgentCockpit decomposition is a refactor. If it introduces regressions, the frontend executor can revert to the monolithic component. All changes must pass existing tests before merge.
 - Light theme changes should not affect dark theme. Use CSS variables so both themes are defined independently.
 - Plan mode is opt-in and additive. Disabling it has no effect on normal execution.
 - Visual element targeting (9.7) is the highest-risk item. `jeff` should evaluate feasibility before committing to implementation.
@@ -1219,7 +1218,7 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 - `coop`: quarterly review of each item against user demand and competitive pressure. Recommend promotion to a numbered phase or removal from backlog.
 - `jeff`: when `coop` promotes an item, write the full spec before implementation begins.
 - `kurt`: when `jeff` writes a spec, write the test plan.
-- `tyson` and `ned`: implement only after spec and test plan exist.
+- `tyson` and frontend executor: implement only after spec and test plan exist.
 
 ### No exit gate
 - Phase 10 items have no collective exit gate. Each item that gets promoted to implementation gets its own exit gate as part of its spec.
