@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from jobs import JobStore
     from memory_graph import MemoryGraph
     from plugin_sdk import HookManager, Marketplace
+    from policy import PolicyEngine
     from providers import ProviderRegistry
     from rag import RAGPipeline
     from registry import AgentRegistry
@@ -53,6 +54,7 @@ schedule_store: ScheduleStore | None = None
 task_store: TaskStore | None = None
 audit_store: AuditStore | None = None
 checkpoint_store: CheckpointStore | None = None
+policy_engine: PolicyEngine | None = None
 session_manager: SessionManager | None = None
 branch_manager: BranchManager | None = None
 skills_registry: SkillsRegistry | None = None
@@ -344,6 +346,7 @@ def _is_private_url(url: str) -> bool:
 
 def _deliver_webhooks(event_type: str, data: dict):
     """Fire-and-forget POST to all matching active webhooks. Runs in background thread."""
+    from policy import PolicyContext
     import urllib.request
     payload = json.dumps({"event": event_type, "data": data, "timestamp": time.time()}).encode()
     for wh in list(_webhooks):
@@ -358,6 +361,22 @@ def _deliver_webhooks(event_type: str, data: dict):
         if _is_private_url(url):
             log.warning("Blocked webhook to private URL: %s", url)
             continue
+        if policy_engine is not None:
+            try:
+                context = PolicyContext(
+                    workspace_id=str(BASE_DIR or "*"),
+                    domain="",
+                    protocol="*",
+                    port=0,
+                    metadata={"webhook_id": wh.get("id", ""), "event_type": event_type},
+                )
+                verdict = asyncio.run(policy_engine.check_egress(url, context))
+                if not verdict.get("allowed"):
+                    log.warning("Blocked webhook by egress policy %s: %s", wh.get("id", ""), verdict.get("reason", "denied"))
+                    continue
+            except Exception as e:
+                log.warning("Webhook policy evaluation failed for %s: %s", wh.get("id", ""), e)
+                continue
         try:
             req = urllib.request.Request(
                 url, data=payload, method="POST",

@@ -49,6 +49,7 @@ from bridges import BridgeManager
 from checkpoints import CheckpointStore
 from jobs import JobStore
 from plugin_sdk import HookManager, Marketplace, SafetyScanner, event_bus
+from policy import PolicyEngine
 from providers import ProviderRegistry
 from profiles import init_profiles_db
 from registry import AgentRegistry, init_registry_db, load_persisted_agents
@@ -368,7 +369,8 @@ async def lifespan(_app: FastAPI):
     bridge_manager = BridgeManager(DATA_DIR, store=store, registry=registry, server_port=PORT)
     marketplace = Marketplace(DATA_DIR)
     hook_manager = HookManager(DATA_DIR, server_port=PORT)
-    hook_manager.register_all()
+    policy_engine = PolicyEngine(db, DATA_DIR)
+    await policy_engine.init()
     exec_policy = ExecPolicy(DATA_DIR)
     audit_log = AuditLog(DATA_DIR)
     audit_store = AuditStore(db)
@@ -387,6 +389,7 @@ async def lifespan(_app: FastAPI):
     deps.job_store = job_store
     deps.task_store = task_store
     deps.checkpoint_store = checkpoint_store
+    deps.policy_engine = policy_engine
     deps.rule_store = rule_store
     deps.schedule_store = schedule_store
     deps.skills_registry = skills_registry
@@ -403,6 +406,7 @@ async def lifespan(_app: FastAPI):
     deps.data_manager = data_manager
     deps.worktree_manager = worktree_manager
     deps.automation_manager = automation_manager
+    await hook_manager.register_all_async()
 
     # v4.4.0: Remote runner + A2A bridge + user auth
     RemoteRunner = _require_startup_attr("remote_runner", "RemoteRunner")

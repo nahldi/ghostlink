@@ -10,6 +10,7 @@ Provides:
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import json
 import logging
@@ -599,9 +600,52 @@ class HookManager:
             if hook.get("enabled"):
                 self._register_hook(hook)
 
+    async def register_all_async(self):
+        """Register enabled hooks, enforcing trust for block hooks."""
+        try:
+            import deps
+        except Exception:
+            self.register_all()
+            return
+        for hook in self._hooks:
+            if not hook.get("enabled"):
+                continue
+            if hook.get("action") == "block" and deps.policy_engine is not None:
+                if not await deps.policy_engine.is_hook_trusted(hook):
+                    log.warning("Skipping untrusted block hook: %s", hook.get("name", ""))
+                    continue
+            trusted_hook = dict(hook)
+            trusted_hook["_trusted_block"] = True
+            self._register_hook(trusted_hook)
+
+    def _is_trusted_block_hook(self, hook: dict) -> bool:
+        if hook.get("action") != "block":
+            return True
+        try:
+            import deps
+
+            if deps.policy_engine is None:
+                return False
+            try:
+                loop = asyncio.get_running_loop()
+                if loop and loop.is_running():
+                    if deps._main_loop is loop:
+                        return False
+                    future = asyncio.run_coroutine_threadsafe(deps.policy_engine.is_hook_trusted(hook), deps._main_loop or loop)
+                    return bool(future.result(timeout=5))
+            except RuntimeError:
+                pass
+            return bool(asyncio.run(deps.policy_engine.is_hook_trusted(hook)))
+        except Exception as e:
+            log.warning("Hook trust verification failed for %s: %s", hook.get("name", ""), e)
+            return False
+
     def _register_hook(self, hook: dict):
         """Register a single hook with the event bus."""
         if not hook.get("enabled"):
+            return
+        if hook.get("action") == "block" and not hook.get("_trusted_block") and not self._is_trusted_block_hook(hook):
+            log.warning("Skipping untrusted block hook: %s", hook.get("name", ""))
             return
 
         action = hook.get("action", "")

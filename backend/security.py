@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 import zipfile
 from io import BytesIO
@@ -190,6 +191,20 @@ class SecretsManager:
     def has(self, key: str) -> bool:
         return key in self._secrets
 
+    def redact(self, value):
+        if isinstance(value, dict):
+            return {k: self.redact(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self.redact(v) for v in value]
+        if not isinstance(value, str):
+            return value
+        redacted = value
+        for secret in self._secrets.values():
+            if secret:
+                redacted = redacted.replace(secret, "***REDACTED***")
+        redacted = re.sub(r"(api[_-]?key|token|secret|password)([\"'\s:=]+)([^\"'\s,}]+)", r"\1\2***REDACTED***", redacted, flags=re.IGNORECASE)
+        return redacted
+
     def clear_all(self):
         self._secrets = {}
         self._save()
@@ -256,6 +271,38 @@ class ExecPolicy:
         self._save()
         return existing
 
+    async def check_command_async(self, agent_name: str, command: str, *, task_id: str = "", profile_id: str = "", sandbox_tier: str = "none", sandbox_root: str = "", policy_snapshot: dict | None = None) -> dict:
+        import deps
+
+        cmd_lower = command.replace("\x00", "")
+        cmd_lower = cmd_lower.replace("\\ ", " ").replace("\\t", "\t").strip()
+        cmd_lower = re.sub(r'\\x[0-9a-fA-F]{2}', lambda m: chr(int(m.group()[2:], 16)), cmd_lower)
+        if (cmd_lower.startswith('"') and cmd_lower.endswith('"')) or (cmd_lower.startswith("'") and cmd_lower.endswith("'")):
+            cmd_lower = cmd_lower[1:-1]
+
+        engine = deps.policy_engine
+        if engine is None:
+            return self.check_command(agent_name, command)
+
+        context = __import__("policy").PolicyContext(
+            agent_name=agent_name,
+            profile_id=profile_id,
+            task_id=task_id,
+            command=cmd_lower,
+            sandbox_tier=sandbox_tier,
+            sandbox_root=sandbox_root,
+        )
+        decision = await engine.evaluate_command(cmd_lower, context, snapshot=policy_snapshot)
+        behavior = decision.get("decision", "ask")
+        return {
+            "allowed": behavior not in {"deny", "escalate"},
+            "reason": decision.get("reason", ""),
+            "requires_approval": behavior in {"ask", "escalate"},
+            "decision": behavior,
+            "tier": decision.get("tier", "shell_exec"),
+            "rule_id": decision.get("rule_id"),
+        }
+
     def check_command(self, agent_name: str, command: str) -> dict:
         """Check if a command is allowed for an agent."""
         # Normalize: strip null bytes, unicode escapes, shell escaping
@@ -312,11 +359,12 @@ class AuditLog:
     _MAX_LOG_SIZE = 50_000_000  # 50MB rotation threshold
 
     def log(self, event_type: str, details: dict, actor: str = "system"):
+        import deps
         entry = {
             "timestamp": time.time(),
             "type": event_type,
             "actor": actor,
-            "details": details,
+            "details": deps.secrets_manager.redact(details) if deps.secrets_manager is not None else details,
         }
         with self._write_lock:
             try:
@@ -411,31 +459,37 @@ class DataManager:
 
     async def export_all_data(self) -> bytes:
         """Export all user data as a ZIP file (GDPR data portability)."""
+        import deps
+
         buf = BytesIO()
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             if self._store and self._store._db:
                 cursor = await self._store._db.execute("SELECT * FROM messages ORDER BY id")
                 rows = await cursor.fetchall()
-                messages = [self._store._row_to_dict(r) for r in rows]
+                messages = [deps.secrets_manager.redact(self._store._row_to_dict(r)) if deps.secrets_manager is not None else self._store._row_to_dict(r) for r in rows]
                 zf.writestr("messages.json", json.dumps(messages, indent=2, default=str))
 
             settings_path = self._data_dir / "settings.json"
             if settings_path.exists():
-                zf.writestr("settings.json", settings_path.read_text())
+                settings_text = settings_path.read_text()
+                zf.writestr("settings.json", deps.secrets_manager.redact(settings_text) if deps.secrets_manager is not None else settings_text)
 
             for agent_dir in sorted(self._data_dir.iterdir()):
                 if agent_dir.is_dir() and (agent_dir / "memory").is_dir():
                     for mem_file in sorted((agent_dir / "memory").glob("*.json")):
-                        zf.writestr(f"agents/{agent_dir.name}/memory/{mem_file.name}", mem_file.read_text())
+                        mem_text = mem_file.read_text()
+                        zf.writestr(f"agents/{agent_dir.name}/memory/{mem_file.name}", deps.secrets_manager.redact(mem_text) if deps.secrets_manager is not None else mem_text)
                     for txt in ("soul.txt", "notes.txt"):
                         p = agent_dir / txt
                         if p.exists():
-                            zf.writestr(f"agents/{agent_dir.name}/{txt}", p.read_text())
+                            text = p.read_text()
+                            zf.writestr(f"agents/{agent_dir.name}/{txt}", deps.secrets_manager.redact(text) if deps.secrets_manager is not None else text)
 
             for f in ("sessions.json", "hooks.json"):
                 p = self._data_dir / f
                 if p.exists():
-                    zf.writestr(f, p.read_text())
+                    text = p.read_text()
+                    zf.writestr(f, deps.secrets_manager.redact(text) if deps.secrets_manager is not None else text)
 
             # Redact API keys from provider config
             prov_path = self._data_dir / "providers.json"
@@ -445,6 +499,8 @@ class DataManager:
                     for k in list(prov_data.keys()):
                         if k.endswith("_api_key"):
                             prov_data[k] = "***REDACTED***"
+                    if deps.secrets_manager is not None:
+                        prov_data = deps.secrets_manager.redact(prov_data)
                     zf.writestr("providers.json", json.dumps(prov_data, indent=2))
                 except Exception:
                     pass
@@ -457,6 +513,8 @@ class DataManager:
                     for cfg in bridges_data.values():
                         if isinstance(cfg, dict) and "token" in cfg:
                             cfg["token"] = "***REDACTED***"
+                    if deps.secrets_manager is not None:
+                        bridges_data = deps.secrets_manager.redact(bridges_data)
                     zf.writestr("bridges.json", json.dumps(bridges_data, indent=2))
                 except Exception:
                     pass

@@ -148,6 +148,21 @@ async def create_task(request: Request):
         return JSONResponse({"error": "title required"}, 400)
     agent_name = str(body.get("agent_name", body.get("agent", "")) or "").strip()
     inst = _resolve_agent(agent_name) if agent_name else None
+    metadata = dict(body.get("metadata", {}) or {})
+    if deps.policy_engine is not None:
+        from policy import PolicyContext
+
+        snapshot_context = PolicyContext(
+            agent_name=getattr(inst, "name", None) if inst else agent_name,
+            agent_id=getattr(inst, "agent_id", "") if inst else "",
+            profile_id=getattr(inst, "profile_id", "") if inst else "",
+            task_id="",
+            workspace_id=str(getattr(inst, "workspace", "") or deps.BASE_DIR),
+            session_mode=str(metadata.get("session_mode", "") or ""),
+            sandbox_tier=str(metadata.get("sandbox_tier", "none") or "none"),
+            sandbox_root=str(metadata.get("sandbox_root", "") or ""),
+        )
+        metadata["policy_snapshot"] = await deps.policy_engine.snapshot_for_task(snapshot_context)
     task = await deps.task_store.create(
         title=title[:200],
         description=str(body.get("description", "") or "")[:4000],
@@ -161,7 +176,7 @@ async def create_task(request: Request):
         trace_id=str(body.get("trace_id", "") or "") or None,
         priority=int(body.get("priority", 0) or 0),
         created_by=str(body.get("created_by", "") or ""),
-        metadata=body.get("metadata", {}),
+        metadata=metadata,
     )
     await _create_checkpoint(task, "task_start", metadata={"automatic": True})
     await deps.broadcast("task_update", task)
@@ -395,6 +410,7 @@ async def fork_task(task_id: str, request: Request):
             "plan_state": source_snapshot.get("plan_state", {}),
             "artifact_log": source_snapshot.get("artifact_log", []),
             "tool_journal": [],
+            "policy_snapshot": dict(task.get("metadata", {})).get("policy_snapshot", {}),
         },
     )
     await deps.checkpoint_store.create(

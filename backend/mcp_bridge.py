@@ -1821,6 +1821,9 @@ def _wrap_tool_with_hooks(func):
         # Extract agent identity from first arg (most tools have sender as first param)
         agent = args[0] if args else kwargs.get("sender", kwargs.get("name", "unknown"))
         ctx = kwargs.get("ctx")
+        task_id = str(kwargs.get("task_id", "") or "")
+        task = None
+        policy_snapshot = None
 
         # Fire pre_tool_use hook — fail closed (hook error blocks the tool call)
         try:
@@ -1836,6 +1839,51 @@ def _wrap_tool_with_hooks(func):
         if mode_error:
             return mode_error
 
+        try:
+            import deps as _deps
+            if task_id and _deps.task_store:
+                task = _run_async(_deps.task_store.get(task_id))
+                if task:
+                    policy_snapshot = dict(task.get("metadata", {})).get("policy_snapshot")
+            if _deps.policy_engine is not None:
+                from policy import PolicyContext
+
+                inst = _deps.registry.resolve(str(agent)) if _deps.registry and agent else None
+                policy_context = PolicyContext(
+                    agent_name=str(agent),
+                    agent_id=(task or {}).get("agent_id", "") or getattr(inst, "agent_id", ""),
+                    profile_id=(task or {}).get("profile_id", "") or getattr(inst, "profile_id", ""),
+                    task_id=task_id,
+                    tool_name=tool_name,
+                    provider=str(getattr(inst, "provider", "") or ""),
+                    workspace_id=str(getattr(inst, "workspace", "") or _deps.BASE_DIR),
+                    session_mode=str(dict((task or {}).get("metadata", {})).get("session_mode", "") or ""),
+                    sandbox_tier=str(dict((task or {}).get("metadata", {})).get("sandbox_tier", "none") or "none"),
+                    sandbox_root=str(dict((task or {}).get("metadata", {})).get("sandbox_root", "") or ""),
+                    metadata={"channel": channel},
+                )
+                breaker = _run_async(_deps.policy_engine.active_circuit_breaker(policy_context))
+                if breaker:
+                    return f"Blocked by circuit breaker: {breaker.get('reason', 'policy halt')}"
+                verdict = _run_async(_deps.policy_engine.evaluate_tool_call(tool_name, policy_context, snapshot=policy_snapshot))
+                decision = verdict.get("decision", "ask")
+                if decision in {"deny", "ask", "escalate"}:
+                    if task_id and _deps.audit_store is not None:
+                        _run_async(_deps.audit_store.record(
+                            "policy.decision",
+                            actor=str(agent),
+                            action=f"{decision} {tool_name}",
+                            actor_type="agent",
+                            agent_name=str(agent),
+                            task_id=task_id,
+                            channel=channel,
+                            detail={"tool": tool_name, "decision": decision, "reason": verdict.get("reason", ""), "rule_id": verdict.get("rule_id")},
+                        ))
+                    return f"Blocked by policy engine: {decision} ({verdict.get('reason', 'no matching rule')})"
+        except Exception as e:
+            log.warning("Policy engine enforcement failed for %s/%s: %s", agent, tool_name, e)
+            return f"Error: policy evaluation failed for '{tool_name}': {e}"
+
         cancel_agent = _resolve_cancellation_agent(kwargs, ctx)
         cancellation_message = _pending_cancellation_message(cancel_agent)
         if cancellation_message:
@@ -1849,6 +1897,21 @@ def _wrap_tool_with_hooks(func):
             result = func(*args, **kwargs)
         except Exception as e:
             log.error("MCP tool %s failed for agent %s: %s", tool_name, agent, e)
+            try:
+                import deps as _deps
+                if _deps.policy_engine is not None:
+                    failure_task = task or (_run_async(_deps.task_store.get(task_id)) if task_id and _deps.task_store else None)
+                    failure_context = __import__("policy").PolicyContext(
+                        agent_name=str(agent),
+                        agent_id=(failure_task or {}).get("agent_id", "") or "",
+                        profile_id=(failure_task or {}).get("profile_id", "") or "",
+                        task_id=task_id,
+                        tool_name=tool_name,
+                        workspace_id=str(_deps.BASE_DIR),
+                    )
+                    _run_async(_deps.policy_engine.record_circuit_event(failure_context, "tool_failure", event_key=tool_name, metadata={"error": str(e)[:200]}))
+            except Exception:
+                pass
             return f"Error: tool '{tool_name}' failed: {e}"
 
         # Fire post_tool_use hook + audit trail
@@ -1881,10 +1944,9 @@ def _wrap_tool_with_hooks(func):
                     channel=channel,
                     detail={"tool": tool_name, "args_keys": list(kwargs.keys()) if kwargs else []},
                 ))
-            task_id = str(kwargs.get("task_id", "") or "")
             if task_id and _deps.task_store:
                 import hashlib
-                task = _run_async(_deps.task_store.get(task_id))
+                task = task or _run_async(_deps.task_store.get(task_id))
                 if task:
                     metadata = dict(task.get("metadata", {}))
                     journal = list(metadata.get("tool_journal", []))
@@ -1900,6 +1962,16 @@ def _wrap_tool_with_hooks(func):
                     )
                     metadata["tool_journal"] = journal[-50:]
                     _run_async(_deps.task_store.update(task_id, metadata=metadata))
+                    if _deps.policy_engine is not None:
+                        policy_context = __import__("policy").PolicyContext(
+                            agent_name=str(agent),
+                            agent_id=task.get("agent_id", "") or "",
+                            profile_id=task.get("profile_id", "") or "",
+                            task_id=task_id,
+                            tool_name=tool_name,
+                            workspace_id=str(_deps.BASE_DIR),
+                        )
+                        _run_async(_deps.policy_engine.record_circuit_event(policy_context, "tool_success", event_key=tool_name))
         except Exception as e:
             log.debug("Audit log failed for %s: %s", tool_name, e)
 

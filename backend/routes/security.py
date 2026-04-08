@@ -56,6 +56,103 @@ async def set_exec_policy(agent_name: str, request: Request):
     return {"ok": True, "policy": policy}
 
 
+@router.get("/api/security/policy-rules")
+async def list_policy_rules():
+    if deps.policy_engine is None:
+        return {"rules": []}
+    return {"rules": await deps.policy_engine.list_rules()}
+
+
+@router.post("/api/security/policy-rules")
+async def create_policy_rule(request: Request):
+    if deps.policy_engine is None:
+        return JSONResponse({"error": "policy engine unavailable"}, 503)
+    body = await request.json()
+    await deps.policy_engine.upsert_rule(
+        scope_type=str(body.get("scope_type", "environment") or "environment"),
+        scope_id=str(body.get("scope_id", "*") or "*"),
+        action=str(body.get("action", "*") or "*"),
+        tier=str(body.get("tier", "high_risk_write") or "high_risk_write"),
+        behavior=str(body.get("behavior", "ask") or "ask"),
+        priority=int(body.get("priority", 0) or 0),
+        conditions=body.get("conditions", {}) if isinstance(body.get("conditions", {}), dict) else {},
+        created_by=str(body.get("created_by", "user") or "user"),
+        enabled=bool(body.get("enabled", True)),
+    )
+    deps.audit_log.log("policy_rule_upsert", {"scope_type": body.get("scope_type", ""), "scope_id": body.get("scope_id", "*"), "action": body.get("action", "*")}, actor="user")
+    return {"ok": True, "rules": await deps.policy_engine.list_rules()}
+
+
+@router.get("/api/security/egress-rules")
+async def list_egress_rules():
+    if deps.policy_engine is None:
+        return {"rules": []}
+    return {"rules": await deps.policy_engine.list_egress_rules()}
+
+
+@router.post("/api/security/egress-rules")
+async def create_egress_rule(request: Request):
+    if deps.policy_engine is None:
+        return JSONResponse({"error": "policy engine unavailable"}, 503)
+    body = await request.json()
+    await deps.policy_engine.add_egress_rule(
+        scope_type=str(body.get("scope_type", "environment") or "environment"),
+        scope_id=str(body.get("scope_id", "*") or "*"),
+        rule_type=str(body.get("rule_type", "allow") or "allow"),
+        domain=str(body.get("domain", "") or "").strip().lower(),
+        protocol=str(body.get("protocol", "*") or "*"),
+        port=int(body.get("port", 0) or 0),
+        priority=int(body.get("priority", 0) or 0),
+    )
+    deps.audit_log.log("egress_rule_upsert", {"scope_type": body.get("scope_type", ""), "scope_id": body.get("scope_id", "*"), "domain": body.get("domain", "")}, actor="user")
+    return {"ok": True, "rules": await deps.policy_engine.list_egress_rules()}
+
+
+@router.get("/api/security/secret-scopes")
+async def list_secret_scopes():
+    if deps.policy_engine is None:
+        return {"scopes": []}
+    return {"scopes": await deps.policy_engine.list_secret_scopes()}
+
+
+@router.post("/api/security/secret-scopes")
+async def bind_secret_scope(request: Request):
+    if deps.policy_engine is None:
+        return JSONResponse({"error": "policy engine unavailable"}, 503)
+    body = await request.json()
+    key = str(body.get("secret_key", "") or "").strip()
+    if not key:
+        return JSONResponse({"error": "secret_key required"}, 400)
+    await deps.policy_engine.bind_secret_scope(
+        key,
+        str(body.get("scope_type", "environment") or "environment"),
+        str(body.get("scope_id", "*") or "*"),
+    )
+    deps.audit_log.log("secret_scope_bind", {"secret_key": key, "scope_type": body.get("scope_type", ""), "scope_id": body.get("scope_id", "*")}, actor="user")
+    return {"ok": True, "scopes": await deps.policy_engine.list_secret_scopes()}
+
+
+@router.post("/api/security/trusted-hooks")
+async def trust_hook_signature(request: Request):
+    if deps.policy_engine is None:
+        return JSONResponse({"error": "policy engine unavailable"}, 503)
+    body = await request.json()
+    hook_name = str(body.get("hook_name", "") or "").strip()
+    signature = str(body.get("signature", "") or "").strip()
+    if not hook_name or not signature:
+        return JSONResponse({"error": "hook_name and signature required"}, 400)
+    await deps.policy_engine.trust_hook_signature(hook_name, signature)
+    deps.audit_log.log("trusted_hook_signature", {"hook_name": hook_name}, actor="user")
+    return {"ok": True}
+
+
+@router.get("/api/security/circuit-events")
+async def list_circuit_events(limit: int = 100):
+    if deps.policy_engine is None:
+        return {"events": []}
+    return {"events": await deps.policy_engine.list_circuit_events(limit)}
+
+
 @router.post("/api/security/check-command")
 async def check_command(request: Request):
     """Check if a command would be allowed for an agent."""
@@ -64,7 +161,15 @@ async def check_command(request: Request):
     command = body.get("command", "")
     if not command:
         return JSONResponse({"error": "command required"}, 400)
-    result = deps.exec_policy.check_command(agent, command)
+    result = await deps.exec_policy.check_command_async(
+        agent,
+        command,
+        task_id=str(body.get("task_id", "") or ""),
+        profile_id=str(body.get("profile_id", "") or ""),
+        sandbox_tier=str(body.get("sandbox_tier", "none") or "none"),
+        sandbox_root=str(body.get("sandbox_root", "") or ""),
+        policy_snapshot=body.get("policy_snapshot"),
+    )
     return result
 
 
