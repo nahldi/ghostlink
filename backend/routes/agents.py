@@ -19,6 +19,25 @@ from fastapi.responses import FileResponse, JSONResponse
 
 import deps
 from identity_inject import get_effective_state, mark_identity_drift, write_effective_state
+from profiles import (
+    DEFAULT_PROFILE_ID,
+    add_profile_rule,
+    compute_effective_state,
+    create_profile,
+    delete_profile,
+    delete_profile_rule,
+    get_profile,
+    get_profile_settings,
+    get_workspace_policy,
+    ignore_agents_md,
+    import_agents_md,
+    list_profiles,
+    scan_agents_md,
+    set_profile_settings,
+    set_profile_skills,
+    toggle_profile_skill,
+    update_profile,
+)
 from plugin_sdk import event_bus
 from registry import persist_agent
 
@@ -95,6 +114,56 @@ def _effective_identity_payload(identifier: str) -> dict:
         state["workspace_id"] = getattr(inst, "workspace", state.get("workspace_id", ""))
         state["runner"] = getattr(inst, "runner", "")
         state["state"] = getattr(inst, "state", "")
+    return state
+
+
+async def _effective_state_payload(identifier: str) -> dict:
+    inst, agent_key = _resolved_agent_key(identifier)
+    if inst is None:
+        state = get_effective_state(deps.DATA_DIR, agent_key)
+        state["effective_state"] = {}
+        return state
+    workspace_id = getattr(inst, "workspace", "") or str(deps.BASE_DIR)
+    workspace_policy = await get_workspace_policy(deps.runtime_db, workspace_id) if deps.runtime_db is not None else {"settings": {}, "rules": []}
+    profile_settings = await get_profile_settings(deps.runtime_db, getattr(inst, "profile_id", DEFAULT_PROFILE_ID)) if deps.runtime_db is not None else {}
+    profile_skills = []
+    if deps.skills_registry is not None:
+        profile_skills = await deps.skills_registry.get_effective_skills(inst.agent_id, getattr(inst, "profile_id", DEFAULT_PROFILE_ID))
+    additions: list[str] = []
+    removals: list[str] = []
+    if deps.runtime_db is not None:
+        cursor = await deps.runtime_db.execute(
+            "SELECT skill_id, action FROM agent_skill_overrides WHERE agent_id = ?",
+            (inst.agent_id,),
+        )
+        try:
+            rows = await cursor.fetchall()
+        finally:
+            await cursor.close()
+        additions = [row["skill_id"] for row in rows if row["action"] == "add"]
+        removals = [row["skill_id"] for row in rows if row["action"] == "remove"]
+    agent_row = {
+        "agent_id": inst.agent_id,
+        "profile_id": getattr(inst, "profile_id", DEFAULT_PROFILE_ID),
+        "model": getattr(inst, "model", ""),
+        "thinkingLevel": getattr(inst, "thinkingLevel", ""),
+        "responseMode": getattr(inst, "responseMode", ""),
+        "failoverModel": getattr(inst, "failoverModel", ""),
+        "autoApprove": getattr(inst, "autoApprove", False),
+        "rules": [],
+    }
+    effective = await compute_effective_state(
+        deps.runtime_db,
+        agent_row=agent_row,
+        workspace_id=workspace_id,
+        profile_settings=profile_settings,
+        profile_skills=profile_skills,
+        workspace_policy=workspace_policy,
+        agent_skill_additions=additions,
+        agent_skill_removals=removals,
+    ) if deps.runtime_db is not None else {}
+    state = _effective_identity_payload(identifier)
+    state["effective_state"] = effective
     return state
 
 
@@ -538,6 +607,7 @@ async def register_agent(request: Request):
     label = body.get("label", "")
     color = body.get("color", "")
     role = body.get("role", "")
+    profile_id = body.get("profile_id", body.get("profileId", DEFAULT_PROFILE_ID)) or DEFAULT_PROFILE_ID
     wrapper_pid = body.get("pid")
     if not base:
         return JSONResponse({"error": "base required"}, 400)
@@ -549,6 +619,7 @@ async def register_agent(request: Request):
             return JSONResponse({"error": str(e)}, 429)
         if role:
             inst.role = role
+        inst.profile_id = profile_id
         if runner in ("mcp", "tmux"):
             inst.runner = runner
         if wrapper_pid is not None:
@@ -1284,7 +1355,7 @@ async def list_skills(category: str = "", search: str = ""):
 @router.get("/api/skills/agent/{agent_name}")
 async def get_agent_skills(agent_name: str):
     """Get enabled skills for a specific agent."""
-    enabled = deps.skills_registry.get_agent_skills(agent_name)
+    enabled = await deps.skills_registry.get_agent_skills(agent_name)
     all_skills = deps.skills_registry.get_all_skills()
     result = []
     for s in all_skills:
@@ -1298,10 +1369,13 @@ async def toggle_agent_skill(agent_name: str, request: Request):
     body = await request.json()
     skill_id = body.get("skillId", "")
     enabled = body.get("enabled", True)
+    inst = _resolve_agent(agent_name)
+    if inst is None:
+        return JSONResponse({"error": "not found"}, 404)
     if enabled:
-        deps.skills_registry.enable_skill(agent_name, skill_id)
+        await deps.skills_registry.enable_skill(inst.agent_id, skill_id)
     else:
-        deps.skills_registry.disable_skill(agent_name, skill_id)
+        await deps.skills_registry.disable_skill(inst.agent_id, skill_id)
     return {"ok": True, "agent": agent_name, "skillId": skill_id, "enabled": enabled}
 
 
@@ -1322,7 +1396,7 @@ async def api_get_soul(name: str):
 async def api_get_effective_state(name: str):
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
-    return _effective_identity_payload(name)
+    return await _effective_state_payload(name)
 
 
 @router.post("/api/agents/{name}/identity-drift")
@@ -1337,6 +1411,140 @@ async def api_identity_drift(name: str, request: Request):
         setattr(inst, "drift_detected", True)
     await deps.broadcast("identity_drift", {"agent": name, "agent_id": state.get("agent_id", agent_key), "reason": reason})
     return {"ok": True, "reason": reason}
+
+
+@router.get("/api/profiles")
+async def api_list_profiles():
+    return {"profiles": await list_profiles(deps.runtime_db)}
+
+
+@router.post("/api/profiles")
+async def api_create_profile(request: Request):
+    body = await request.json()
+    profile = await create_profile(
+        deps.runtime_db,
+        body.get("name", "").strip(),
+        body.get("description", "").strip(),
+        body.get("base_provider", body.get("baseProvider", "")).strip(),
+    )
+    return profile
+
+
+@router.get("/api/profiles/{profile_id}")
+async def api_get_profile(profile_id: str):
+    try:
+        return await get_profile(deps.runtime_db, profile_id)
+    except KeyError:
+        return JSONResponse({"error": "not found"}, 404)
+
+
+@router.put("/api/profiles/{profile_id}")
+async def api_update_profile(profile_id: str, request: Request):
+    body = await request.json()
+    try:
+        return await update_profile(deps.runtime_db, profile_id, body)
+    except KeyError:
+        return JSONResponse({"error": "not found"}, 404)
+
+
+@router.delete("/api/profiles/{profile_id}")
+async def api_delete_profile(profile_id: str):
+    try:
+        await delete_profile(deps.runtime_db, profile_id)
+        return {"ok": True}
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+
+
+@router.get("/api/profiles/{profile_id}/settings")
+async def api_profile_settings(profile_id: str):
+    return {"profile_id": profile_id, "settings": await get_profile_settings(deps.runtime_db, profile_id)}
+
+
+@router.put("/api/profiles/{profile_id}/settings")
+async def api_set_profile_settings(profile_id: str, request: Request):
+    body = await request.json()
+    return {"profile_id": profile_id, "settings": await set_profile_settings(deps.runtime_db, profile_id, body)}
+
+
+@router.get("/api/profiles/{profile_id}/skills")
+async def api_get_profile_skills(profile_id: str):
+    profile = await get_profile(deps.runtime_db, profile_id)
+    return {"profile_id": profile_id, "skills": profile["skills"]}
+
+
+@router.put("/api/profiles/{profile_id}/skills")
+async def api_set_profile_skills(profile_id: str, request: Request):
+    body = await request.json()
+    skills = await set_profile_skills(
+        deps.runtime_db,
+        profile_id,
+        body.get("skill_ids", body.get("skillIds", [])),
+        deps.skills_registry.get_all_skills(),
+    )
+    return {"profile_id": profile_id, "skills": skills}
+
+
+@router.post("/api/profiles/{profile_id}/skills/{skill_id}/toggle")
+async def api_toggle_profile_skill(profile_id: str, skill_id: str, request: Request):
+    body = await request.json()
+    await toggle_profile_skill(deps.runtime_db, profile_id, skill_id, bool(body.get("enabled", True)))
+    profile = await get_profile(deps.runtime_db, profile_id)
+    return {"profile_id": profile_id, "skills": profile["skills"]}
+
+
+@router.get("/api/profiles/{profile_id}/rules")
+async def api_get_profile_rules(profile_id: str):
+    profile = await get_profile(deps.runtime_db, profile_id)
+    return {"profile_id": profile_id, "rules": profile["rules"]}
+
+
+@router.post("/api/profiles/{profile_id}/rules")
+async def api_add_profile_rule(profile_id: str, request: Request):
+    body = await request.json()
+    rule = await add_profile_rule(
+        deps.runtime_db,
+        profile_id,
+        body.get("content", "").strip(),
+        body.get("rule_type", body.get("ruleType", "custom")).strip() or "custom",
+        int(body.get("priority", 0)),
+    )
+    return rule
+
+
+@router.delete("/api/profiles/{profile_id}/rules/{rule_id}")
+async def api_delete_profile_rule(profile_id: str, rule_id: int):
+    await delete_profile_rule(deps.runtime_db, profile_id, rule_id)
+    return {"ok": True}
+
+
+@router.get("/api/workspace-policy")
+async def api_get_workspace_policy(workspace_id: str = ""):
+    target = workspace_id or str(deps.BASE_DIR)
+    return await get_workspace_policy(deps.runtime_db, target)
+
+
+@router.post("/api/workspace-policy/agents-md/scan")
+async def api_scan_agents_md(request: Request):
+    body = await request.json()
+    target = body.get("workspace_id", body.get("workspaceId", "")) or str(deps.BASE_DIR)
+    result = await scan_agents_md(deps.runtime_db, target)
+    await deps.broadcast("agents_md_changed", {"workspace_id": target, "has_pending": result.get("has_pending", False)})
+    return result
+
+
+@router.post("/api/workspace-policy/agents-md/import")
+async def api_import_agents_md(request: Request):
+    body = await request.json()
+    target = body.get("workspace_id", body.get("workspaceId", "")) or str(deps.BASE_DIR)
+    return await import_agents_md(deps.runtime_db, target)
+
+
+@router.post("/api/workspace-policy/agents-md/ignore")
+async def api_ignore_agents_md(request: Request):
+    body = await request.json()
+    target = body.get("workspace_id", body.get("workspaceId", "")) or str(deps.BASE_DIR)
+    return await ignore_agents_md(deps.runtime_db, target)
 
 
 @router.post("/api/agents/{name}/soul")
@@ -1384,11 +1592,12 @@ async def get_agent_config(name: str):
     inst = _resolve_agent(name)
     if not inst:
         return JSONResponse({"error": "not found"}, 404)
-    return {
+    payload = {
         "name": inst.name,
         "base": inst.base,
         "label": inst.label,
         "color": inst.color,
+        "profile_id": getattr(inst, "profile_id", DEFAULT_PROFILE_ID),
         "workspace": getattr(inst, "workspace", None),
         "command": getattr(inst, "command", None),
         "args": getattr(inst, "args", []),
@@ -1399,6 +1608,8 @@ async def get_agent_config(name: str):
         "failoverModel": getattr(inst, "failoverModel", ""),
         "autoApprove": getattr(inst, "autoApprove", False),
     }
+    payload["effective_state"] = (await _effective_state_payload(name)).get("effective_state", {})
+    return payload
 
 
 @router.post("/api/agents/{name}/config")
@@ -1412,6 +1623,7 @@ async def set_agent_config(name: str, request: Request):
         "label": lambda v: isinstance(v, str) and 0 < len(v) <= 50,
         "color": lambda v: isinstance(v, str) and len(v) <= 20,
         "role": lambda v: isinstance(v, str) and v in ("", "manager", "worker", "peer"),
+        "profile_id": lambda v: isinstance(v, str) and 0 < len(v) <= 64,
         "workspace": lambda v: isinstance(v, str) and len(v) <= 500,
         "responseMode": lambda v: isinstance(v, str) and v in ("mentioned", "always", "listen", "silent"),
         "thinkingLevel": lambda v: isinstance(v, str) and v in ("", "off", "minimal", "low", "medium", "high"),

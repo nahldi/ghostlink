@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS agents (
     registered_at    REAL NOT NULL,
     created_at       REAL NOT NULL,
     role             TEXT NOT NULL DEFAULT '',
+    profile_id       TEXT NOT NULL DEFAULT 'default',
     workspace        TEXT NOT NULL DEFAULT '',
     response_mode    TEXT NOT NULL DEFAULT 'mentioned',
     thinking_level   TEXT NOT NULL DEFAULT '',
@@ -48,8 +49,20 @@ async def _migration_create_agents_table(db: aiosqlite.Connection) -> None:
     await db.executescript(AGENTS_TABLE_SQL)
 
 
+async def _migration_add_profile_id(db: aiosqlite.Connection) -> None:
+    cursor = await db.execute("PRAGMA table_info(agents)")
+    try:
+        rows = await cursor.fetchall()
+    finally:
+        await cursor.close()
+    columns = {row[1] if not isinstance(row, aiosqlite.Row) else row["name"] for row in rows}
+    if "profile_id" not in columns:
+        await db.execute("ALTER TABLE agents ADD COLUMN profile_id TEXT NOT NULL DEFAULT 'default'")
+
+
 REGISTRY_MIGRATIONS = [
     ("20260408_create_agents_table", _migration_create_agents_table),
+    ("20260408_add_agents_profile_id", _migration_add_profile_id),
 ]
 
 
@@ -68,6 +81,7 @@ class AgentInstance:
     token_issued_at: float = field(default_factory=time.time)
     token_ttl: float = field(default_factory=lambda: TOKEN_TTL)
     role: str = ""
+    profile_id: str = "default"
     workspace: str = ""
     responseMode: str = "mentioned"
     thinkingLevel: str = ""
@@ -110,6 +124,7 @@ def _agent_from_row(row: aiosqlite.Row) -> AgentInstance:
         token_issued_at=float(row["token_issued_at"]),
         token_ttl=float(row["token_ttl"]),
         role=row["role"],
+        profile_id=row["profile_id"] if "profile_id" in row.keys() else "default",
         workspace=row["workspace"],
         responseMode=row["response_mode"],
         thinkingLevel=row["thinking_level"],
@@ -135,6 +150,7 @@ def _agent_db_params(inst: AgentInstance) -> tuple:
         inst.registered_at,
         inst.created_at,
         inst.role,
+        inst.profile_id,
         inst.workspace,
         inst.responseMode,
         inst.thinkingLevel,
@@ -156,10 +172,10 @@ async def persist_agent(db: aiosqlite.Connection, inst: AgentInstance) -> None:
         INSERT INTO agents (
             agent_id, name, base, label, color, slot, state, token,
             token_issued_at, token_ttl, registered_at, created_at, role,
-            workspace, response_mode, thinking_level, model, failover_model,
+            profile_id, workspace, response_mode, thinking_level, model, failover_model,
             auto_approve, runner
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(agent_id) DO UPDATE SET
             name = excluded.name,
             base = excluded.base,
@@ -172,6 +188,7 @@ async def persist_agent(db: aiosqlite.Connection, inst: AgentInstance) -> None:
             token_ttl = excluded.token_ttl,
             registered_at = excluded.registered_at,
             role = excluded.role,
+            profile_id = excluded.profile_id,
             workspace = excluded.workspace,
             response_mode = excluded.response_mode,
             thinking_level = excluded.thinking_level,

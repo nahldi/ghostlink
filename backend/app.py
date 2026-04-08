@@ -48,6 +48,7 @@ from bridges import BridgeManager
 from jobs import JobStore
 from plugin_sdk import HookManager, Marketplace, SafetyScanner, event_bus
 from providers import ProviderRegistry
+from profiles import init_profiles_db
 from registry import AgentRegistry, init_registry_db, load_persisted_agents
 from router import MessageRouter
 from rules import RuleStore
@@ -343,6 +344,7 @@ async def lifespan(_app: FastAPI):
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA busy_timeout=5000")  # 5s retry on lock
     await init_registry_db(db)
+    await init_profiles_db(db)
     registry.load_persisted(await load_persisted_agents(db))
     job_store = JobStore(db)
     await job_store.init()
@@ -350,7 +352,8 @@ async def lifespan(_app: FastAPI):
     await rule_store.init()
     schedule_store = ScheduleStore(db)
     await schedule_store.init()
-    skills_registry = SkillsRegistry(DATA_DIR)
+    skills_registry = SkillsRegistry(DATA_DIR, db)
+    await skills_registry.init()
     session_manager = SessionManager(DATA_DIR)
     branch_manager = BranchManager(DATA_DIR)
     secrets_manager = SecretsManager(DATA_DIR)
