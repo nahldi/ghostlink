@@ -50,14 +50,12 @@ Returns summary of memory state across all agents. Summary-first — no raw bodi
       "layers": {
         "identity": { "entry_count": 0, "total_tokens": 0 },
         "workspace": { "entry_count": 0, "total_tokens": 0 },
-        "session": { "entry_count": 0, "total_tokens": 0 },
-        "thread": { "entry_count": 0, "total_tokens": 0 }
+        "session": { "entry_count": 0, "total_tokens": 0 }
       },
       "total_entries": 0,
       "total_tokens": 0,
       "last_accessed": "ISO8601 | null",
-      "drift_count": 0,
-      "conflict_count": 0
+      "has_conflicts": false
     }
   ],
   "totals": {
@@ -126,7 +124,7 @@ Returns system-level aggregate stats.
   "skills": { "total": 28 },
   "personas": { "total": 14 },
   "errors": { "rate_1h": 0.0 },
-  "version": "6.0.1"
+  "version": "read from app.__version__ at runtime"
 }
 ```
 
@@ -138,6 +136,9 @@ Returns system-level aggregate stats.
 
 ### Implementation notes for tyson
 - Use existing data sources: `agent_memory.py` for memory stats, `mcp_bridge._ALL_TOOLS` for tool list, `deps.py` for runtime state
+- **Version field:** read from `app.__version__` at runtime (`from app import __version__`). Do NOT hardcode "6.0.1" — the version bumps separately.
+- **Memory layers:** backend has 3 layers: `identity`, `workspace`, `session` (defined in `agent_memory._MEMORY_LAYERS`). No `thread` layer exists.
+- **Conflict detection:** `agent_memory._detect_conflicts()` emits events but doesn't store counts. Use a boolean `has_conflicts` field — call `_detect_conflicts` and return `true` if any conflicts found for the agent's entries, or `false`. If too expensive, default to `false` and note it as best-effort.
 - Tool invocation/success/failure counts: if not currently tracked, initialize counters at 0 and wire into `_wrap_tool_with_hooks`
 - Policy mode per tool: read from policy engine if available, default to "allow"
 - All routes should return 200 with empty/zero-state data when no agents/tools exist — never 500
