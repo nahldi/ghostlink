@@ -58,7 +58,18 @@ async function findPythonVersion(command: string, useWsl: boolean): Promise<stri
 }
 
 async function findSupportedPython(useWsl: boolean): Promise<{ command: string; version: string } | null> {
-  for (const candidate of ['python3', 'python']) {
+  // On macOS, Finder-launched apps don't inherit shell PATH.
+  // Include common macOS Python install paths explicitly.
+  const candidates = ['python3', 'python'];
+  if (process.platform === 'darwin') {
+    candidates.push(
+      '/opt/homebrew/bin/python3',          // Homebrew on Apple Silicon
+      '/usr/local/bin/python3',             // Homebrew on Intel / python.org installer
+      '/Library/Frameworks/Python.framework/Versions/Current/bin/python3',
+    );
+  }
+
+  for (const candidate of candidates) {
     const version = await findPythonVersion(candidate, useWsl);
     if (!version) continue;
 
