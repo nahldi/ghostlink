@@ -12,7 +12,7 @@
 
 **[Download the latest installer from Releases](../../releases/latest)**
 
-- **Windows:** `GhostLink-Setup-x.x.x.exe` — one-click install, auto-updates
+- **Windows:** `GhostLink-Setup-6.0.1.exe` — one-click install, auto-updates
 - **Linux:** `.AppImage` / `.deb`
 - **macOS:** `.dmg`
 
