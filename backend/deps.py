@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from plugin_sdk import HookManager, Marketplace
     from policy import PolicyEngine
     from providers import ProviderRegistry
+    from cost import CostTracker
     from rag import RAGPipeline
     from registry import AgentRegistry
     from remote_runner import RemoteRunner
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from store import MessageStore
     from task_store import TaskStore
     from worktree import WorktreeManager
+    from transport import ProviderTransportManager
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +61,8 @@ session_manager: SessionManager | None = None
 branch_manager: BranchManager | None = None
 skills_registry: SkillsRegistry | None = None
 provider_registry: ProviderRegistry | None = None
+cost_tracker: CostTracker | None = None
+transport_manager: ProviderTransportManager | None = None
 bridge_manager: BridgeManager | None = None
 marketplace: Marketplace | None = None
 hook_manager: HookManager | None = None

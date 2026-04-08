@@ -36,6 +36,13 @@ async def configure_provider(request: Request):
         if capability not in CAPABILITY_PRIORITY:
             return JSONResponse({"error": f"unknown capability: {capability}"}, 400)
         config_updates[f"preferred_{capability}"] = pid
+    override_fields = ("base_url", "headers", "proxy", "tls_cert_path", "timeout", "max_retries")
+    overrides = {}
+    for field in override_fields:
+        if field in body:
+            overrides[field] = body[field]
+    if overrides:
+        config_updates["overrides"] = {pid: overrides}
 
     deps.provider_registry.save_config(config_updates)
     return {"ok": True, "status": deps.provider_registry.get_provider_status()}

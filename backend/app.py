@@ -47,6 +47,7 @@ from audit_store import AuditStore
 from branches import BranchManager
 from bridges import BridgeManager
 from checkpoints import CheckpointStore
+from cost import CostTracker
 from jobs import JobStore
 from plugin_sdk import HookManager, Marketplace, SafetyScanner, event_bus
 from policy import PolicyEngine
@@ -61,6 +62,7 @@ from sessions import SessionManager
 from skills import SkillsRegistry
 from store import MessageStore
 from task_store import TaskStore
+from transport import ProviderTransportManager
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -366,6 +368,9 @@ async def lifespan(_app: FastAPI):
     branch_manager = BranchManager(DATA_DIR)
     secrets_manager = SecretsManager(DATA_DIR)
     provider_registry = ProviderRegistry(DATA_DIR)
+    cost_tracker = CostTracker(db)
+    await cost_tracker.init()
+    transport_manager = ProviderTransportManager(provider_registry, cost_tracker=cost_tracker)
     bridge_manager = BridgeManager(DATA_DIR, store=store, registry=registry, server_port=PORT)
     marketplace = Marketplace(DATA_DIR)
     hook_manager = HookManager(DATA_DIR, server_port=PORT)
@@ -396,6 +401,8 @@ async def lifespan(_app: FastAPI):
     deps.session_manager = session_manager
     deps.branch_manager = branch_manager
     deps.provider_registry = provider_registry
+    deps.cost_tracker = cost_tracker
+    deps.transport_manager = transport_manager
     deps.bridge_manager = bridge_manager
     deps.marketplace = marketplace
     deps.hook_manager = hook_manager

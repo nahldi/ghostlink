@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 from mcp.server.fastmcp import Context, FastMCP
+from transport import ProviderRequest, TransportError, normalized_cache_key
 
 log = logging.getLogger(__name__)
 
@@ -131,6 +132,58 @@ _WRITE_TOOLS = {
     "code_execute", "gemini_image", "gemini_video",
     "image_generate", "text_to_speech", "speech_to_text",
 }
+
+
+def _transport_request(
+    capability: str,
+    *,
+    provider: str = "",
+    model: str = "",
+    path: str = "",
+    url: str = "",
+    json_body: dict | None = None,
+    data: bytes | None = None,
+    headers: dict | None = None,
+    timeout: int = 60,
+    metadata: dict | None = None,
+    input_tokens: int = 0,
+    expected_output_tokens: int = 0,
+) -> dict:
+    try:
+        import deps as _deps
+        manager = getattr(_deps, "transport_manager", None)
+    except Exception:
+        manager = None
+    if manager is None:
+        raise RuntimeError("Transport manager not configured")
+    cache_key = normalized_cache_key(
+        [capability, provider, model, path or url, json_body or "", metadata or {}]
+    )
+    req = ProviderRequest(
+        capability=capability,
+        provider=provider,
+        model=model,
+        path=path,
+        url=url,
+        json_body=json_body,
+        data=data,
+        headers=dict(headers or {}),
+        timeout=timeout,
+        cache_key=cache_key,
+        input_tokens=input_tokens,
+        expected_output_tokens=expected_output_tokens,
+        metadata=dict(metadata or {}),
+    )
+    response = _run_async(manager.execute(capability, req, preferred_provider=provider))
+    return {
+        "json": response.json_body,
+        "body": response.body,
+        "headers": response.headers,
+        "provider": response.provider,
+        "model": response.model,
+        "cache_hit": response.cache_hit,
+        "transport": response.transport,
+    }
 
 
 def _check_execution_mode(channel: str, tool_name: str) -> str | None:
@@ -1255,7 +1308,6 @@ def image_generate(prompt: str, style: str = "natural", provider: str = "auto") 
         Path to saved image or URL, or error with setup instructions
     """
     import base64
-    import urllib.request
 
     save_dir = _data_dir / "generated" if _data_dir else Path("./data/generated")
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -1278,17 +1330,19 @@ def image_generate(prompt: str, style: str = "natural", provider: str = "auto") 
     for prov in providers_to_try:
         try:
             if prov == "google":
-                key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-                body = json.dumps({
+                body = {
                     "instances": [{"prompt": prompt}],
                     "parameters": {"sampleCount": 1, "aspectRatio": "1:1", "personGeneration": "allow_adult"},
-                }).encode()
-                req = urllib.request.Request(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key={key}",
-                    data=body, headers={"Content-Type": "application/json"},
-                )
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    result = json.loads(resp.read())
+                }
+                result = _transport_request(
+                    "image",
+                    provider="google",
+                    model="imagen-4.0-generate-001",
+                    path=f"models/imagen-4.0-generate-001:predict?key={_gemini_api_key()}",
+                    json_body=body,
+                    timeout=60,
+                    metadata={"style": style, "prompt": prompt},
+                )["json"] or {}
                 predictions = result.get("predictions", [])
                 if predictions:
                     img_data = base64.b64decode(predictions[0].get("bytesBase64Encoded", ""))
@@ -1297,27 +1351,29 @@ def image_generate(prompt: str, style: str = "natural", provider: str = "auto") 
                     return f"Image generated (Imagen 4): {filepath}\nPrompt: {prompt}"
 
             elif prov == "openai":
-                key = os.environ.get("OPENAI_API_KEY")
-                body = json.dumps({"model": "dall-e-3", "prompt": prompt, "n": 1, "size": "1024x1024",
-                                   "style": "vivid" if style == "artistic" else "natural"}).encode()
-                req = urllib.request.Request(
-                    "https://api.openai.com/v1/images/generations", data=body,
-                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                )
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    result = json.loads(resp.read())
+                result = _transport_request(
+                    "image",
+                    provider="openai",
+                    model="dall-e-3",
+                    path="images/generations",
+                    json_body={"model": "dall-e-3", "prompt": prompt, "n": 1, "size": "1024x1024",
+                               "style": "vivid" if style == "artistic" else "natural"},
+                    timeout=60,
+                    metadata={"style": style, "prompt": prompt},
+                )["json"] or {}
                 return f"Image generated (DALL-E 3): {result['data'][0]['url']}\nPrompt: {prompt}"
 
             elif prov == "together":
-                key = os.environ.get("TOGETHER_API_KEY")
-                body = json.dumps({"model": "black-forest-labs/FLUX.1-schnell-Free", "prompt": prompt,
-                                   "width": 1024, "height": 1024, "steps": 4, "n": 1}).encode()
-                req = urllib.request.Request(
-                    "https://api.together.xyz/v1/images/generations", data=body,
-                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                )
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    result = json.loads(resp.read())
+                result = _transport_request(
+                    "image",
+                    provider="together",
+                    model="black-forest-labs/FLUX.1-schnell-Free",
+                    path="images/generations",
+                    json_body={"model": "black-forest-labs/FLUX.1-schnell-Free", "prompt": prompt,
+                               "width": 1024, "height": 1024, "steps": 4, "n": 1},
+                    timeout=60,
+                    metadata={"style": style, "prompt": prompt},
+                )["json"] or {}
                 img_b64 = result.get("data", [{}])[0].get("b64_json", "")
                 if img_b64:
                     filepath = save_dir / f"img-{int(time.time())}.png"
@@ -1325,14 +1381,15 @@ def image_generate(prompt: str, style: str = "natural", provider: str = "auto") 
                     return f"Image generated (FLUX.1 Free): {filepath}\nPrompt: {prompt}"
 
             elif prov == "huggingface":
-                key = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY")
-                req = urllib.request.Request(
-                    "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev",
-                    data=json.dumps({"inputs": prompt}).encode(),
-                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                )
-                with urllib.request.urlopen(req, timeout=120) as resp:
-                    img_data = resp.read()
+                img_data = _transport_request(
+                    "image",
+                    provider="huggingface",
+                    model="black-forest-labs/FLUX.1-dev",
+                    path="models/black-forest-labs/FLUX.1-dev",
+                    json_body={"inputs": prompt},
+                    timeout=120,
+                    metadata={"style": style, "prompt": prompt},
+                )["body"]
                 filepath = save_dir / f"img-{int(time.time())}.png"
                 filepath.write_bytes(img_data)
                 return f"Image generated (FLUX.1 Dev): {filepath}\nPrompt: {prompt}"
@@ -1432,15 +1489,18 @@ def _gemini_api_key() -> str | None:
 
 def _gemini_request(endpoint: str, body: dict, timeout: int = 60) -> dict:
     """Make authenticated request to Gemini API."""
-    import urllib.request
     key = _gemini_api_key()
     if not key:
         raise RuntimeError("No GEMINI_API_KEY or GOOGLE_API_KEY set")
-    url = f"{_GEMINI_API_BASE}/{endpoint}?key={key}"
-    data = json.dumps(body).encode()
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read())
+    result = _transport_request(
+        "chat",
+        provider="google",
+        path=f"{endpoint}?key={key}",
+        json_body=body,
+        timeout=timeout,
+        metadata={"endpoint": endpoint},
+    )
+    return result["json"] or {}
 
 
 def gemini_image(prompt: str, aspect_ratio: str = "1:1", model: str = "imagen-4.0-generate-001") -> str:

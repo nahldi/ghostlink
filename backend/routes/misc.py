@@ -591,6 +591,8 @@ async def get_server_config():
 @router.get("/api/usage")
 async def get_usage():
     """Return token usage and cost data."""
+    if deps.cost_tracker:
+        return await deps.cost_tracker.usage_snapshot()
     return {
         "entries": deps._usage_log[-1000:],
         "total_cost": round(sum(e["cost"] for e in deps._usage_log), 4),
@@ -598,6 +600,14 @@ async def get_usage():
         "total_output_tokens": sum(e["output_tokens"] for e in deps._usage_log),
         "entry_count": len(deps._usage_log),
     }
+
+
+@router.get("/api/diagnostics/cache")
+async def get_prompt_cache_diagnostics():
+    """Return prompt-cache hit/miss diagnostics from the active transport layer."""
+    if deps.transport_manager:
+        return deps.transport_manager.cache_metrics()
+    return {"providers": {}, "total_hits": 0, "total_misses": 0}
 
 
 # ── Export ───────────────────────────────────────────────────────────
