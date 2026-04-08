@@ -318,6 +318,30 @@ Everything in Gates 0-7, plus:
 
 ---
 
+## Gate 8.5: Post-Agent And Skill Productization (After Phase 8.5)
+
+Everything in Gates 0-8, plus:
+
+### Versioning and Compatibility
+- [ ] Profiles and skills can be resolved by explicit version with deterministic behavior
+- [ ] Compatibility and capability metadata are enforced before activation
+- [ ] Unversioned legacy assets remain readable or migrate additively without loss
+- [ ] Mixed-version state is truthful per agent/profile/skill
+
+### Rollout, Rollback, and Deprecation
+- [ ] Private/beta/stable channel state is truthful in backend and UI
+- [ ] Promotion from beta to stable requires policy approval
+- [ ] Rollback from N+1 to N restores a clean prior effective state
+- [ ] Deprecation notices, forced removal, and migration targets are visible and auditable
+
+### Distribution and Health
+- [ ] Workspace/org distribution respects scope boundaries
+- [ ] Distribution failures do not leave partially visible versions behind
+- [ ] Per-version health metrics use real usage/error/cost/eval data
+- [ ] Unknown health data is labeled honestly instead of being shown as healthy
+
+---
+
 ## Stress Tests (Run Before Any Release)
 
 These are manual verification flows, not automated tests.
