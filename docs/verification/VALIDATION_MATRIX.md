@@ -270,6 +270,30 @@ Everything in Gates 0-5, plus:
 
 ---
 
+## Gate 7: Post-Media Generation (After Phase 7)
+
+Everything in Gates 0-6, plus:
+
+### Video and Music Async Delivery
+- [ ] `generate_video` returns a task ID immediately and completes through truthful async task states
+- [ ] `generate_music` returns a task ID immediately and completes through truthful async task states
+- [ ] Provider timeout/cancel/failure paths leave media tasks in honest terminal states
+- [ ] Missing or unconfigured media providers return clear operator-visible errors
+
+### Rendering and Editing
+- [ ] Completed video artifacts render inline with playback and download
+- [ ] Completed audio artifacts render inline with playback and download
+- [ ] Expanded image generation does not regress the existing image path
+- [ ] Image editing preserves source/result lineage and renders edited output inline
+
+### Cost and Task Surfaces
+- [ ] Media generation costs appear in the normal Phase 4B usage/cost surfaces
+- [ ] Unknown or derived media costs are labeled honestly
+- [ ] Media task progress shown in chat matches the Phase 3 task dashboard state
+- [ ] Media routing/failover metadata stays truthful in task and cost records
+
+---
+
 ## Stress Tests (Run Before Any Release)
 
 These are manual verification flows, not automated tests.
