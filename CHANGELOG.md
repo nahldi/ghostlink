@@ -1,5 +1,11 @@
 # GhostLink Changelog
 
+## v6.0.4 — 2026-04-08
+### Launcher UX Improvements
+- **Pricing badges in Supported Agents** — Paid/Free Tier/Local/Free + Setup badges visible before installing
+- **Agent descriptions** — one-line descriptions in Supported Agents section
+- **Switch button for connected providers** — re-login or switch accounts without disconnecting first (e.g. switch Gemini from free tier to Google Ultra)
+
 ## v6.0.3 — 2026-04-08
 ### Critical Launcher Fix
 - **Fix launcher crash** — `contextBridge` binding conflict caused `SyntaxError: Identifier 'api' has already been declared`, killing all launcher buttons (Start Server, minimize, close, updates)
