@@ -30,6 +30,7 @@ This phase is about making memory useful without turning it into a bag of stale 
 Validation must enforce these:
 
 - Phase 6 must integrate with the existing memory systems already present in live code; it cannot quietly build a parallel unused memory stack
+- Phase 6 must reconcile `MemoryGraph` and `RAGPipeline` with the new memory model instead of leaving both old and new retrieval paths active with contradictory behavior
 - identity memory must never be evicted or degraded by workspace/session pressure
 - workspace/session eviction and promotion behavior must be truthful and deterministic
 - schema migration from the current flat memory entries must be additive and non-destructive
@@ -70,6 +71,7 @@ If any previously green command fails, or memory migration leaves unreadable ent
 - identity, workspace, and session layers exist with the documented storage semantics
 - current flat-schema entries migrate safely into workspace-layer entries
 - existing soul/identity data migrates into the identity layer
+- existing `MemoryGraph` / `RAGPipeline` initialization paths reconcile with the new storage model instead of silently bypassing it
 - session-end promotion produces workspace summaries instead of silent data loss
 - token-budget eviction respects layer rules and metadata
 
@@ -77,6 +79,7 @@ If any previously green command fails, or memory migration leaves unreadable ent
 
 - `test_flat_schema_entries_migrate_to_workspace_layer_without_loss`
 - `test_existing_soul_data_migrates_to_identity_layer`
+- `test_memorygraph_and_ragpipeline_resolve_through_reconciled_memory_model`
 - `test_identity_layer_is_never_evicted_under_budget_pressure`
 - `test_session_end_promotes_qualifying_items_to_workspace_summary`
 - `test_workspace_eviction_removes_lowest_scored_items_first`
@@ -200,6 +203,7 @@ If any previously green command fails, or memory migration leaves unreadable ent
 ### Must Be True
 
 - cache hit/miss accounting stays consistent with provider/runtime metadata
+- stable identity prefixes do not create contradictory cache keys for equivalent requests after reinforcement/memory layering changes
 - estimated values are clearly marked when direct cache data does not exist
 - savings calculations stay non-negative and pricing-consistent
 - alert thresholds fire only after the configured sustained miss pattern
@@ -208,6 +212,7 @@ If any previously green command fails, or memory migration leaves unreadable ent
 ### Suggested Tests
 
 - `test_provider_cache_metadata_maps_to_consistent_hit_miss_counts`
+- `test_identity_reinforcement_keeps_cache_key_behavior_stable_for_equivalent_requests`
 - `test_estimated_cache_stats_are_marked_inferred_when_provider_lacks_direct_signals`
 - `test_estimated_savings_are_nonnegative_and_pricing_consistent`
 - `test_low_cache_hit_rate_threshold_emits_alert_after_configured_window`
@@ -246,6 +251,7 @@ Keep these green:
 - Phase 4B prompt-cache optimization and cost accounting feeding diagnostics
 - Phase 5 collaboration/workspace coordination boundaries when cross-agent memory is enabled
 - existing `MemoryGraph` and `RAGPipeline` startup/init paths
+- cache behavior for equivalent requests before and after identity reinforcement changes
 
 Phase 6 is allowed to improve memory quality. It is not allowed to quietly break the current startup, retrieval, or identity stack to do it.
 
