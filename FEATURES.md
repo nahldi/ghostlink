@@ -1,13 +1,15 @@
 # GhostLink — Feature Reference
 
 **Last updated:** 2026-04-08  
-**Version:** v6.0.0
+**Version:** v6.0.1
 
 > This file lists features that are actually shipped in the current codebase. Planned work belongs in `UNIFIED_ROADMAP.md`, not here.
 
 ---
 
 ## Current Verified Counts
+
+`v6.0.1` is an additive patch release. Platform counts below remain the `v6.0.0` truth-synced baseline unless noted.
 
 - **323 API/websocket endpoints** across **19 route modules**
 - **32 MCP tools**
@@ -16,7 +18,7 @@
 - **5 channel bridges**
 - **90 React component files**
 - **28 built-in skills**
-- **389 automated test cases** (277 backend across 35 test files + 112 frontend across 15 test files)
+- **393 automated test cases** (281 backend across 36 test files + 112 frontend across 15 test files)
 
 ---
 
@@ -45,6 +47,7 @@
 ## MCP and Runtime
 
 - 32 built-in MCP tools across chat, memory, web, AI/media, agent control, and streaming
+- Operator introspection endpoints: `/api/introspect/memory`, `/api/introspect/tools`, `/api/introspect/stats`
 - MCP exposed over:
   - streamable HTTP on `:8200`
   - SSE on `:8201`
@@ -112,12 +115,15 @@ Provider/runtime features:
 
 ## Ops and Reliability
 
-Shipped through the current `v6.0.0` release:
+Shipped through the current `v6.0.1` release:
 
 - `/api/health`
 - `/api/diagnostics`
 - `/api/backup`
 - `/api/restore`
+- `/api/introspect/memory`
+- `/api/introspect/tools`
+- `/api/introspect/stats`
 - Heartbeat auth hardening
 - Error visibility improvements
 - Bounded in-memory runtime caches

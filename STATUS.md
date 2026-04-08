@@ -1,7 +1,7 @@
 # GhostLink — Project Status
 
 **Last updated:** 2026-04-08
-**Version:** v6.0.0
+**Version:** v6.0.1
 **License:** MIT
 
 ---
@@ -14,13 +14,13 @@ GhostLink is a local-first multi-agent AI chat platform. It provides a shared ch
 
 ## Verified Baseline
 
-This is the current verified baseline for `v6.0.0`:
+This is the current release-ready baseline for `v6.0.1`:
 
-- Latest release: `v6.0.0` (2026-04-08) — complete multi-agent orchestration platform, all phases 0-9 shipped
-- Latest verified automated test baseline: **389 test cases** total
-  - Backend: **277 cases** across 35 test files
+- Latest release: `v6.0.1` (2026-04-08) — operator introspection patch on top of the shipped `v6.0.0` platform baseline
+- Latest verified automated test baseline: **393 test cases** total
+  - Backend: **281 cases** across 36 test files
   - Frontend: **112 cases** across 15 test files
-- Frontend lint/build and desktop TypeScript build were re-verified during the `v6.0.0` release cycle
+- Frontend lint/build and desktop TypeScript build were re-verified during the `v6.0.1` validation pass
 - No tracked runtime data, local settings, API keys, or local databases are included in git
 - Release/install defaults remain neutral for new users
 
@@ -41,6 +41,8 @@ Runtime and local-only paths intentionally stay out of git:
 ## Current Product Surface
 
 ### Core counts
+
+These remain the last full truth-synced platform counts; `v6.0.1` is an additive patch release.
 
 - **323 API/websocket endpoints** across `backend/app.py` and **19 route modules**
 - **32 MCP tools**
@@ -77,6 +79,7 @@ Anthropic, OpenAI, Google, xAI, Groq, Together, Hugging Face, Ollama, Mistral, O
 
 ## Recent Releases
 
+- **v6.0.1** — operator introspection patch: safe memory/tool/system summary endpoints, `/inspect ...` chat wiring, and truthfulness fixes for runtime version/count reporting. 393 tests (281 backend + 112 frontend).
 - **v6.0.0** — complete multi-agent orchestration platform: identity/profiles, operator control plane, durable execution, policy engine, provider independence (21 providers), evals/trace grading, multi-agent execution, memory stratification, media generation, A2A interoperability, productization. 389 tests (277 backend + 112 frontend).
 - **v5.7.2** — launcher/wizard reliability fixes, backend memory safety, export/share pagination, process reaping, reconnect throttling, streaming perf, component decomposition cleanup
 - **v5.7.1** — safe dependency refresh and version sync

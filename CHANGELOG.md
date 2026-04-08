@@ -1,5 +1,15 @@
 # GhostLink Changelog
 
+## v6.0.1 — 2026-04-08
+### Operator Introspection & Doc Truth-Sync
+- **Operator introspection commands** — `/inspect memory`, `/inspect tools`, `/inspect stats` for real-time system visibility
+- **3 new backend routes** — `GET /api/introspect/memory`, `/api/introspect/tools`, `/api/introspect/stats` with secret redaction
+- **Doc truth-sync** — 11 active docs synced to v6.0.0 shipped reality, all metrics verified against source
+- **Team update** — 4-agent model (jeff, coop, kurt, tyson), ned removed from active docs
+- **Competitive gap analysis** — 10-platform research persisted in Phase 10 backlog
+- **Git hygiene** — 10 stale branches deleted, dangling worktrees pruned
+- **Test coverage** — 281 backend + 112 frontend tests (393 total, up from 389)
+
 ## v6.0.0 — 2026-04-08
 ### Complete Multi-Agent Orchestration Platform
 Full roadmap execution — Phases 0 through 9 plus Phase 10 promoted items.
