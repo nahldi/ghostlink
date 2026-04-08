@@ -319,6 +319,32 @@ def _pending_cancellation_message(agent_name: str) -> str | None:
     return f"Task {task['task_id']} has been cancelled by the operator. Stop current work and acknowledge."
 
 
+def _pending_pause_message(agent_name: str) -> str | None:
+    if not agent_name or _task_store is None:
+        return None
+    task = _run_async(_task_store.get_pending_pause(agent_name))
+    if not task:
+        return None
+    _run_async(_task_store.mark_pause_signal_delivered(task["task_id"]))
+    return f"Task {task['task_id']} has been paused by the operator. Wait for resume signal. Do not continue work on this task."
+
+
+TOOL_REPLAY_CLASSIFICATION = {
+    "chat_read": "replay_safe",
+    "chat_send": "replay_requires_confirmation",
+    "chat_progress": "replay_safe",
+    "chat_propose_job": "replay_requires_confirmation",
+    "chat_react": "replay_safe",
+    "chat_join": "replay_safe",
+    "chat_who": "replay_safe",
+    "chat_channels": "replay_safe",
+    "chat_rules": "replay_safe",
+    "chat_claim": "replay_safe",
+    "set_thinking": "replay_safe",
+    "code_execute": "replay_blocked",
+}
+
+
 def _serialize_messages(msgs: list[dict]) -> str:
     """Serialize store messages into MCP chat_read output shape."""
     out = []
@@ -1814,6 +1840,9 @@ def _wrap_tool_with_hooks(func):
         cancellation_message = _pending_cancellation_message(cancel_agent)
         if cancellation_message:
             return cancellation_message
+        pause_message = _pending_pause_message(cancel_agent)
+        if pause_message:
+            return pause_message
 
         # Execute the actual tool
         try:
@@ -1852,6 +1881,25 @@ def _wrap_tool_with_hooks(func):
                     channel=channel,
                     detail={"tool": tool_name, "args_keys": list(kwargs.keys()) if kwargs else []},
                 ))
+            task_id = str(kwargs.get("task_id", "") or "")
+            if task_id and _deps.task_store:
+                import hashlib
+                task = _run_async(_deps.task_store.get(task_id))
+                if task:
+                    metadata = dict(task.get("metadata", {}))
+                    journal = list(metadata.get("tool_journal", []))
+                    journal.append(
+                        {
+                            "tool_name": tool_name,
+                            "args_hash": hashlib.sha256(json.dumps(kwargs, sort_keys=True, default=str).encode()).hexdigest()[:16],
+                            "result_hash": hashlib.sha256(str(result).encode()).hexdigest()[:16] if result else "",
+                            "result": str(result)[:500],
+                            "classification": TOOL_REPLAY_CLASSIFICATION.get(tool_name, "replay_blocked"),
+                            "timestamp": time.time(),
+                        }
+                    )
+                    metadata["tool_journal"] = journal[-50:]
+                    _run_async(_deps.task_store.update(task_id, metadata=metadata))
         except Exception as e:
             log.debug("Audit log failed for %s: %s", tool_name, e)
 

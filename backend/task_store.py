@@ -50,6 +50,8 @@ VALID_STATUSES = {
     "completed",
     "failed",
     "cancelled",
+    "interrupted",
+    "awaiting_external",
     "awaiting_approval",
     "awaiting_input",
 }
@@ -280,6 +282,23 @@ class TaskStore:
             await cursor.close()
         return self._row_to_dict(row) if row else None
 
+    async def get_pending_pause(self, agent_name: str) -> dict | None:
+        cursor = await self._db.execute(
+            """
+            SELECT * FROM tasks
+            WHERE agent_name = ? AND status = 'paused'
+              AND json_extract(metadata, '$.pause_signal_delivered') != 1
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+            """,
+            (agent_name,),
+        )
+        try:
+            row = await cursor.fetchone()
+        finally:
+            await cursor.close()
+        return self._row_to_dict(row) if row else None
+
     async def mark_cancel_signal_delivered(self, task_id: str) -> dict | None:
         task = await self.get(task_id)
         if not task:
@@ -287,6 +306,15 @@ class TaskStore:
         metadata = dict(task.get("metadata", {}))
         metadata["cancel_signal_delivered"] = True
         metadata["cancel_signal_delivered_at"] = time.time()
+        return await self.update(task_id, metadata=metadata)
+
+    async def mark_pause_signal_delivered(self, task_id: str) -> dict | None:
+        task = await self.get(task_id)
+        if not task:
+            return None
+        metadata = dict(task.get("metadata", {}))
+        metadata["pause_signal_delivered"] = True
+        metadata["pause_signal_delivered_at"] = time.time()
         return await self.update(task_id, metadata=metadata)
 
     async def _get_by_id(self, row_id: int) -> dict | None:

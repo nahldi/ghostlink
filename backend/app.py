@@ -46,6 +46,7 @@ import plugin_loader
 from audit_store import AuditStore
 from branches import BranchManager
 from bridges import BridgeManager
+from checkpoints import CheckpointStore
 from jobs import JobStore
 from plugin_sdk import HookManager, Marketplace, SafetyScanner, event_bus
 from providers import ProviderRegistry
@@ -350,6 +351,8 @@ async def lifespan(_app: FastAPI):
     registry.load_persisted(await load_persisted_agents(db))
     task_store = TaskStore(db)
     await task_store.init()
+    checkpoint_store = CheckpointStore(db)
+    await checkpoint_store.init()
     job_store = JobStore(db, task_store=task_store)
     await job_store.init()
     rule_store = RuleStore(db)
@@ -383,6 +386,7 @@ async def lifespan(_app: FastAPI):
     deps.runtime_db = db
     deps.job_store = job_store
     deps.task_store = task_store
+    deps.checkpoint_store = checkpoint_store
     deps.rule_store = rule_store
     deps.schedule_store = schedule_store
     deps.skills_registry = skills_registry
@@ -733,6 +737,85 @@ async def lifespan(_app: FastAPI):
                             ).result(timeout=5)
                         except Exception as e:
                             log.debug("Health monitor broadcast failed: %s", e)
+                        try:
+                            if deps.task_store and deps.checkpoint_store:
+                                tasks = asyncio.run_coroutine_threadsafe(
+                                    deps.task_store.list_tasks(agent_name=inst.name, limit=200),
+                                    _main_loop,
+                                ).result(timeout=5)
+                                now = time.time()
+                                for task in tasks:
+                                    if task.get("status") not in ("running", "paused"):
+                                        continue
+                                    latest_cp = asyncio.run_coroutine_threadsafe(
+                                        deps.checkpoint_store.get_latest(task["task_id"]),
+                                        _main_loop,
+                                    ).result(timeout=5)
+                                    cp_age = now - float((latest_cp or {}).get("created_at", 0) or 0)
+                                    if elapsed > 60 and cp_age > 60:
+                                        updated = asyncio.run_coroutine_threadsafe(
+                                            deps.task_store.update(
+                                                task["task_id"],
+                                                status="interrupted",
+                                                metadata={
+                                                    **dict(task.get("metadata", {})),
+                                                    "interrupted_at": now,
+                                                    "resume_checkpoint_id": (latest_cp or {}).get("checkpoint_id", ""),
+                                                },
+                                            ),
+                                            _main_loop,
+                                        ).result(timeout=5)
+                                        asyncio.run_coroutine_threadsafe(
+                                            deps.audit_store.record(
+                                                "task.interrupted",
+                                                actor="system",
+                                                action="task interrupted by heartbeat loss",
+                                                actor_type="system",
+                                                agent_id=task.get("agent_id"),
+                                                agent_name=task.get("agent_name"),
+                                                task_id=task.get("task_id"),
+                                                trace_id=task.get("trace_id"),
+                                                channel=task.get("channel"),
+                                                profile_id=task.get("profile_id"),
+                                                detail={"checkpoint_id": (latest_cp or {}).get("checkpoint_id", "")},
+                                            ),
+                                            _main_loop,
+                                        ).result(timeout=5)
+                                        asyncio.run_coroutine_threadsafe(
+                                            deps.broadcast("task_update", updated),
+                                            _main_loop,
+                                        ).result(timeout=5)
+                        except Exception as e:
+                            log.debug("Health monitor interruption tracking failed: %s", e)
+                    elif elapsed <= HEARTBEAT_STALE_THRESHOLD and inst.state != "offline":
+                        try:
+                            if deps.task_store and deps.checkpoint_store:
+                                tasks = asyncio.run_coroutine_threadsafe(
+                                    deps.task_store.list_tasks(agent_name=inst.name, limit=200),
+                                    _main_loop,
+                                ).result(timeout=5)
+                                for task in tasks:
+                                    if task.get("status") != "interrupted":
+                                        continue
+                                    latest_cp = asyncio.run_coroutine_threadsafe(
+                                        deps.checkpoint_store.get_latest(task["task_id"]),
+                                        _main_loop,
+                                    ).result(timeout=5)
+                                    metadata = dict(task.get("metadata", {}))
+                                    metadata["resume_message"] = (
+                                        f"[SYSTEM] Resuming task '{task['title']}' from checkpoint {(latest_cp or {}).get('sequence_num', 0)}. "
+                                        f"Last completed step: {((latest_cp or {}).get('state_snapshot', {}).get('task', {}).get('progress_step', ''))}."
+                                    ).strip()
+                                    updated = asyncio.run_coroutine_threadsafe(
+                                        deps.task_store.update(task["task_id"], status="running", metadata=metadata),
+                                        _main_loop,
+                                    ).result(timeout=5)
+                                    asyncio.run_coroutine_threadsafe(
+                                        deps.broadcast("task_update", updated),
+                                        _main_loop,
+                                    ).result(timeout=5)
+                        except Exception as e:
+                            log.debug("Health monitor resume tracking failed: %s", e)
             except Exception as e:
                 log.debug("Health monitor error: %s", e)
             _health_stop.wait(HEALTH_CHECK_INTERVAL)

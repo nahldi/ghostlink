@@ -386,6 +386,8 @@ class DataManager:
             "delete_memories": False,
             "delete_audit_events": False,
             "audit_max_age_days": 90,
+            "delete_checkpoints": False,
+            "checkpoint_max_age_days": 30,
         }
 
     def save_retention(self, policy: dict):
@@ -396,6 +398,8 @@ class DataManager:
             "delete_memories",
             "delete_audit_events",
             "audit_max_age_days",
+            "delete_checkpoints",
+            "checkpoint_max_age_days",
         ):
             if k in policy:
                 self._retention[k] = policy[k]
@@ -503,6 +507,7 @@ class DataManager:
         cutoff = time.time() - (max_age * 86400)
         deleted_count = 0
         deleted_audit = 0
+        deleted_checkpoints = 0
         if self._store and self._store._db:
             # Preserve system messages (join, session, scheduled)
             cursor = await self._store._db.execute(
@@ -512,10 +517,15 @@ class DataManager:
             deleted_count = cursor.rowcount
         if self._audit_store is not None and self._retention.get("delete_audit_events"):
             deleted_audit = await self._audit_store.apply_retention(int(self._retention.get("audit_max_age_days", max_age)))
+        checkpoint_store = getattr(__import__("deps"), "checkpoint_store", None)
+        if checkpoint_store is not None and self._retention.get("delete_checkpoints"):
+            deleted_checkpoints = await checkpoint_store.apply_retention(int(self._retention.get("checkpoint_max_age_days", 30)))
         return {
             "ok": True,
             "deleted_messages": deleted_count,
             "deleted_audit_events": deleted_audit,
+            "deleted_checkpoints": deleted_checkpoints,
             "cutoff_days": max_age,
             "audit_cutoff_days": int(self._retention.get("audit_max_age_days", max_age)),
+            "checkpoint_cutoff_days": int(self._retention.get("checkpoint_max_age_days", 30)),
         }

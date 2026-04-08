@@ -652,6 +652,27 @@ def _queue_watcher(get_identity_fn, inject_fn, *, server_port: int = 8300,
                     except Exception:
                         pass
                     signal_file.unlink(missing_ok=True)
+                for signal_file in sorted(cancel_dir.glob(".pause_*")):
+                    task_id = signal_file.name.replace(".pause_", "", 1)
+                    try:
+                        subprocess.run(["tmux", "send-keys", "-t", session_name, "C-c"], capture_output=True, timeout=3)
+                        time.sleep(0.1)
+                        subprocess.run(
+                            [
+                                "tmux",
+                                "send-keys",
+                                "-t",
+                                session_name,
+                                f"Task {task_id} was paused by the operator. Wait for resume signal and do not continue this task.",
+                            ],
+                            capture_output=True,
+                            timeout=3,
+                        )
+                        time.sleep(0.1)
+                        subprocess.run(["tmux", "send-keys", "-t", session_name, "Enter"], capture_output=True, timeout=3)
+                    except Exception:
+                        pass
+                    signal_file.unlink(missing_ok=True)
             if queue_file.exists() and queue_file.stat().st_size > 0:
                 # Atomic read-and-clear: rename to .processing, read, delete.
                 # New writes go to the original filename, so no triggers are lost.

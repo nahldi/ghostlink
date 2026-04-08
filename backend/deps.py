@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from rules import RuleStore
     from schedules import ScheduleStore
     from audit_store import AuditStore
+    from checkpoints import CheckpointStore
     from security import AuditLog, DataManager, ExecPolicy, SecretsManager
     from sessions import SessionManager
     from skills import SkillsRegistry
@@ -51,6 +52,7 @@ rule_store: RuleStore | None = None
 schedule_store: ScheduleStore | None = None
 task_store: TaskStore | None = None
 audit_store: AuditStore | None = None
+checkpoint_store: CheckpointStore | None = None
 session_manager: SessionManager | None = None
 branch_manager: BranchManager | None = None
 skills_registry: SkillsRegistry | None = None
