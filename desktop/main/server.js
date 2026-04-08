@@ -673,6 +673,7 @@ class ServerManager {
      *   1. Virtual-env python inside the backend directory
      *   2. `python3` on PATH
      *   3. `python` on PATH
+     *   4. Common absolute macOS install paths for Finder-launched apps
      */
     getPythonPath() {
         const backendPath = this.getBackendPath();
@@ -705,6 +706,9 @@ class ServerManager {
         const systemCandidates = process.platform === 'win32'
             ? ['python', 'python3']
             : ['python3', 'python'];
+        if (process.platform === 'darwin') {
+            systemCandidates.push('/opt/homebrew/bin/python3', '/usr/local/bin/python3', '/Library/Frameworks/Python.framework/Versions/Current/bin/python3');
+        }
         for (const cmd of systemCandidates) {
             try {
                 const result = this.exec(cmd, ['--version'], { stdio: 'pipe', timeout: 5_000 });
