@@ -1,5 +1,10 @@
 # GhostLink Changelog
 
+## v6.0.2 — 2026-04-08
+### macOS Fix
+- **macOS Python detection** — fix Finder-launched app failing to detect Python. Added explicit paths: `/opt/homebrew/bin/python3`, `/usr/local/bin/python3`, `/Library/Frameworks/Python.framework/Versions/Current/bin/python3`
+- Resolves GitHub issue: Python 3.13 detection failure on macOS Apple Silicon
+
 ## v6.0.1 — 2026-04-08
 ### Operator Introspection & Doc Truth-Sync
 - **Operator introspection commands** — `/inspect memory`, `/inspect tools`, `/inspect stats` for real-time system visibility
