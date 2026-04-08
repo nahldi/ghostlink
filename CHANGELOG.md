@@ -1,5 +1,23 @@
 # GhostLink Changelog
 
+## v6.0.0 — 2026-04-08
+### Complete Multi-Agent Orchestration Platform
+Full roadmap execution — Phases 0 through 9 plus Phase 10 promoted items.
+
+- **Identity & Profiles** — stable agent_id, SQLite persistence, dual name/ID lookup, runtime isolation, drift detection, 4-layer profile inheritance, AGENTS.md reviewed import, rename-safe skills
+- **Operator Control Plane** — unified task model, structured progress, thinking level picker, context visibility controls, stop/cancel, timeline-first audit with export
+- **Durable Execution** — auto-checkpoints, tool-call journal replay, fork from checkpoint, pause/resume, artifact lineage
+- **Policy & Security** — policy engine at MCP/shell choke points, approval tiers, egress/SSRF protection, secret redaction, circuit breakers, hook signing, task-level policy snapshots
+- **Provider Independence** — transport abstraction layer, cost tracking with honest accounting, budget enforcement, failover routing, provider expansion (Bedrock, Kimi, Z.AI, BytePlus), prompt cache diagnostics
+- **Evals & Trace Grading** — golden task corpus, 8-dimension grading, CI regression gates
+- **Multi-Agent Execution** — per-agent worktree isolation, background executor with process isolation, arena mode, collaboration patterns, lifecycle hooks
+- **Memory & Intelligence** — 4-layer stratification, weighted recall, MemoryGraph/RAGPipeline reconciled, conflict detection, observational memory, promotion
+- **Media Generation** — video/music/image-edit MCP tools with async tracking, inline chat rendering, cost integration
+- **A2A Interoperability** — agent card publication, remote discovery, cross-platform task delegation, inbound policy gating, shared-key auth
+- **Productization** — versioned profiles/skills, rollout channels, policy-gated promotion, real rollback
+- **Platform & Quality** — accessibility pass (ARIA, keyboard nav, focus management), loading/empty/error standardization, AgentCockpit decomposition, plan mode, code review agent, PID recycling detection, doctor CLI
+- **Test coverage** — 277 backend + 112 frontend tests (up from 171 + 49 in v5.7.2)
+
 ## v5.7.2 — 2026-04-06
 ### Reliability, Performance, Architecture
 - **Launcher/setup wizard fixes** — unified desktop/backend settings path, fixed setupComplete lifecycle so wizard doesn't re-appear, hardened server start health verification, made wizard→launcher transition atomic
