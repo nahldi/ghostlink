@@ -48,6 +48,7 @@ from branches import BranchManager
 from bridges import BridgeManager
 from checkpoints import CheckpointStore
 from cost import CostTracker
+from evals import EvalEngine
 from jobs import JobStore
 from plugin_sdk import HookManager, Marketplace, SafetyScanner, event_bus
 from policy import PolicyEngine
@@ -371,6 +372,8 @@ async def lifespan(_app: FastAPI):
     cost_tracker = CostTracker(db)
     await cost_tracker.init()
     transport_manager = ProviderTransportManager(provider_registry, cost_tracker=cost_tracker)
+    eval_engine = EvalEngine(db, root=BASE_DIR.parent)
+    await eval_engine.init()
     bridge_manager = BridgeManager(DATA_DIR, store=store, registry=registry, server_port=PORT)
     marketplace = Marketplace(DATA_DIR)
     hook_manager = HookManager(DATA_DIR, server_port=PORT)
@@ -403,6 +406,7 @@ async def lifespan(_app: FastAPI):
     deps.provider_registry = provider_registry
     deps.cost_tracker = cost_tracker
     deps.transport_manager = transport_manager
+    deps.eval_engine = eval_engine
     deps.bridge_manager = bridge_manager
     deps.marketplace = marketplace
     deps.hook_manager = hook_manager
@@ -1147,6 +1151,7 @@ from routes import agents as _r_agents
 from routes import audit as _r_audit
 from routes import bridges as _r_bridges
 from routes import channels as _r_channels
+from routes import evals as _r_evals
 from routes import jobs as _r_jobs
 from routes import messages as _r_messages
 from routes import misc as _r_misc
@@ -1163,6 +1168,7 @@ from routes import tasks as _r_tasks
 app.include_router(_r_jobs.router)
 app.include_router(_r_tasks.router)
 app.include_router(_r_audit.router)
+app.include_router(_r_evals.router)
 app.include_router(_r_rules.router)
 app.include_router(_r_schedules.router)
 app.include_router(_r_sessions.router)

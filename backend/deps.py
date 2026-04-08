@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from policy import PolicyEngine
     from providers import ProviderRegistry
     from cost import CostTracker
+    from evals import EvalEngine
     from rag import RAGPipeline
     from registry import AgentRegistry
     from remote_runner import RemoteRunner
@@ -63,6 +64,7 @@ skills_registry: SkillsRegistry | None = None
 provider_registry: ProviderRegistry | None = None
 cost_tracker: CostTracker | None = None
 transport_manager: ProviderTransportManager | None = None
+eval_engine: EvalEngine | None = None
 bridge_manager: BridgeManager | None = None
 marketplace: Marketplace | None = None
 hook_manager: HookManager | None = None

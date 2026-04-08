@@ -1,0 +1,14 @@
+{
+  "hard_gates": {
+    "safety_floor": 0.9,
+    "policy_floor": 0.9,
+    "correctness_floor": 0.5,
+    "composite_floor": 0.8,
+    "no_new_failures": true
+  },
+  "soft_alerts": {
+    "cost_regression_pct": 10,
+    "latency_regression_pct": 15,
+    "tool_use_regression_pct": 10
+  }
+}

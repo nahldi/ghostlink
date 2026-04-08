@@ -1,0 +1,267 @@
+{
+  "generated_at": 1775635636.5348322,
+  "task_count": 22,
+  "categories": [
+    "approvals",
+    "delegation",
+    "failover",
+    "hooks",
+    "identity",
+    "memory",
+    "policy",
+    "replay",
+    "routing",
+    "worktrees"
+  ],
+  "tasks": [
+    {
+      "id": "golden-approvals-001",
+      "name": "High risk action requests approval",
+      "category": "approvals",
+      "tags": [
+        "approvals"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "approvals/golden-approvals-001.json"
+    },
+    {
+      "id": "golden-approvals-002",
+      "name": "Approval denial respected",
+      "category": "approvals",
+      "tags": [
+        "approvals"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "approvals/golden-approvals-002.json"
+    },
+    {
+      "id": "golden-delegation-001",
+      "name": "Delegates subtask",
+      "category": "delegation",
+      "tags": [
+        "delegation"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "delegation/golden-delegation-001.json"
+    },
+    {
+      "id": "golden-delegation-002",
+      "name": "Delegation result flows back",
+      "category": "delegation",
+      "tags": [
+        "delegation"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "delegation/golden-delegation-002.json"
+    },
+    {
+      "id": "golden-failover-001",
+      "name": "Provider failover happens",
+      "category": "failover",
+      "tags": [
+        "failover"
+      ],
+      "provider_requirements": [
+        "anthropic",
+        "groq"
+      ],
+      "sandbox_tier": "none",
+      "file": "failover/golden-failover-001.json"
+    },
+    {
+      "id": "golden-failover-002",
+      "name": "Failover audit emitted",
+      "category": "failover",
+      "tags": [
+        "failover"
+      ],
+      "provider_requirements": [
+        "anthropic",
+        "groq"
+      ],
+      "sandbox_tier": "none",
+      "file": "failover/golden-failover-002.json"
+    },
+    {
+      "id": "golden-hooks-001",
+      "name": "Pre-tool hook blocks dangerous action",
+      "category": "hooks",
+      "tags": [
+        "hooks"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "worktree_only",
+      "file": "hooks/golden-hooks-001.json"
+    },
+    {
+      "id": "golden-hooks-002",
+      "name": "Post-tool hook logs",
+      "category": "hooks",
+      "tags": [
+        "hooks"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "hooks/golden-hooks-002.json"
+    },
+    {
+      "id": "golden-identity-001",
+      "name": "Agent uses correct sender name",
+      "category": "identity",
+      "tags": [
+        "identity",
+        "regression"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "identity/golden-identity-001.json"
+    },
+    {
+      "id": "golden-identity-002",
+      "name": "No impersonation",
+      "category": "identity",
+      "tags": [
+        "identity"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "identity/golden-identity-002.json"
+    },
+    {
+      "id": "golden-identity-003",
+      "name": "Identity after MCP",
+      "category": "identity",
+      "tags": [
+        "identity"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "identity/golden-identity-003.json"
+    },
+    {
+      "id": "golden-memory-001",
+      "name": "Saves memory correctly",
+      "category": "memory",
+      "tags": [
+        "memory"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "memory/golden-memory-001.json"
+    },
+    {
+      "id": "golden-memory-002",
+      "name": "Loads memory correctly",
+      "category": "memory",
+      "tags": [
+        "memory"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "memory/golden-memory-002.json"
+    },
+    {
+      "id": "golden-policy-001",
+      "name": "Denied action blocked",
+      "category": "policy",
+      "tags": [
+        "policy"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "worktree_only",
+      "file": "policy/golden-policy-001.json"
+    },
+    {
+      "id": "golden-policy-002",
+      "name": "Budget limit enforced",
+      "category": "policy",
+      "tags": [
+        "policy"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "policy/golden-policy-002.json"
+    },
+    {
+      "id": "golden-policy-003",
+      "name": "Egress allowlist works",
+      "category": "policy",
+      "tags": [
+        "policy"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "policy/golden-policy-003.json"
+    },
+    {
+      "id": "golden-replay-001",
+      "name": "Completed trace replays identically",
+      "category": "replay",
+      "tags": [
+        "replay"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "replay/golden-replay-001.json"
+    },
+    {
+      "id": "golden-replay-002",
+      "name": "Resume after crash",
+      "category": "replay",
+      "tags": [
+        "replay"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "replay/golden-replay-002.json"
+    },
+    {
+      "id": "golden-routing-001",
+      "name": "Mention routes correctly",
+      "category": "routing",
+      "tags": [
+        "routing"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "routing/golden-routing-001.json"
+    },
+    {
+      "id": "golden-routing-002",
+      "name": "@all fanout",
+      "category": "routing",
+      "tags": [
+        "routing"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "none",
+      "file": "routing/golden-routing-002.json"
+    },
+    {
+      "id": "golden-worktrees-001",
+      "name": "Writes stay inside worktree",
+      "category": "worktrees",
+      "tags": [
+        "worktrees"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "worktree_only",
+      "file": "worktrees/golden-worktrees-001.json"
+    },
+    {
+      "id": "golden-worktrees-002",
+      "name": "Merge diff is correct",
+      "category": "worktrees",
+      "tags": [
+        "worktrees"
+      ],
+      "provider_requirements": [],
+      "sandbox_tier": "worktree_only",
+      "file": "worktrees/golden-worktrees-002.json"
+    }
+  ]
+}
