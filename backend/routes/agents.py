@@ -2614,7 +2614,31 @@ async def list_agent_tasks(name: str):
     """List autonomous tasks queued or recorded for an agent."""
     if not _VALID_AGENT_NAME.match(name):
         return JSONResponse({"error": "invalid agent name"}, 400)
-    return {"tasks": _load_agent_tasks(name)}
+    inst = _resolve_agent(name)
+    if deps.task_store is None or inst is None:
+        return {"tasks": _load_agent_tasks(name)}
+    try:
+        tasks = await deps.task_store.list_tasks(agent_name=inst.name, limit=_TASK_RETENTION)
+    except Exception:
+        return {"tasks": _load_agent_tasks(name)}
+    mapped = [
+        {
+            "id": task["task_id"],
+            "agent": task.get("agent_name") or name,
+            "title": task["title"],
+            "description": task["description"],
+            "status": task["status"],
+            "progress": task["progress_pct"],
+            "created_at": task["created_at"],
+            "started_at": task.get("started_at") or 0,
+            "completed_at": task.get("completed_at") or 0,
+            "error": task.get("error") or "",
+            "channel": task.get("channel") or "general",
+            "trace_id": task.get("trace_id") or "",
+        }
+        for task in tasks
+    ]
+    return {"tasks": mapped}
 
 
 @router.post("/api/agents/{name}/tasks")
@@ -2645,8 +2669,28 @@ async def create_agent_task(name: str, request: Request):
         "error": "",
         "channel": channel,
     }
-    tasks = _trim_task_history([task, *_load_agent_tasks(name)])
-    _save_agent_tasks(name, tasks)
+    if deps.task_store is not None:
+        try:
+            inst = deps.registry.get(name)
+            created = await deps.task_store.create(
+                title=title,
+                description=description,
+                channel=channel,
+                agent_id=getattr(inst, "agent_id", None),
+                agent_name=name,
+                profile_id=getattr(inst, "profile_id", None),
+                source_type="manual",
+                created_by="user",
+                metadata={"legacy_agent_task": True},
+            )
+            task["id"] = created["task_id"]
+            task["created_at"] = created["created_at"]
+        except Exception:
+            tasks = _trim_task_history([task, *_load_agent_tasks(name)])
+            _save_agent_tasks(name, tasks)
+    else:
+        tasks = _trim_task_history([task, *_load_agent_tasks(name)])
+        _save_agent_tasks(name, tasks)
 
     await _trigger_agent_task(name, task, channel=channel)
     await _emit_task_event(
@@ -2669,10 +2713,29 @@ async def delete_agent_task(name: str, task_id: str):
 
     tasks = _load_agent_tasks(name)
     removed = next((task for task in tasks if str(task.get("id", "")) == task_id), None)
-    if not removed:
-        return JSONResponse({"error": "task not found"}, 404)
-    remaining = [task for task in tasks if str(task.get("id", "")) != task_id]
-    _save_agent_tasks(name, remaining)
+    if deps.task_store is not None:
+        try:
+            task = await deps.task_store.cancel(task_id)
+            if not task:
+                return JSONResponse({"error": "task not found"}, 404)
+            cancel_dir = deps.DATA_DIR / "agents" / (task.get("agent_id") or task.get("agent_name") or name)
+            cancel_dir.mkdir(parents=True, exist_ok=True)
+            (cancel_dir / f".cancel_{task_id}").write_text(
+                json.dumps({"task_id": task_id, "agent_name": task.get("agent_name", name)}),
+                encoding="utf-8",
+            )
+            await deps.broadcast("task_update", task)
+            removed = {"title": task.get("title", task_id)}
+        except Exception:
+            if not removed:
+                return JSONResponse({"error": "task not found"}, 404)
+            remaining = [task for task in tasks if str(task.get("id", "")) != task_id]
+            _save_agent_tasks(name, remaining)
+    else:
+        if not removed:
+            return JSONResponse({"error": "task not found"}, 404)
+        remaining = [task for task in tasks if str(task.get("id", "")) != task_id]
+        _save_agent_tasks(name, remaining)
 
     await _emit_task_event(
         name,

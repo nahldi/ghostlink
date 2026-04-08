@@ -366,9 +366,10 @@ class AuditLog:
 class DataManager:
     """Handles data export, deletion, and retention for GDPR compliance."""
 
-    def __init__(self, data_dir: Path, store=None):
+    def __init__(self, data_dir: Path, store=None, audit_store=None):
         self._data_dir = data_dir
         self._store = store
+        self._audit_store = audit_store
         self._retention_file = data_dir / "retention_policy.json"
         self._retention: dict = self._load_retention()
 
@@ -378,10 +379,24 @@ class DataManager:
                 return json.loads(self._retention_file.read_text())
             except (json.JSONDecodeError, OSError):
                 pass
-        return {"enabled": False, "max_age_days": 90, "delete_attachments": True, "delete_memories": False}
+        return {
+            "enabled": False,
+            "max_age_days": 90,
+            "delete_attachments": True,
+            "delete_memories": False,
+            "delete_audit_events": False,
+            "audit_max_age_days": 90,
+        }
 
     def save_retention(self, policy: dict):
-        for k in ("enabled", "max_age_days", "delete_attachments", "delete_memories"):
+        for k in (
+            "enabled",
+            "max_age_days",
+            "delete_attachments",
+            "delete_memories",
+            "delete_audit_events",
+            "audit_max_age_days",
+        ):
             if k in policy:
                 self._retention[k] = policy[k]
         self._retention_file.parent.mkdir(parents=True, exist_ok=True)
@@ -487,6 +502,7 @@ class DataManager:
         max_age = self._retention.get("max_age_days", 90)
         cutoff = time.time() - (max_age * 86400)
         deleted_count = 0
+        deleted_audit = 0
         if self._store and self._store._db:
             # Preserve system messages (join, session, scheduled)
             cursor = await self._store._db.execute(
@@ -494,4 +510,12 @@ class DataManager:
             )
             await self._store._db.commit()
             deleted_count = cursor.rowcount
-        return {"ok": True, "deleted_messages": deleted_count, "cutoff_days": max_age}
+        if self._audit_store is not None and self._retention.get("delete_audit_events"):
+            deleted_audit = await self._audit_store.apply_retention(int(self._retention.get("audit_max_age_days", max_age)))
+        return {
+            "ok": True,
+            "deleted_messages": deleted_count,
+            "deleted_audit_events": deleted_audit,
+            "cutoff_days": max_age,
+            "audit_cutoff_days": int(self._retention.get("audit_max_age_days", max_age)),
+        }

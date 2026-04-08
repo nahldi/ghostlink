@@ -26,8 +26,9 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 
 class JobStore:
-    def __init__(self, db: aiosqlite.Connection):
+    def __init__(self, db: aiosqlite.Connection, task_store=None):
         self._db = db
+        self._task_store = task_store
 
     async def init(self):
         await self._db.executescript(JOBS_SCHEMA)
@@ -54,7 +55,20 @@ class JobStore:
             lastrowid = cursor.lastrowid
         finally:
             await cursor.close()
-        return await self._get_by_id(lastrowid)  # type: ignore
+        job = await self._get_by_id(lastrowid)  # type: ignore
+        if job and self._task_store is not None:
+            await self._task_store.create(
+                title=title,
+                description=body,
+                channel=channel,
+                agent_name=assignee or None,
+                source_type="job",
+                source_ref=job["uid"],
+                created_by=created_by,
+                status="queued" if job["status"] == "open" else job["status"],
+                metadata={"job_id": job["id"], "job_uid": job["uid"]},
+            )
+        return job
 
     async def update(self, job_id: int, updates: dict) -> dict | None:
         allowed = {"status", "title", "assignee", "body", "sort_order"}
@@ -66,12 +80,31 @@ class JobStore:
         vals = list(sets.values()) + [job_id]
         await self._db.execute(f"UPDATE jobs SET {cols} WHERE id = ?", vals)
         await self._db.commit()
-        return await self._get_by_id(job_id)
+        job = await self._get_by_id(job_id)
+        if job and self._task_store is not None:
+            task = await self._task_store.get_by_source_ref("job", job["uid"])
+            if task:
+                status_map = {"open": "queued", "done": "completed", "archived": "cancelled"}
+                await self._task_store.update(
+                    task["task_id"],
+                    title=job["title"],
+                    description=job["body"],
+                    agent_name=job["assignee"] or None,
+                    channel=job["channel"],
+                    status=status_map.get(job["status"], task["status"]),
+                    metadata={"job_id": job["id"], "job_uid": job["uid"]},
+                )
+        return job
 
     async def delete(self, job_id: int) -> bool:
+        job = await self._get_by_id(job_id)
         cursor = await self._db.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         await self._db.commit()
         try:
+            if cursor.rowcount > 0 and job and self._task_store is not None:
+                task = await self._task_store.get_by_source_ref("job", job["uid"])
+                if task:
+                    await self._task_store.delete(task["task_id"])
             return cursor.rowcount > 0
         finally:
             await cursor.close()

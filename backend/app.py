@@ -43,6 +43,7 @@ log = logging.getLogger(__name__)
 
 import mcp_bridge
 import plugin_loader
+from audit_store import AuditStore
 from branches import BranchManager
 from bridges import BridgeManager
 from jobs import JobStore
@@ -57,6 +58,7 @@ from security import AuditLog, DataManager, ExecPolicy, SecretsManager
 from sessions import SessionManager
 from skills import SkillsRegistry
 from store import MessageStore
+from task_store import TaskStore
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -346,7 +348,9 @@ async def lifespan(_app: FastAPI):
     await init_registry_db(db)
     await init_profiles_db(db)
     registry.load_persisted(await load_persisted_agents(db))
-    job_store = JobStore(db)
+    task_store = TaskStore(db)
+    await task_store.init()
+    job_store = JobStore(db, task_store=task_store)
     await job_store.init()
     rule_store = RuleStore(db)
     await rule_store.init()
@@ -364,7 +368,9 @@ async def lifespan(_app: FastAPI):
     hook_manager.register_all()
     exec_policy = ExecPolicy(DATA_DIR)
     audit_log = AuditLog(DATA_DIR)
-    data_manager = DataManager(DATA_DIR, store=store)
+    audit_store = AuditStore(db)
+    await audit_store.init()
+    data_manager = DataManager(DATA_DIR, store=store, audit_store=audit_store)
     # v3.6.0: Worktree manager for agent isolation + automation manager
     WorktreeManager = _require_startup_attr("worktree", "WorktreeManager")
     AutomationManager = _require_startup_attr("automations", "AutomationManager")
@@ -376,6 +382,7 @@ async def lifespan(_app: FastAPI):
     deps.store = store
     deps.runtime_db = db
     deps.job_store = job_store
+    deps.task_store = task_store
     deps.rule_store = rule_store
     deps.schedule_store = schedule_store
     deps.skills_registry = skills_registry
@@ -388,6 +395,7 @@ async def lifespan(_app: FastAPI):
     deps.secrets_manager = secrets_manager
     deps.exec_policy = exec_policy
     deps.audit_log = audit_log
+    deps.audit_store = audit_store
     deps.data_manager = data_manager
     deps.worktree_manager = worktree_manager
     deps.automation_manager = automation_manager
@@ -426,6 +434,7 @@ async def lifespan(_app: FastAPI):
         server_port=PORT,
         rule_store=rule_store,
         job_store=job_store,
+        task_store=task_store,
         router=router_msg,
         mcp_http_port=int(mcp_cfg.get("http_port", 0)),
         mcp_sse_port=int(mcp_cfg.get("sse_port", 0)),
@@ -1041,6 +1050,7 @@ async def ws_endpoint(ws: WebSocket):
 # ── Include route modules ───────────────────────────────────────────
 
 from routes import agents as _r_agents
+from routes import audit as _r_audit
 from routes import bridges as _r_bridges
 from routes import channels as _r_channels
 from routes import jobs as _r_jobs
@@ -1054,8 +1064,11 @@ from routes import schedules as _r_schedules
 from routes import search as _r_search
 from routes import security as _r_security
 from routes import sessions as _r_sessions
+from routes import tasks as _r_tasks
 
 app.include_router(_r_jobs.router)
+app.include_router(_r_tasks.router)
+app.include_router(_r_audit.router)
 app.include_router(_r_rules.router)
 app.include_router(_r_schedules.router)
 app.include_router(_r_sessions.router)

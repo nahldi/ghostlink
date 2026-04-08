@@ -27,6 +27,7 @@ _store = None          # MessageStore (async)
 _registry = None       # AgentRegistry
 _rule_store = None     # RuleStore (async)
 _job_store = None      # JobStore (async)
+_task_store = None     # TaskStore (async)
 _router = None         # MessageRouter
 _settings = None       # dict with channels etc.
 _data_dir: Path | None = None
@@ -66,13 +67,14 @@ def configure(
     server_port: int = 8300,
     rule_store=None,
     job_store=None,
+    task_store=None,
     router=None,
     mcp_http_port: int = 0,
     mcp_sse_port: int = 0,
 ):
     """Called before server start to inject dependencies."""
     global _store, _registry, _settings, _data_dir, _server_port
-    global _rule_store, _job_store, _router
+    global _rule_store, _job_store, _task_store, _router
     global MCP_HTTP_PORT, MCP_SSE_PORT, MCP_PORT
     _store = store
     _registry = registry
@@ -81,6 +83,7 @@ def configure(
     _server_port = server_port
     _rule_store = rule_store
     _job_store = job_store
+    _task_store = task_store
     _router = router
     if mcp_http_port:
         MCP_HTTP_PORT = mcp_http_port
@@ -249,6 +252,71 @@ def _update_cursor(sender: str, msgs: list[dict], channel: str | None):
         with _cursors_lock:
             agent_cursors = _cursors.setdefault(sender, {})
             agent_cursors[ch_key] = msgs[-1]["id"]
+
+
+def _channel_context(channel: str) -> dict:
+    if not _settings:
+        return {}
+    contexts = _settings.get("channel_context", {})
+    if not isinstance(contexts, dict):
+        return {}
+    payload = contexts.get(channel, {})
+    return payload if isinstance(payload, dict) else {}
+
+
+def _apply_channel_filter(msgs: list[dict], channel: str, sender: str) -> list[dict]:
+    context = _channel_context(channel)
+    mode = str(context.get("mode", "full") or "full").strip().lower()
+    if mode == "full":
+        return msgs
+    include_system = bool(context.get("include_system_messages", True))
+    include_progress = bool(context.get("include_progress_messages", True))
+    filtered = []
+    for msg in msgs:
+        msg_type = msg.get("type", "")
+        if msg_type == "system" and not include_system:
+            continue
+        if msg_type == "progress" and not include_progress:
+            continue
+        filtered.append(msg)
+    msgs = filtered
+    if mode == "mentions_only":
+        mention = f"@{sender}".lower()
+        return [m for m in msgs if mention in str(m.get("text", "")).lower()]
+    if mode == "recent":
+        max_history = int(context.get("max_history", 0) or 0)
+        return msgs[-max_history:] if max_history > 0 else msgs
+    if mode == "filtered":
+        visible = {str(v).lower() for v in context.get("visible_agents", []) if str(v).strip()}
+        hidden = {str(v).lower() for v in context.get("hidden_agents", []) if str(v).strip()}
+        if visible:
+            return [m for m in msgs if str(m.get("sender", "")).lower() in visible]
+        if hidden:
+            return [m for m in msgs if str(m.get("sender", "")).lower() not in hidden]
+    return msgs
+
+
+def _resolve_cancellation_agent(kwargs: dict, ctx: Context | None) -> str:
+    for key in ("sender", "name"):
+        value = str(kwargs.get(key, "") or "").strip()
+        if value and _registry and _registry.get(value):
+            return value
+    token = _extract_agent_token(ctx)
+    if token and _registry:
+        inst = _registry.resolve_token(token)
+        if inst:
+            return inst.name
+    return ""
+
+
+def _pending_cancellation_message(agent_name: str) -> str | None:
+    if not agent_name or _task_store is None:
+        return None
+    task = _run_async(_task_store.get_pending_cancellation(agent_name))
+    if not task:
+        return None
+    _run_async(_task_store.mark_cancel_signal_delivered(task["task_id"]))
+    return f"Task {task['task_id']} has been cancelled by the operator. Stop current work and acknowledge."
 
 
 def _serialize_messages(msgs: list[dict]) -> str:
@@ -505,6 +573,8 @@ def chat_read(
         msgs = _run_async(_store.get_recent(limit, ch))
 
     msgs = msgs[-limit:]
+    if sender:
+        msgs = _apply_channel_filter(msgs, ch, sender)
 
     # Smart context compression: if this is a first read (no cursor) with many messages,
     # compress older messages into a summary to save tokens
@@ -674,6 +744,7 @@ def chat_progress(
     current: int = 0,
     total: int = 0,
     message_id: int = 0,
+    task_id: str = "",
     ctx: Context | None = None,
 ) -> str:
     """Report progress on a multi-step task. Shows a live-updating progress card in the chat.
@@ -708,8 +779,28 @@ def chat_progress(
             "current": current,
             "total": total or len(steps),
             "title": title,
+            "task_id": task_id,
         }
     })
+
+    if task_id and _task_store is not None:
+        pct = int((current / max(total or len(steps), 1)) * 100) if (total or len(steps)) else 0
+        task = _run_async(_task_store.update_progress(task_id, pct, step_data[current - 1]["label"] if 0 < current <= len(step_data) else "", total or len(steps), {"steps": step_data}))
+        if task:
+            _run_async(
+                __import__("deps").broadcast(
+                    "task_progress",
+                    {
+                        "task_id": task["task_id"],
+                        "agent_name": task.get("agent_name"),
+                        "progress_pct": task["progress_pct"],
+                        "progress_step": task["progress_step"],
+                        "progress_total": task["progress_total"],
+                        "steps": step_data,
+                        "updated_at": task["updated_at"],
+                    },
+                )
+            )
 
     if message_id:
         # Update existing progress message via store abstraction
@@ -1703,6 +1794,7 @@ def _wrap_tool_with_hooks(func):
     def wrapper(*args, **kwargs):
         # Extract agent identity from first arg (most tools have sender as first param)
         agent = args[0] if args else kwargs.get("sender", kwargs.get("name", "unknown"))
+        ctx = kwargs.get("ctx")
 
         # Fire pre_tool_use hook — fail closed (hook error blocks the tool call)
         try:
@@ -1717,6 +1809,11 @@ def _wrap_tool_with_hooks(func):
         mode_error = _check_execution_mode(channel, tool_name)
         if mode_error:
             return mode_error
+
+        cancel_agent = _resolve_cancellation_agent(kwargs, ctx)
+        cancellation_message = _pending_cancellation_message(cancel_agent)
+        if cancellation_message:
+            return cancellation_message
 
         # Execute the actual tool
         try:
@@ -1745,6 +1842,16 @@ def _wrap_tool_with_hooks(func):
                     "result_hash": result_hash,
                     "result_length": len(str(result)) if result else 0,
                 }, actor=str(agent))
+            if _deps.audit_store:
+                _run_async(_deps.audit_store.record(
+                    "tool.invoke",
+                    actor=str(agent),
+                    action=f"invoked {tool_name}",
+                    actor_type="agent",
+                    agent_name=str(agent),
+                    channel=channel,
+                    detail={"tool": tool_name, "args_keys": list(kwargs.keys()) if kwargs else []},
+                ))
         except Exception as e:
             log.debug("Audit log failed for %s: %s", tool_name, e)
 

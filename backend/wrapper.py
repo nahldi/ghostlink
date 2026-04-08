@@ -623,6 +623,35 @@ def _queue_watcher(get_identity_fn, inject_fn, *, server_port: int = 8300,
     while True:
         try:
             name, queue_file = get_identity_fn()
+            agent_id = os.environ.get("GHOSTLINK_AGENT_ID", "").strip()
+            cancel_dirs = []
+            if agent_id:
+                cancel_dirs.append((data_dir / "agents" / agent_id).resolve())
+            cancel_dirs.append((data_dir / "agents" / name).resolve())
+            for cancel_dir in cancel_dirs:
+                if not cancel_dir.exists():
+                    continue
+                for signal_file in sorted(cancel_dir.glob(".cancel_*")):
+                    task_id = signal_file.name.replace(".cancel_", "", 1)
+                    try:
+                        subprocess.run(["tmux", "send-keys", "-t", session_name, "C-c"], capture_output=True, timeout=3)
+                        time.sleep(0.1)
+                        subprocess.run(
+                            [
+                                "tmux",
+                                "send-keys",
+                                "-t",
+                                session_name,
+                                f"Task {task_id} was cancelled by the operator. Stop current work and acknowledge in GhostLink.",
+                            ],
+                            capture_output=True,
+                            timeout=3,
+                        )
+                        time.sleep(0.1)
+                        subprocess.run(["tmux", "send-keys", "-t", session_name, "Enter"], capture_output=True, timeout=3)
+                    except Exception:
+                        pass
+                    signal_file.unlink(missing_ok=True)
             if queue_file.exists() and queue_file.stat().st_size > 0:
                 # Atomic read-and-clear: rename to .processing, read, delete.
                 # New writes go to the original filename, so no triggers are lost.

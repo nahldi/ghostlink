@@ -138,6 +138,58 @@ def _save_settings():
     save_settings()
 
 
+def _default_context() -> dict:
+    return {
+        "mode": "full",
+        "visible_agents": [],
+        "hidden_agents": [],
+        "max_history": 0,
+        "include_system_messages": True,
+        "include_progress_messages": True,
+    }
+
+
+@router.get("/api/channels/{name}/context")
+async def get_channel_context(name: str):
+    channels = deps._settings.get("channels", ["general"])
+    if name not in channels:
+        return JSONResponse({"error": "channel not found"}, 404)
+    contexts = deps._settings.get("channel_context", {})
+    payload = contexts.get(name, _default_context()) if isinstance(contexts, dict) else _default_context()
+    return {"channel": name, "context": payload}
+
+
+@router.put("/api/channels/{name}/context")
+async def set_channel_context(name: str, request: Request):
+    channels = deps._settings.get("channels", ["general"])
+    if name not in channels:
+        return JSONResponse({"error": "channel not found"}, 404)
+    body = await request.json()
+    mode = str(body.get("mode", "full") or "full").strip().lower()
+    if mode not in {"full", "mentions_only", "recent", "filtered"}:
+        return JSONResponse({"error": "invalid mode"}, 400)
+    payload = _default_context()
+    payload.update(
+        {
+            "mode": mode,
+            "visible_agents": [str(v) for v in body.get("visible_agents", body.get("visibleAgents", [])) if str(v).strip()],
+            "hidden_agents": [str(v) for v in body.get("hidden_agents", body.get("hiddenAgents", [])) if str(v).strip()],
+            "max_history": max(0, int(body.get("max_history", body.get("maxHistory", 0)) or 0)),
+            "include_system_messages": bool(body.get("include_system_messages", body.get("includeSystemMessages", True))),
+            "include_progress_messages": bool(body.get("include_progress_messages", body.get("includeProgressMessages", True))),
+        }
+    )
+    async with deps._settings_lock:
+        contexts = deps._settings.setdefault("channel_context", {})
+        if not isinstance(contexts, dict):
+            contexts = {}
+            deps._settings["channel_context"] = contexts
+        contexts[name] = payload
+        _save_settings()
+    await deps.broadcast("channel_context", {"channel": name, "context": payload})
+    return {"channel": name, "context": payload}
+
+
 async def _clone_branch_messages(parent_channel: str, branch_channel: str, fork_message_id: int) -> tuple[int, float]:
     if deps.store is None or deps.store._db is None:
         raise RuntimeError("Message store not initialized")

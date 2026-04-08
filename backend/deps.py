@@ -30,11 +30,13 @@ if TYPE_CHECKING:
     from router import MessageRouter
     from rules import RuleStore
     from schedules import ScheduleStore
+    from audit_store import AuditStore
     from security import AuditLog, DataManager, ExecPolicy, SecretsManager
     from sessions import SessionManager
     from skills import SkillsRegistry
     from specialization import SpecializationEngine
     from store import MessageStore
+    from task_store import TaskStore
     from worktree import WorktreeManager
 
 log = logging.getLogger(__name__)
@@ -47,6 +49,8 @@ router_inst: MessageRouter | None = None
 job_store: JobStore | None = None
 rule_store: RuleStore | None = None
 schedule_store: ScheduleStore | None = None
+task_store: TaskStore | None = None
+audit_store: AuditStore | None = None
 session_manager: SessionManager | None = None
 branch_manager: BranchManager | None = None
 skills_registry: SkillsRegistry | None = None

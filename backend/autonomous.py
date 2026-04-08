@@ -15,6 +15,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Literal
 
+import deps
+
 log = logging.getLogger(__name__)
 
 
@@ -77,6 +79,26 @@ class AutonomousManager:
             ],
         )
         self._plans[plan.plan_id] = plan
+        if deps.task_store is not None:
+            for st in plan.subtasks:
+                inst = deps.registry.resolve(st.assignee) if deps.registry and st.assignee else None
+                deps._main_loop.create_task(
+                    deps.task_store.create(
+                        title=st.label,
+                        description=st.description,
+                        channel=channel,
+                        agent_id=getattr(inst, "agent_id", None),
+                        agent_name=st.assignee or agent,
+                        profile_id=getattr(inst, "profile_id", None),
+                        source_type="autonomous",
+                        source_ref=plan.plan_id,
+                        parent_task_id=None,
+                        trace_id=plan.plan_id,
+                        created_by=agent,
+                        status="queued",
+                        metadata={"plan_id": plan.plan_id, "subtask_id": st.id},
+                    )
+                )
         log.info("Autonomous plan created: %s (%d subtasks) by %s", plan.plan_id, len(plan.subtasks), agent)
         return plan
 
@@ -113,6 +135,8 @@ class AutonomousManager:
                     st.status = "done"
                     st.result = result
                 st.completed_at = time.time()
+                if deps.task_store is not None:
+                    deps._main_loop.create_task(self._sync_subtask(plan, st))
                 break
 
         # Check if all done
@@ -155,8 +179,34 @@ class AutonomousManager:
             if st.status == "pending":
                 st.status = "running"
                 st.started_at = time.time()
+                if deps.task_store is not None:
+                    deps._main_loop.create_task(self._sync_subtask(plan, st))
                 return st
         return None
+
+    async def _sync_subtask(self, plan: AutonomousPlan, st: Subtask) -> None:
+        if deps.task_store is None:
+            return
+        task = await deps.task_store.get_by_source_ref("autonomous", plan.plan_id)
+        candidates = await deps.task_store.list_tasks(trace_id=plan.plan_id, limit=200)
+        match = next((row for row in candidates if row.get("metadata", {}).get("subtask_id") == st.id), task)
+        if not match:
+            return
+        status_map = {
+            "pending": "queued",
+            "running": "running",
+            "done": "completed",
+            "failed": "failed",
+            "skipped": "cancelled",
+        }
+        await deps.task_store.update(
+            match["task_id"],
+            status=status_map.get(st.status, "queued"),
+            error=st.error or None,
+            started_at=st.started_at or None,
+            completed_at=st.completed_at or None,
+            metadata={"plan_id": plan.plan_id, "subtask_id": st.id, "result": st.result},
+        )
 
     def _generate_summary(self, plan: AutonomousPlan) -> str:
         done = sum(1 for s in plan.subtasks if s.status == "done")
