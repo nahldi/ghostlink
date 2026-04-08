@@ -95,6 +95,10 @@ EVENTS = {
     # v3.4.0: Lifecycle hooks for MCP tool execution
     "pre_tool_use": "Fired before an MCP tool is called (data: agent, tool, args)",
     "post_tool_use": "Fired after an MCP tool completes (data: agent, tool, args, result)",
+    "memory_written": "Fired when an agent memory entry is written (data: agent_id, key, layer, tags)",
+    "memory_promoted": "Fired when a memory entry is promoted to shared knowledge",
+    "memory_conflict": "Fired when conflicting memory entries are detected",
+    "cache_alert": "Fired when provider cache hit rate stays below threshold",
 }
 
 

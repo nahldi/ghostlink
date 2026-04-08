@@ -214,14 +214,70 @@ class ProviderTransportManager:
     def _record_cache(self, provider: str, capability: str, cache_key: str) -> bool:
         if not cache_key:
             return False
-        provider_stats = self._cache_metrics.setdefault(provider, {"hits": 0, "misses": 0})
+        provider_stats = self._cache_metrics.setdefault(
+            provider,
+            {
+                "hits": 0,
+                "misses": 0,
+                "total_requests": 0,
+                "consecutive_misses": 0,
+                "alert_active": 0,
+            },
+        )
         seen = self._seen_cache_keys.setdefault((provider, capability), set())
         if cache_key in seen:
             provider_stats["hits"] += 1
+            provider_stats["total_requests"] += 1
+            provider_stats["consecutive_misses"] = 0
+            provider_stats["alert_active"] = 0
             return True
         seen.add(cache_key)
         provider_stats["misses"] += 1
+        provider_stats["total_requests"] += 1
+        provider_stats["consecutive_misses"] += 1
         return False
+
+    async def _maybe_emit_cache_alert(
+        self,
+        provider: str,
+        *,
+        capability: str,
+        agent_id: str,
+        session_id: str,
+        task_id: str,
+    ) -> None:
+        import deps
+        from plugin_sdk import event_bus
+
+        stats = self._cache_metrics.get(provider)
+        if not stats:
+            return
+        total = max(1, int(stats.get("total_requests", 0) or 0))
+        hit_rate = round(float(stats.get("hits", 0)) / total, 4)
+        threshold = float(deps._settings.get("cacheAlertThreshold", 0.5) or 0.5)
+        miss_streak_limit = int(deps._settings.get("cacheAlertMissStreak", 5) or 5)
+        if hit_rate >= threshold or int(stats.get("consecutive_misses", 0) or 0) < miss_streak_limit:
+            return
+        if int(stats.get("alert_active", 0) or 0):
+            return
+        stats["alert_active"] = 1
+        payload = {
+            "provider": provider,
+            "capability": capability,
+            "agent_id": agent_id or "system",
+            "session_id": session_id or "default",
+            "task_id": task_id,
+            "cache_hit_rate": hit_rate,
+            "threshold": threshold,
+            "consecutive_misses": int(stats.get("consecutive_misses", 0) or 0),
+            "suggested_actions": [
+                "Check if prompt ordering changed",
+                "Verify system prompt stability",
+                "Check provider cache TTL",
+            ],
+        }
+        event_bus.emit("cache_alert", payload)
+        await self._emit_event("cache_alert", payload)
 
     async def _emit_event(self, event_type: str, payload: dict[str, Any]) -> None:
         import deps
@@ -290,6 +346,13 @@ class ProviderTransportManager:
             cache_hit = self._record_cache(provider_id, capability, provider_request.cache_key)
             response.cache_hit = cache_hit
             response.metadata["cache_hit"] = cache_hit
+            await self._maybe_emit_cache_alert(
+                provider_id,
+                capability=capability,
+                agent_id=provider_request.agent_id or "system",
+                session_id=provider_request.session_id or "default",
+                task_id=provider_request.task_id,
+            )
             if self._cost_tracker:
                 usage = self._provider_registry.extract_usage(provider_id, model, response)
                 await self._cost_tracker.record(
@@ -340,8 +403,12 @@ class ProviderTransportManager:
     def cache_metrics(self) -> dict[str, Any]:
         total_hits = sum(v.get("hits", 0) for v in self._cache_metrics.values())
         total_misses = sum(v.get("misses", 0) for v in self._cache_metrics.values())
+        providers = {k: dict(v) for k, v in self._cache_metrics.items()}
+        for provider_stats in providers.values():
+            total = max(1, int(provider_stats.get("total_requests", 0) or 0))
+            provider_stats["cache_hit_rate"] = round(float(provider_stats.get("hits", 0)) / total, 4)
         return {
-            "providers": {k: dict(v) for k, v in self._cache_metrics.items()},
+            "providers": providers,
             "total_hits": total_hits,
             "total_misses": total_misses,
         }

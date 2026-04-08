@@ -8,6 +8,7 @@ export function AgentStatusPill({ agent }: { agent: Agent }) {
   const [showInfo, setShowInfo] = useState(false);
   const isOnline = agent.state === 'active' || agent.state === 'idle' || agent.state === 'thinking';
   const isOffline = agent.state === 'offline';
+  const hasDrift = Boolean(agent.drift_detected);
 
   return (
     <>
@@ -30,19 +31,24 @@ export function AgentStatusPill({ agent }: { agent: Agent }) {
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div className={`text-xs font-semibold truncate ${isOffline ? 'text-on-surface-variant/50' : 'text-on-surface'}`}>
-            {agent.label}
+          <div className={`flex items-center gap-1.5 text-xs font-semibold truncate ${isOffline ? 'text-on-surface-variant/50' : 'text-on-surface'}`}>
+            <span className="truncate">{agent.label}</span>
+            {hasDrift && (
+              <span className="shrink-0 rounded-md bg-red-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase leading-none text-red-300">
+                Drift
+              </span>
+            )}
           </div>
           <AnimatePresence mode="wait">
             <motion.div
-              key={agent.state}
+              key={`${agent.state}-${hasDrift ? 'drift' : 'normal'}`}
               initial={{ opacity: 0, y: 3 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -3 }}
               transition={{ duration: 0.18 }}
               className="text-[10px] truncate text-on-surface-variant/40"
             >
-              {isOffline ? 'Offline' : agent.role || providerTag(agent.base)}
+              {hasDrift ? 'Identity drift detected' : isOffline ? 'Offline' : agent.role || providerTag(agent.base)}
             </motion.div>
           </AnimatePresence>
         </div>

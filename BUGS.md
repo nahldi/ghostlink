@@ -1,6 +1,6 @@
 # GhostLink — Active Risks & Known Gaps
 
-**Last updated:** 2026-04-06  
+**Last updated:** 2026-04-07  
 **Version:** v5.7.2
 
 > This file tracks current open issues, structural risks, and release-relevant gaps. Historical audits and fixed bug archaeology have been moved out of the active surface.
@@ -100,4 +100,4 @@ These are tracked as future platform work, not current release blockers.
 - Reconnect API fanout spike
 - Token streaming state-update hot path inefficiency
 
-See [CHANGELOG.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/CHANGELOG.md) for release detail and [UNIFIED_ROADMAP.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md) for the forward plan.
+See [CHANGELOG.md](./CHANGELOG.md) for release detail and [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md) for the forward plan.

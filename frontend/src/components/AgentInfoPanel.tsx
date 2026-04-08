@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
-import type { Agent } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import type { Agent, AgentEffectiveStateResponse, AgentMemorySnapshot } from '../types';
 import { AgentIcon } from './AgentIcon';
 import { api } from '../lib/api';
 import { useChatStore } from '../stores/chatStore';
 import { timeAgo } from '../lib/timeago';
 import { toast } from './Toast';
+import { EffectiveStateViewer } from './EffectiveStateViewer';
+import { MemoryInspector } from './MemoryInspector';
 
 interface AgentInfoPanelProps {
   agent: Agent;
@@ -25,11 +27,15 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
   const isPaused = agent.state === 'paused';
   const [killing, setKilling] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [tab, setTab] = useState<'info' | 'context' | 'skills'>('info');
+  const [tab, setTab] = useState<'info' | 'identity' | 'context' | 'skills' | 'profile'>('info');
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [skillSearch, setSkillSearch] = useState('');
   const [skillFilter, setSkillFilter] = useState('');
+  const [effectiveState, setEffectiveState] = useState<AgentEffectiveStateResponse | null>(null);
+  const [effectiveStateError, setEffectiveStateError] = useState('');
+  const [availableProfiles, setAvailableProfiles] = useState<Array<{ profile_id: string; name: string }>>([]);
   const setAgents = useChatStore((s) => s.setAgents);
+  const setProfileManagerOpen = useChatStore((s) => s.setProfileManagerOpen);
 
   useEffect(() => {
     if (tab === 'skills') {
@@ -38,6 +44,47 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
         .catch((e) => console.warn('Skills fetch:', e.message || e));
     }
   }, [tab, agent.name]);
+
+  useEffect(() => {
+    if (tab !== 'identity' && tab !== 'profile') return;
+    let cancelled = false;
+    api.getAgentEffectiveState(agent.name)
+      .then((data) => {
+        if (!cancelled) {
+          setEffectiveState(data);
+          setEffectiveStateError('');
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setEffectiveState(null);
+          setEffectiveStateError(e instanceof Error ? e.message : 'Identity status unavailable');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, agent.name]);
+
+  useEffect(() => {
+    if (tab !== 'profile') return;
+    let cancelled = false;
+    api.getProfiles()
+      .then((result) => {
+        if (!cancelled) {
+          setAvailableProfiles(result.profiles.map((profile) => ({
+            profile_id: profile.profile_id,
+            name: profile.name,
+          })));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableProfiles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
 
   const toggleSkill = async (skillId: string, enabled: boolean) => {
     try {
@@ -103,6 +150,18 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
             <div className="flex-1 min-w-0">
               <div className="text-lg font-bold text-on-surface">{agent.label}</div>
               <div className="text-xs text-on-surface-variant/40">@{agent.name}</div>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                {agent.profile_name && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-primary/15 text-primary uppercase">
+                    {agent.profile_name}
+                  </span>
+                )}
+                {agent.drift_detected && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-red-500/20 text-red-300 uppercase">
+                    Identity drift
+                  </span>
+                )}
+              </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant/30">
               <span className="material-symbols-outlined text-lg">close</span>
@@ -111,7 +170,7 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
 
           {/* Tabs */}
           <div className="flex gap-1 mt-4">
-            {(['info', 'context', 'skills'] as const).map(t => (
+            {(['info', 'identity', 'profile', 'context', 'skills'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -119,7 +178,15 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
                   tab === t ? 'bg-primary/10 text-primary' : 'text-on-surface-variant/40 hover:text-on-surface-variant/60'
                 }`}
               >
-                {t === 'info' ? 'Info' : t === 'context' ? 'Context' : `Skills ${skills.length > 0 ? `(${skills.filter(s => s.enabled).length})` : ''}`}
+                {t === 'info'
+                  ? 'Info'
+                  : t === 'identity'
+                    ? 'Identity'
+                    : t === 'profile'
+                      ? 'Profile'
+                    : t === 'context'
+                      ? 'Context'
+                      : `Skills ${skills.length > 0 ? `(${skills.filter(s => s.enabled).length})` : ''}`}
               </button>
             ))}
           </div>
@@ -142,6 +209,16 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
               {/* Response Mode */}
               <ResponseModeSelector agent={agent} />
             </div>
+          ) : tab === 'identity' ? (
+            <IdentityPanel agent={agent} effectiveState={effectiveState} error={effectiveStateError} />
+          ) : tab === 'profile' ? (
+            <ProfileTab
+              agent={agent}
+              effectiveState={effectiveState}
+              error={effectiveStateError}
+              availableProfiles={availableProfiles}
+              onOpenProfileManager={() => setProfileManagerOpen(true)}
+            />
           ) : tab === 'context' ? (
             <ContextPanel agent={agent} />
           ) : (
@@ -223,6 +300,141 @@ export function AgentInfoPanel({ agent, onClose }: AgentInfoPanelProps) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function IdentityPanel({
+  agent,
+  effectiveState,
+  error,
+}: {
+  agent: Agent;
+  effectiveState: AgentEffectiveStateResponse | null;
+  error: string;
+}) {
+  const identityAgentId = effectiveState?.agent_id || agent.agent_id || 'Pending backend support';
+  const profileName = effectiveState?.profile_name || agent.profile_name || 'Unassigned';
+  const profileId = effectiveState?.profile_id || agent.profile_id || 'Pending backend support';
+  const driftDetected = Boolean(effectiveState?.drift_detected || agent.drift_detected);
+  const driftScore = typeof effectiveState?.drift_score === 'number' ? `${Math.round(effectiveState.drift_score * 100)}%` : 'Pending backend support';
+  const reinforcementState = effectiveState?.reinforcement_pending ? 'Pending' : driftDetected ? 'Triggered' : 'Clear';
+  const reinforcementCount = typeof effectiveState?.reinforcement_count === 'number' ? String(effectiveState.reinforcement_count) : '0';
+  const lastReinforcement = effectiveState?.last_reinforcement_at ? timeAgo(effectiveState.last_reinforcement_at) : 'Not recorded';
+  return (
+    <div className="space-y-3">
+      <InfoRow icon="fingerprint" label="Agent ID" value={String(identityAgentId)} color={agent.color} mono />
+      <InfoRow icon="badge" label="Profile" value={profileName} color={agent.color} />
+      <InfoRow icon="deployed_code" label="Profile ID" value={String(profileId)} color={agent.color} mono />
+      <InfoRow
+        icon={driftDetected ? 'warning' : 'verified_user'}
+        label="Identity State"
+        value={driftDetected ? 'Drift detected' : 'Stable'}
+        color={driftDetected ? '#f87171' : '#4ade80'}
+      />
+      <InfoRow icon="speed" label="Drift Score" value={driftScore} color={driftDetected ? '#f59e0b' : agent.color} />
+      <InfoRow icon="bolt" label="Reinforcement" value={reinforcementState} color={effectiveState?.reinforcement_pending ? '#f59e0b' : '#4ade80'} />
+      <InfoRow icon="history" label="Reinforcement Count" value={reinforcementCount} color={agent.color} />
+      <InfoRow icon="schedule" label="Last Reinforcement" value={lastReinforcement} color={agent.color} />
+      {effectiveState?.drift_reason && (
+        <div className="rounded-xl border border-amber-400/15 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-100/80">
+          {effectiveState.drift_reason}
+        </div>
+      )}
+      <div className="py-3 px-3 rounded-xl bg-surface-container/30 border border-outline-variant/4">
+        <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mb-2">Effective State</div>
+        {error ? (
+          <p className="text-[11px] text-on-surface-variant/40 leading-relaxed">
+            {error}. Backend may still be wiring the Phase 1B identity endpoints.
+          </p>
+        ) : effectiveState ? (
+          <EffectiveStateViewer state={effectiveState} compact />
+        ) : (
+          <p className="text-[11px] text-on-surface-variant/40 leading-relaxed">
+            Effective identity state will appear here once the backend exposes the Phase 1B payload.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProfileTab({
+  agent,
+  effectiveState,
+  error,
+  availableProfiles,
+  onOpenProfileManager,
+}: {
+  agent: Agent;
+  effectiveState: AgentEffectiveStateResponse | null;
+  error: string;
+  availableProfiles: Array<{ profile_id: string; name: string }>;
+  onOpenProfileManager: () => void;
+}) {
+  const profileId = effectiveState?.profile_id || agent.profile_id || '';
+  const [selectedProfileId, setSelectedProfileId] = useState(profileId);
+
+  useEffect(() => {
+    setSelectedProfileId(profileId);
+  }, [profileId]);
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-outline-variant/6 bg-surface-container/30 px-3 py-3">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/35">Profile Assignment</div>
+            <div className="mt-1 text-[11px] text-on-surface-variant/35">
+              Profiles own the durable behavior layer. Agent overrides stay visible below.
+            </div>
+          </div>
+          <button
+            onClick={onOpenProfileManager}
+            className="rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1.5 text-[10px] font-semibold text-primary"
+          >
+            Manage Profiles
+          </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-[1fr,auto]">
+          <label className="space-y-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/35">Current Profile</span>
+            <select
+              value={selectedProfileId}
+              onChange={async (event) => {
+                const nextProfileId = event.target.value;
+                setSelectedProfileId(nextProfileId);
+                try {
+                  await api.setAgentConfig(agent.name, { profile_id: nextProfileId });
+                  toast('Profile assignment saved', 'success');
+                } catch (fetchError) {
+                  toast(fetchError instanceof Error ? fetchError.message : 'Failed to assign profile', 'error');
+                }
+              }}
+              className="setting-input w-full"
+            >
+              <option value="">Unassigned</option>
+              {availableProfiles.map((profile) => (
+                <option key={profile.profile_id} value={profile.profile_id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid gap-2 md:min-w-[160px]">
+            <InfoRow icon="badge" label="Profile Name" value={effectiveState?.profile_name || agent.profile_name || 'Unassigned'} color={agent.color} />
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="rounded-xl border border-red-400/12 bg-red-500/8 px-3 py-3 text-[11px] text-red-200/80">
+          {error}
+        </div>
+      ) : (
+        <EffectiveStateViewer state={effectiveState} emptyMessage="Phase 2 effective-state details will appear here once Tyson’s profile endpoints are live." />
+      )}
     </div>
   );
 }
@@ -334,17 +546,10 @@ const MODEL_CONTEXT: Record<string, { tokens: number; label: string; costPerMTok
 function ContextPanel({ agent }: { agent: Agent }) {
   const messages = useChatStore(s => s.messages);
   const setAgents = useChatStore(s => s.setAgents);
-  const [soul, setSoul] = useState('');
-  const [notes, setNotes] = useState('');
-  const [memories, setMemories] = useState<{ key: string; size: number }[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  // Load soul, notes, memories
-  useEffect(() => {
-    api.getAgentSoul(agent.name).then(r => setSoul(r.soul || '')).catch((e) => console.warn('Agent soul fetch:', e.message || e));
-    api.getAgentNotes(agent.name).then(r => setNotes(r.notes || '')).catch((e) => console.warn('Agent notes fetch:', e.message || e));
-    api.getAgentMemories(agent.name).then(r => setMemories(r.memories || [])).catch((e) => console.warn('Agent memories fetch:', e.message || e));
-  }, [agent.name]);
+  const [memoryCount, setMemoryCount] = useState(0);
+  const handleMemorySnapshot = useCallback((snapshot: AgentMemorySnapshot) => {
+    setMemoryCount(snapshot.memories.length + snapshot.observations.length);
+  }, []);
 
   const agentMsgs = messages.filter(m => m.sender === agent.name);
   const totalChars = agentMsgs.reduce((s, m) => s + m.text.length, 0);
@@ -357,18 +562,6 @@ function ContextPanel({ agent }: { agent: Agent }) {
     : 0;
   const sessionDisplay = sessionMinutes < 60 ? `${sessionMinutes}m` : `${Math.floor(sessionMinutes / 60)}h ${sessionMinutes % 60}m`;
   const estimatedCost = (estimatedTokens / 1_000_000) * contextInfo.costPerMTok;
-
-  const handleSaveSoul = async () => {
-    setSaving(true);
-    await api.setAgentSoul(agent.name, soul).catch((e) => console.warn('Save soul:', e.message || e));
-    setSaving(false);
-  };
-
-  const handleSaveNotes = async () => {
-    setSaving(true);
-    await api.setAgentNotes(agent.name, notes).catch((e) => console.warn('Save notes:', e.message || e));
-    setSaving(false);
-  };
 
   const handleNewSession = async () => {
     // Kill and re-spawn
@@ -423,45 +616,16 @@ function ContextPanel({ agent }: { agent: Agent }) {
             <div className="text-[9px] text-on-surface-variant/40">Est. Cost</div>
           </div>
           <div className="text-center py-2 px-2 rounded-lg bg-surface-container/40">
-            <div className="text-lg font-bold" style={{ color: agent.color }}>{memories.length}</div>
+            <div className="text-lg font-bold" style={{ color: agent.color }}>{memoryCount}</div>
             <div className="text-[9px] text-on-surface-variant/40">Memories</div>
           </div>
         </div>
       </div>
 
-      {/* SOUL Identity */}
-      <div className="py-3 px-3 rounded-xl bg-surface-container/30 border border-outline-variant/4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider">SOUL Identity</div>
-          <button onClick={handleSaveSoul} disabled={saving} className="text-[9px] text-primary hover:text-primary/80 font-medium">
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-        <textarea
-          value={soul}
-          onChange={e => setSoul(e.target.value)}
-          placeholder="Define this agent's personality and behavior..."
-          rows={3}
-          className="setting-input w-full text-[11px] resize-none"
-        />
-      </div>
-
-      {/* Notes */}
-      <div className="py-3 px-3 rounded-xl bg-surface-container/30 border border-outline-variant/4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider">Working Notes</div>
-          <button onClick={handleSaveNotes} disabled={saving} className="text-[9px] text-primary hover:text-primary/80 font-medium">
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="Scratch pad for this agent..."
-          rows={3}
-          className="setting-input w-full text-[11px] resize-none"
-        />
-      </div>
+      <MemoryInspector
+        agent={agent}
+        onSnapshot={handleMemorySnapshot}
+      />
 
       {/* Session Actions */}
       {(agent.state === 'active' || agent.state === 'thinking') && (

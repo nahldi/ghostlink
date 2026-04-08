@@ -331,14 +331,17 @@ PROVIDERS = {
     "minimax": {
         "name": "MiniMax (stashed)",
         "env_keys": ["MINIMAX_API_KEY"],
-        "capabilities": ["chat"],
+        "capabilities": ["chat", "music"],
         "transport_mode": "api",
         "auth_method": "api_key",
         "usage_policy_flags": ["geographic_restriction"],
         "degraded_mode_behavior": "failover",
         "setup_url": "",
         "setup_instructions": "",
-        "models": {"abab7-chat": {"label": "ABAB 7 Chat", "tier": "standard"}},
+        "models": {
+            "abab7-chat": {"label": "ABAB 7 Chat", "tier": "standard"},
+            "music-2.5+": {"label": "MiniMax Music 2.5+", "tier": "music"},
+        },
     },
 }
 
@@ -348,6 +351,7 @@ CAPABILITY_PRIORITY = {
     "code": ["anthropic", "openai", "google", "mistral", "deepseek", "openrouter", "ollama"],
     "image": ["google", "openai", "together", "huggingface", "openrouter"],
     "video": ["google"],
+    "music": ["minimax"],
     "tts": ["google", "openai"],
     "stt": ["google", "openai", "groq", "huggingface"],
     "code_exec": ["google"],
@@ -681,6 +685,7 @@ class ProviderRegistry:
             "zai": "https://open.bigmodel.cn/api/paas/v4/",
             "byteplus": "https://ark.cn-beijing.volces.com/api/v3/",
             "bedrock": "https://bedrock-runtime.us-east-1.amazonaws.com/",
+            "minimax": "https://api.minimax.io/v1/",
         }
         headers = dict(overrides.get("headers", {}) or {})
         api_key = self.get_api_key(provider_id)

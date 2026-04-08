@@ -1,6 +1,6 @@
 # GhostLink — Feature Reference
 
-**Last updated:** 2026-04-06  
+**Last updated:** 2026-04-07  
 **Version:** v5.7.2
 
 > This file lists features that are actually shipped in the current codebase. Planned work belongs in `UNIFIED_ROADMAP.md`, not here.
@@ -176,4 +176,4 @@ This file intentionally does **not** claim the following as shipped today:
 - Advanced dreaming-style memory
 - Full accessibility/systematic loading-state pass
 
-Those belong to [UNIFIED_ROADMAP.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md).
+Those belong to [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md).

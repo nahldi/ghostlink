@@ -49,6 +49,10 @@ def _create_parser() -> argparse.ArgumentParser:
     status_p.add_argument("--port", type=int, default=8300, help="Server port")
     status_p.add_argument("--output", choices=["json", "text"], default="text", help="Output format")
 
+    doctor_p = sub.add_parser("doctor", help="Run actionable system diagnostics")
+    doctor_p.add_argument("--port", type=int, default=8300, help="Server port")
+    doctor_p.add_argument("--output", choices=["json", "text"], default="text", help="Output format")
+
     # ghostlink send
     send_p = sub.add_parser("send", help="Send a message (fire and forget)")
     send_p.add_argument("text", help="Message text")
@@ -226,6 +230,46 @@ async def cmd_status(args):
     return 0
 
 
+async def cmd_doctor(args):
+    try:
+        health = await _http_get(args.port, "/api/health")
+        diagnostics = await _http_get(args.port, "/api/diagnostics")
+    except Exception as exc:
+        payload = {
+            "status": "error",
+            "checks": [{"name": "backend", "status": "error", "detail": f"unreachable on port {args.port}: {exc}"}],
+        }
+        if args.output == "json":
+            print(json.dumps(payload, indent=2))
+        else:
+            print(f"doctor: backend unreachable on port {args.port}", file=sys.stderr)
+            print(f"fix: start GhostLink or verify the configured port ({args.port})", file=sys.stderr)
+        return 1
+
+    checks = [{"name": "backend", "status": health.get("status", "error"), "detail": f"reachable, uptime={round(float(health.get('uptime', 0.0)), 1)}s"}]
+    checks.extend(diagnostics.get("checks", []))
+    failing = [check for check in checks if check.get("status") == "error"]
+    payload = {"status": "ok" if not failing else "error", "checks": checks}
+
+    if args.output == "json":
+        print(json.dumps(payload, indent=2))
+    else:
+        for check in checks:
+            prefix = {"ok": "OK", "warn": "WARN", "info": "INFO", "error": "ERROR"}.get(check.get("status", "info"), "INFO")
+            print(f"{prefix:5s} {check.get('name')}: {check.get('detail', '')}")
+            if check.get("name") == "database" and check.get("status") == "error":
+                print("      fix: inspect backend/data/ghostlink_v2.db and run sqlite integrity checks")
+            if check.get("name") == "dependencies" and check.get("status") == "error":
+                print("      fix: install the missing Python packages from backend/requirements.txt")
+            if check.get("name") == "process_bookkeeping" and check.get("status") != "ok":
+                print("      fix: run cleanup, then inspect stale agent/process bookkeeping in the backend")
+            if check.get("name") == "port_conflict" and check.get("status") != "ok":
+                print(f"      fix: verify GhostLink is bound to {args.port} and no other process owns the configured port")
+            if check.get("name") == "backend" and check.get("status") == "error":
+                print(f"      fix: start GhostLink on port {args.port} or pass the correct --port")
+    return 1 if failing else 0
+
+
 async def cmd_send(args):
     """Send a message."""
     try:
@@ -273,6 +317,7 @@ def main():
     cmd_map = {
         "run": cmd_run,
         "status": cmd_status,
+        "doctor": cmd_doctor,
         "send": cmd_send,
         "agents": cmd_agents,
     }

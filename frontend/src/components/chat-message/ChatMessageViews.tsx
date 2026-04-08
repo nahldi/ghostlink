@@ -13,6 +13,10 @@ import { HandoffCard } from '../HandoffCard';
 import { ApprovalCard } from '../ApprovalCard';
 import { UrlPreviews } from '../UrlPreview';
 import { GenerativeCard } from '../GenerativeCard';
+import { VideoPlayer } from '../VideoPlayer';
+import { AudioPlayer } from '../AudioPlayer';
+import { MediaTaskCard } from '../MediaTaskCard';
+import { ImageEditCard } from '../ImageEditCard';
 import { AgentIcon } from '../AgentIcon';
 import { StreamingText } from '../StreamingText';
 import type { Agent, Attachment, Message, Settings } from '../../types';
@@ -112,6 +116,10 @@ function Attachments({ attachments }: { attachments: Attachment[] }) {
         <div key={att.url || i}>
           {att.type?.startsWith('image/') ? (
             <img src={att.url} alt={att.name} className="max-w-[280px] max-h-[180px] rounded-lg border border-outline-variant/10 object-cover" />
+          ) : att.type?.startsWith('video/') ? (
+            <VideoPlayer src={att.url} title={att.name} />
+          ) : att.type?.startsWith('audio/') ? (
+            <AudioPlayer src={att.url} title={att.name} />
           ) : (
             <a href={att.url} className="text-xs text-secondary underline" target="_blank" rel="noopener noreferrer">{att.name}</a>
           )}
@@ -368,6 +376,36 @@ export function AgentMessageView({
   const handoff = metadata.handoff as { from: string; to: string; reason?: string; context?: string } | undefined;
   const approval = message.type === 'approval_request' ? metadata as { agent?: string; prompt?: string; responded?: string } : undefined;
   const card = metadata.card as { type: string; title?: string; [key: string]: unknown } | undefined;
+  const mediaTask = (metadata.media_task || metadata.media) as {
+    kind?: string;
+    artifact_type?: string;
+    mime_type?: string;
+    status?: string;
+    progress_pct?: number;
+    provider?: string;
+    model?: string;
+    cost_usd?: number;
+    eta_seconds?: number;
+    error?: string;
+    output_url?: string;
+    artifact_path?: string;
+    thumbnail_url?: string;
+    steps?: Array<{ label?: string; status?: 'done' | 'active' | 'pending' | string }>;
+    duration?: number;
+    genre?: string;
+    mood?: string;
+    tempo?: string;
+    lyrics?: string;
+    instrumental?: boolean;
+  } | undefined;
+  const imageEdit = metadata.image_edit as {
+    mode?: string;
+    prompt?: string;
+    source_url?: string;
+    result_url?: string;
+    mask_url?: string;
+    status?: string;
+  } | undefined;
 
   return (
     <div
@@ -433,6 +471,8 @@ export function AgentMessageView({
           {proposal && <JobProposal title={proposal.title} assignee={proposal.assignee} description={proposal.description} accepted={proposal.accepted} onAccept={() => {}} onDismiss={() => {}} />}
           {handoff && <HandoffCard from={handoff.from} to={handoff.to} reason={handoff.reason} context={handoff.context} fromColor={agents.find(a => a.name === handoff.from)?.color} toColor={agents.find(a => a.name === handoff.to)?.color} />}
           {approval && <ApprovalCard messageId={message.id} agent={approval.agent || message.sender} agentColor={agentColor} agentBase={agent?.base} prompt={approval.prompt || message.text} responded={approval.responded} />}
+          {mediaTask && <MediaTaskCard task={mediaTask} />}
+          {imageEdit && <ImageEditCard edit={imageEdit} />}
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- card shape validated by 'type' in check */}
           {card && 'type' in card && <GenerativeCard card={card as any} agentColor={agentColor} />}
         </div>

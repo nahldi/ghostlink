@@ -1,9 +1,11 @@
 # Phase 1A Risk Audit: Stable Agent Identity
 
 **Auditor:** Independent audit agent
-**Date:** 2026-04-06
-**Scope:** Full codebase regression risk analysis for adding `agent_id` (UUID v7) and rekeying from agent name to stable ID
-**Verdict:** HIGH cumulative risk. Over 40 distinct code locations use agent name as a primary key. No single change is catastrophic, but the blast radius is wide and there are zero integration tests covering the migration path.
+**Date:** 2026-04-07
+**Scope:** Full codebase regression risk analysis for adding `agent_id` (`uuid.uuid4().hex`) and rekeying from agent name to stable ID
+**Verdict:** HIGH cumulative risk. 48 API routes and multiple code locations use agent name as a primary key. No single change is catastrophic, but the blast radius is wide and there are zero integration tests covering the migration path.
+
+> **2026-04-07 Revision Note:** Frontend numbers corrected after code-verified recount. Backend route count updated from "40+" to verified 48. See inline `[CORRECTED]` markers.
 
 ---
 
@@ -130,7 +132,7 @@ data/copilot/   (directory exists)
 
 **Break risk:** CRITICAL -- These directories contain persistent user data (memories, soul prompts, notes). If the identity system switches from names to UUIDs for directory paths, all existing data is orphaned. If names stay as directory paths but the internal key becomes agent_id, every function that constructs a path needs agent name resolution.
 
-**`_sanitize_agent_name()`** at line 21 validates that names match `^[a-zA-Z0-9_-]{1,50}$`. UUID v7 strings would pass this regex, but the directory names would become opaque UUIDs instead of human-readable slugs.
+**`_sanitize_agent_name()`** at line 21 validates that names match `^[a-zA-Z0-9_-]{1,50}$`. `uuid4().hex` strings (32 hex chars) would pass this regex, but the directory names would become opaque UUIDs instead of human-readable slugs.
 
 **`search_all_memories()`** at line 188 iterates `data_dir` subdirectories and uses `agent_dir.name` as the agent identifier. This would break if directories are renamed to UUIDs.
 
@@ -175,7 +177,7 @@ Worktree paths and branch names are derived from agent name:
 ghostlink-{agent_name}          (git branch name)
 ```
 
-**Break risk:** HIGH -- Branch names containing UUIDs would be ugly and hard to manage. Git branch names have restrictions that may conflict with UUID formats (though UUID v7 hex would be fine). More importantly, existing worktrees would be orphaned.
+**Break risk:** HIGH -- Branch names containing UUIDs would be ugly and hard to manage. Git branch names have restrictions that may conflict with UUID formats (though `uuid4().hex` is pure hex and fine). More importantly, existing worktrees would be orphaned.
 
 ### 2.5 Spawn Log Files
 
@@ -240,7 +242,7 @@ All these routes use `{name}` as a URL path parameter that maps to agent name:
 | `POST /api/security/exec-policy/{agent_name}` | security.py:51 | Set exec policy |
 | `POST /api/kill-agent/{name}` | agents.py (spawn section) | Kill by name |
 
-**Total: 40+ routes parameterized by agent name.**
+**Total: 48 routes parameterized by agent name.** `[CORRECTED: was "40+", verified count is 48 — includes 44 in agents.py, 2 in security.py, 1 in misc.py (/api/trigger/{agent_name}), 1 in phase4_7.py (/api/remote/stop/{name})]`
 
 **Break risk:** CRITICAL -- Every one of these routes is called by the frontend using `agent.name`. Changing the URL parameter to `agent_id` requires coordinated frontend + backend changes. Keeping both name and ID routes simultaneously is the safest migration path but doubles the route count temporarily.
 
@@ -254,7 +256,7 @@ The `Agent` interface at line 27-42 has `name: string` as a primary field. There
 
 ### 4.2 API Client (`frontend/src/lib/api.ts`)
 
-**33 API methods** construct URLs using agent name via `encodeURIComponent(name)` or `encodeURIComponent(agentName)`. Examples:
+`[CORRECTED: was 33, verified count is 23]` **23 API methods** construct URLs using agent name as a URL path parameter. The original count of 33 incorrectly included methods that pass agent name as a request body field (e.g., `sendMessage`, `reportUsage`, `createSchedule`), which do not require URL routing changes. Examples of the 23 URL-path methods:
 - `pauseAgent(name)` -> `/api/agents/${name}/pause`
 - `getAgentPresence(name)` -> `/api/agents/${name}/presence`
 - `killAgent(name)` -> `/api/kill-agent/${name}`
@@ -276,9 +278,12 @@ All per-agent state in the store is keyed by agent name string:
 
 ### 4.4 React Component `key=` Props
 
-**30+ components** use `key={agent.name}` for React list rendering:
+`[CORRECTED: was "30+ components", verified count is 12 agent-specific keys]` **12 components** use `key={agent.name}` for React list rendering of agent objects. The original count of 30+ incorrectly included non-agent `key={x.name}` patterns (channels, commands, themes, files, worktrees, config items):
+
+Agent-specific `key=` usage:
 - `AgentBar.tsx:178`
 - `AgentMiniCard.tsx:49`
+- `AgentCockpit.tsx:1168`
 - `Sidebar.tsx:270`
 - `StatsPanel.tsx:86`
 - `MobileHeader.tsx:39`
@@ -293,10 +298,11 @@ All per-agent state in the store is keyed by agent name string:
 
 ### 4.5 Agent Lookup by Name
 
-**15+ components** use `agents.find(a => a.name === ...)`:
+`[CORRECTED: was "15+ components", verified count is 11 files]` **11 files** use `agents.find(a => a.name === ...)`:
 - `App.tsx:67`
 - `AgentCockpit.tsx:1053`
 - `ChatMessage.tsx:187`
+- `ChatMessageViews.tsx:434` `[ADDED: was missing from original audit — uses agents.find for handoff.from and handoff.to]`
 - `useWebSocket.ts:222, 228`
 - `AgentInfoPanel.tsx:280`
 - `MessageInput.tsx:551`
@@ -562,6 +568,9 @@ The `schedules` table has an `agent TEXT` column storing agent names. Existing s
 | `test_agent_arg_validation.py` | 5, 8, 14 | Uses `"claude"`, `"codex"`, `"gemini"` as base names |
 | `test_message_routes.py` | 131, 136, 146, 158, 162 | Uses `"codex"` as sender and in metadata |
 | `test_misc_routes.py` | 249 | Uses `"claude"` in agent field |
+| `test_core.py` | various | Uses agent name strings `[ADDED: was missing from original audit]` |
+
+`[CORRECTED: was 11 test files, verified count is 12]`
 
 **Break risk:** MEDIUM -- These tests would need updating, but the assertions are about behavior, not specific name strings. The tests should continue to work if `AgentInstance` gains an `agent_id` field, as long as `name` still works as before.
 
@@ -595,9 +604,9 @@ Phase 2 introduces `global -> profile -> agent override` inheritance. This requi
 
 **Conflict risk:** LOW -- Phase 2 benefits from Phase 1A. No conflict.
 
-However, Phase 2 adds `profile_id` to the identity record. If Phase 1A's identity record schema doesn't include `profile_id` as a nullable field, Phase 2 would need a schema migration.
+However, Phase 2 adds `profile_id` to the identity record. That no longer means Phase 1A should bloat the schema early.
 
-**Recommendation:** Phase 1A should include all fields from the roadmap spec (agent_id, session_id, parent_agent_id, task_id, context_id, trace_id, artifact_namespace, auth_scope, provider, workspace_id, profile_id, capabilities, transport, rename_history) even if most are NULL initially.
+**Audit correction (2026-04-07):** the locked Phase 1A scope explicitly rejected the "add every future field now" approach. `profile_id` should land through a dedicated Phase 2 migration instead of being inserted into Phase 1A as a dead nullable field. The same applies to `session_id`, `trace_id`, and other later-phase fields.
 
 ### 12.3 Phase 3 (Operator Control Plane)
 
@@ -624,11 +633,11 @@ This assumes Phase 1A established `agent-id` as the worktree key. Current code u
 |----------|-------|----------|---------------|
 | Registry internal keying | 1 dict + 6 methods | CRITICAL | 2-4 hours |
 | deps.py state dicts | 10 dicts | HIGH | 3-5 hours |
-| API routes (name in URL) | 40+ routes | CRITICAL | 8-12 hours |
-| Frontend API client | 33 methods | HIGH | 4-6 hours |
-| Frontend store keying | 8 Record types | HIGH | 2-3 hours |
-| Frontend component keys | 30+ `key={agent.name}` | MEDIUM | 2-3 hours |
-| Frontend agent lookups | 15+ `find(a => a.name ===)` | MEDIUM | 2-3 hours |
+| API routes (name in URL) | 48 routes `[CORRECTED]` | CRITICAL | 8-12 hours |
+| Frontend API client | 23 URL-path methods `[CORRECTED from 33]` | HIGH | 2-4 hours |
+| Frontend store keying | 9 Record types + 1 string `[CORRECTED from 8]` | HIGH | 2-3 hours |
+| Frontend component keys | 12 agent-specific `key=` `[CORRECTED from 30+]` | MEDIUM | 1-2 hours |
+| Frontend agent lookups | 11 files `[CORRECTED from 15+]` | MEDIUM | 1-2 hours |
 | Filesystem paths (memory/soul) | 6 functions in agent_memory.py | CRITICAL | 3-5 hours |
 | Queue file IPC | 6 producers + 1 consumer | HIGH | 3-4 hours |
 | Provider config files | wrapper.py + on-disk | MEDIUM | 1-2 hours |
@@ -642,10 +651,10 @@ This assumes Phase 1A established `agent-id` as the worktree key. Current code u
 | A2A bridge | Registration flow | LOW | 30 min |
 | Webhook payloads | Event data | LOW | 30 min |
 | Data migration | 7 data types on disk | CRITICAL | 4-8 hours |
-| Test updates | 11 test files | MEDIUM | 3-5 hours |
+| Test updates | 12 test files `[CORRECTED from 11]` | MEDIUM | 3-5 hours |
 | Missing test coverage | 9 gaps | CRITICAL | 8-12 hours |
 
-**Estimated total effort:** 50-80 hours of focused implementation and testing
+**Estimated total effort:** 45-70 hours of focused implementation and testing `[CORRECTED from 50-80: frontend effort reduced ~40% due to corrected counts]`
 
 ---
 
@@ -659,15 +668,12 @@ This assumes Phase 1A established `agent-id` as the worktree key. Current code u
 
 3. **Keep all existing API routes working with names.** Add optional `?id=` query parameters or new routes that accept IDs. Do not break the frontend in a single deploy.
 
-4. **Design the filesystem path strategy.** Options:
-   - Keep `data/{name}/` paths (human-readable, but breaks if name changes)
-   - Switch to `data/{agent_id}/` paths (opaque, but stable)
-   - Use `data/{agent_id}/` with a symlink `data/{name} -> data/{agent_id}/` (best of both, but symlinks are fragile on Windows)
+4. **Design the filesystem path strategy.** The locked 2026-04-07 decision is to standardize on `data/agents/{agent_id}/` as the canonical path and treat legacy `data/{name}/` files as migration input only. Do not preserve name-keyed canonical paths.
 
 5. **Write the migration tool first.** Before any code changes, write and test a migration script that:
    - Creates the SQLite identity table
    - Reads existing agent data directories
-   - Assigns UUID v7 IDs
+   - Assigns `uuid.uuid4().hex` IDs
    - Creates the name-to-ID mapping
    - Renames directories (or creates the mapping table)
    - Is idempotent (safe to run multiple times)

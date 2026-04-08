@@ -233,6 +233,28 @@ async def test_cache_diagnostics_report_hits_and_misses(monkeypatch: pytest.Monk
     metrics = deps.transport_manager.cache_metrics()
     assert metrics["providers"]["openai"]["misses"] == 1
     assert metrics["providers"]["openai"]["hits"] == 1
+    assert metrics["providers"]["openai"]["cache_hit_rate"] == 0.5
+
+
+@pytest.mark.asyncio
+async def test_cache_alert_fires_after_sustained_low_hit_rate(monkeypatch: pytest.MonkeyPatch, phase4b_env):
+    deps._settings["cacheAlertThreshold"] = 0.5
+    deps._settings["cacheAlertMissStreak"] = 5
+    responses = [ProviderResponse("openai", "gpt-5.4-mini", "api", 200, {}, b"{}", {}, 8) for _ in range(5)]
+    monkeypatch.setattr(deps.provider_registry, "iter_providers_for_capability", lambda *args, **kwargs: ["openai"])
+    monkeypatch.setattr(deps.provider_registry, "default_model_for", lambda *args, **kwargs: "gpt-5.4-mini")
+    monkeypatch.setattr(deps.provider_registry, "build_transport", lambda *args, **kwargs: _DummyTransport("openai", responses))
+    monkeypatch.setattr(deps.provider_registry, "extract_usage", lambda *args, **kwargs: {"input_tokens": 10, "output_tokens": 1, "accounting_mode": "direct"})
+
+    for idx in range(5):
+        req = ProviderRequest(capability="chat", agent_id="codex", session_id="cache-alert", task_id=f"t{idx}", cache_key=f"unique-{idx}")
+        await deps.transport_manager.execute("chat", req)
+
+    alerts = [payload for event, payload in phase4b_env["events"] if event == "cache_alert"]
+    assert len(alerts) == 1
+    assert alerts[0]["provider"] == "openai"
+    assert alerts[0]["consecutive_misses"] == 5
+    assert alerts[0]["cache_hit_rate"] == 0.0
 
 
 @pytest.mark.asyncio

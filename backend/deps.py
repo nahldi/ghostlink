@@ -10,11 +10,17 @@ import logging
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 if TYPE_CHECKING:
     import aiosqlite
-    from a2a_bridge import A2ABridge
+    from a2a import A2AManager
     from auth import UserManager
     from automations import AutomationManager
     from autonomous import AutonomousManager
@@ -22,6 +28,7 @@ if TYPE_CHECKING:
     from bridges import BridgeManager
     from jobs import JobStore
     from memory_graph import MemoryGraph
+    from observer import ObservationEngine
     from plugin_sdk import HookManager, Marketplace
     from policy import PolicyEngine
     from providers import ProviderRegistry
@@ -34,6 +41,7 @@ if TYPE_CHECKING:
     from rules import RuleStore
     from schedules import ScheduleStore
     from audit_store import AuditStore
+    from bg_executor import BackgroundExecutor
     from checkpoints import CheckpointStore
     from security import AuditLog, DataManager, ExecPolicy, SecretsManager
     from sessions import SessionManager
@@ -73,14 +81,16 @@ exec_policy: ExecPolicy | None = None
 audit_log: AuditLog | None = None
 data_manager: DataManager | None = None
 worktree_manager: WorktreeManager | None = None  # v3.6.0
+bg_executor: BackgroundExecutor | None = None  # v5.x
 automation_manager: AutomationManager | None = None  # v3.6.0
 remote_runner: RemoteRunner | None = None  # v4.4.0
 user_manager: UserManager | None = None  # v4.4.0
-a2a_bridge: A2ABridge | None = None  # v4.4.0
+a2a_bridge: A2AManager | None = None  # v4.4.0
 autonomous_manager: AutonomousManager | None = None  # v4.5.0
 memory_graph: MemoryGraph | None = None  # v4.5.0
 specialization: SpecializationEngine | None = None  # v4.5.0
 rag_pipeline: RAGPipeline | None = None  # v4.5.0
+observer_engine: ObservationEngine | None = None  # v6.0.0
 runtime_db: aiosqlite.Connection | None = None
 
 # ── Process tracking (set by spawn/register routes) ──────────────────
@@ -91,6 +101,116 @@ _agent_lock = asyncio.Lock()
 _last_heartbeats: dict[str, float] = {}
 _AGENT_DETECTION_CACHE: dict[str, tuple[bool, float]] = {}
 _AGENT_DETECTION_CACHE_TTL = 60.0
+
+
+@dataclass
+class ProcessRecord:
+    proc: subprocess.Popen
+    pid: int
+    created_at: float | None = None
+    executable: str = ""
+    command: tuple[str, ...] = ()
+    owner: str = ""
+    token: str = ""
+
+    def __getattr__(self, item: str):
+        return getattr(self.proc, item)
+
+
+def _safe_cmdline(proc: Any) -> tuple[str, ...]:
+    try:
+        cmdline = proc.cmdline()
+    except Exception:
+        return ()
+    return tuple(str(part) for part in cmdline if str(part).strip())
+
+
+def capture_process_record(proc: subprocess.Popen, *, owner: str = "", token: str = "") -> ProcessRecord:
+    created_at = None
+    executable = ""
+    command: tuple[str, ...] = ()
+    if psutil is not None:
+        try:
+            live = psutil.Process(proc.pid)
+            created_at = float(live.create_time())
+            executable = str(live.exe() or "")
+            command = _safe_cmdline(live)
+        except Exception:
+            pass
+    return ProcessRecord(
+        proc=proc,
+        pid=int(proc.pid),
+        created_at=created_at,
+        executable=executable,
+        command=command,
+        owner=owner,
+        token=token,
+    )
+
+
+def is_same_process(record: ProcessRecord | subprocess.Popen | None) -> bool:
+    if record is None:
+        return False
+    if not isinstance(record, ProcessRecord):
+        try:
+            return record.poll() is None
+        except Exception:
+            return False
+    try:
+        if record.proc.poll() is not None:
+            return False
+    except Exception:
+        return False
+    if psutil is None:
+        return True
+    try:
+        live = psutil.Process(record.pid)
+    except Exception:
+        return False
+    try:
+        if record.created_at is not None and abs(float(live.create_time()) - record.created_at) > 0.001:
+            return False
+        if record.executable:
+            live_exe = str(live.exe() or "")
+            if live_exe and live_exe != record.executable:
+                return False
+        if record.command:
+            live_cmd = _safe_cmdline(live)
+            if live_cmd and live_cmd != record.command:
+                return False
+    except Exception:
+        return False
+    return True
+
+
+def _unwrap_process(record: ProcessRecord | subprocess.Popen | None) -> subprocess.Popen | None:
+    if record is None:
+        return None
+    if isinstance(record, ProcessRecord):
+        return record.proc
+    return record
+
+
+def snapshot_process_bookkeeping() -> dict[str, Any]:
+    live_registry = {inst.name for inst in registry.get_all()} if registry else set()
+    tracked_agents = set(_agent_processes.keys())
+    stale_pending = []
+    stale_agents = []
+    for pid, record in _pending_spawns.items():
+        if not is_same_process(record):
+            stale_pending.append(pid)
+    for name, record in _agent_processes.items():
+        if not is_same_process(record):
+            stale_agents.append(name)
+    return {
+        "tracked_agent_processes": len(_agent_processes),
+        "tracked_pending_spawns": len(_pending_spawns),
+        "registry_agents": len(live_registry),
+        "registry_missing_processes": sorted(live_registry - tracked_agents),
+        "orphaned_process_records": sorted(tracked_agents - live_registry),
+        "stale_pending_pids": stale_pending,
+        "stale_agent_records": stale_agents,
+    }
 
 
 def _finalize_process(proc: subprocess.Popen) -> None:
@@ -104,24 +224,28 @@ async def reap_dead_agent_processes() -> list[str]:
     cleaned: list[str] = []
 
     async with _agent_lock:
-        for pid, proc in list(_pending_spawns.items()):
+        for pid, record in list(_pending_spawns.items()):
             try:
-                if proc.poll() is None:
+                if is_same_process(record):
                     continue
             except Exception as exc:
                 log.debug("Pending spawn poll failed for pid %s: %s", pid, exc)
             _pending_spawns.pop(pid, None)
-            _finalize_process(proc)
+            proc = _unwrap_process(record)
+            if proc is not None:
+                _finalize_process(proc)
             cleaned.append(f"pending:{pid}")
 
-        for name, proc in list(_agent_processes.items()):
+        for name, record in list(_agent_processes.items()):
             try:
-                if proc.poll() is None:
+                if is_same_process(record):
                     continue
             except Exception as exc:
                 log.debug("Agent process poll failed for %s: %s", name, exc)
             _agent_processes.pop(name, None)
-            _finalize_process(proc)
+            proc = _unwrap_process(record)
+            if proc is not None:
+                _finalize_process(proc)
             cleaned.append(f"process:{name}")
 
     return cleaned

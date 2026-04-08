@@ -34,7 +34,7 @@
 
 **Type:** hardening
 **Goal:** Remove dependence on shared workspace instruction files for identity correctness.
-**Prerequisite:** Phase 1A (stable identity records with agent_id in SQLite) must be complete.
+**Prerequisite:** Phase 1A must at least land stable `agent_id`, persisted registry rows, dual lookup, and canonical ID-keyed memory/soul/notes paths. As of the current audited codebase, that prerequisite is not complete, so this spec is blocked behind Phase 1A.
 
 ## 1. Per-Agent Identity Storage
 
@@ -47,9 +47,14 @@ Memory lives at `backend/data/{agent_name}/memory/*.json` (created on demand by
 
 The soul/notes API routes at `backend/routes/agents.py:1255-1291` use
 `deps.DATA_DIR / "agents"` as the base, but the wrapper at `backend/wrapper.py:932`
-uses a `data_dir` parameter that resolves to the same location. There is a naming
-inconsistency: some call sites use `data_dir` (the raw data directory), others use
-`data_dir / "agents"`. Phase 1B must normalize this.
+passes the raw `data_dir` into `set_soul()`. This is not just naming drift; it is an
+active production bug:
+
+- wrapper writes soul/notes to `data/{agent_name}/...`
+- API reads soul/notes from `data/agents/{agent_name}/...`
+
+That means the current soul/notes UI has never been reading the wrapper-written files.
+Phase 1A must fix the path foundation before this Phase 1B layout can be implemented safely.
 
 ### Target Directory Structure
 
@@ -197,18 +202,23 @@ per-instance file.
 Replace shared workspace paths with per-agent namespaced paths. Two strategies, chosen
 per provider based on what the CLI actually reads:
 
-**Strategy A: Per-agent config directory (preferred)**
+**Audit correction:** the earlier draft assumed redirectable per-agent config directories
+for Claude/Codex via `CLAUDE_CODE_CONFIG_DIR`, `CODEX_CONFIG_DIR`, or similar config-dir
+controls. Those mechanisms are not verified in the audited code path and should not be treated
+as available design primitives for this spec.
 
-For providers that accept a config path via flag or env var, write the identity file
-to `backend/data/agents/{agent_id}/injection/` and point the CLI to it.
+**Strategy A: Verified per-agent config directory support**
+
+Use this only where the provider has a verified config redirection mechanism in real CLI
+behavior, not just a hoped-for env var.
 
 | Provider | Strategy | Mechanism |
 |----------|----------|-----------|
-| `claude` | A | Write instructions.md to `data/agents/{agent_id}/injection/.claude/instructions.md`. Pass `--directory {agent_injection_dir}` or use `CLAUDE_CODE_CONFIG_DIR` env var if available. **Fallback:** If the CLI does not support redirecting the config dir, use Strategy B. |
-| `codex` | A | Write instructions.md to `data/agents/{agent_id}/injection/.codex/instructions.md`. Codex respects `--config-dir` or `CODEX_CONFIG_DIR`. **Fallback:** Strategy B. |
+| `claude` | B | No verified config-dir redirection is available in the audited code path. Treat shared `.claude/instructions.md` semantics as current reality until worktree isolation or another verified mechanism exists. |
+| `codex` | B | No verified config-dir redirection is available in the audited code path. Treat shared `.codex/instructions.md` semantics as current reality until worktree isolation or another verified mechanism exists. |
 | `gemini` | Already isolated | MCP settings at `data/provider-config/{instance_name}-settings.json` with `systemInstruction` field. No change needed. |
 | `aider` | B | Aider reads `.aider.conventions.md` from cwd. No config-dir flag exists. Must use Strategy B. |
-| `grok` | A | Write to `data/agents/{agent_id}/injection/.grok/instructions.md`. Pass flag if supported. **Fallback:** Strategy B. |
+| `grok` | B | No verified redirect support is assumed. Current shared workspace file behavior must be treated as the baseline until proven otherwise. |
 | `ollama` | N/A | Ollama uses system prompts via API, not filesystem files. Injection goes through the MCP bridge `systemInstruction`. |
 | fallback | B | Generic INSTRUCTIONS.md fallback. |
 
@@ -402,7 +412,7 @@ use a per-agent config directory:
 
 - Claude: Set `CLAUDE_CONFIG_DIR` env var to `data/agents/{agent_id}/injection/`.
   Write `.claude/instructions.md` inside that directory.
-- Codex: Set `CODEX_CONFIG_DIR` if supported, otherwise fall back.
+- Codex: no verified config-dir env var should be assumed until it is confirmed against the real CLI.
 - Others: Similar pattern where the CLI supports it.
 
 This is injected via the `inject_env` dict returned by `_apply_mcp_inject()` at
@@ -867,7 +877,7 @@ Agent overrides can:
 ```python
 # backend/profiles.py (new file)
 
-def compute_effective_state(
+async def compute_effective_state(
     agent_id: str,
     profile_id: str,
     workspace_id: str,
@@ -1489,8 +1499,8 @@ back to the legacy flat skills model.
 | Phase 1B Deliverable | Phase 2 Consumer |
 |---------------------|-----------------|
 | Per-agent directory `agents/{agent_id}/` | Profile and effective state files stored here |
-| `state.json` with `profile_id` | Profile resolution reads this field |
-| SQLite identity record with `profile_id` column | Profile assignment persisted here |
+| `state.json` runtime projection | Phase 2 extends it with `profile_id` after the profile model exists |
+| SQLite identity record with stable `agent_id` | Phase 2 adds `profile_id` via its own migration |
 | `identity_inject.py` module | Profile rules and effective soul injected via this module |
 | Drift detection | Profile changes trigger reinjection for exec-per-trigger agents |
 

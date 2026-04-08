@@ -199,16 +199,56 @@ async def diagnostics():
     checks.append({"name": "agents", "status": "ok" if agent_count > 0 else "info",
                     "detail": f"{agent_count} running"})
 
-    # Port availability
+    bookkeeping = deps.snapshot_process_bookkeeping()
+    drift = (
+        bookkeeping["registry_missing_processes"]
+        or bookkeeping["orphaned_process_records"]
+        or bookkeeping["stale_pending_pids"]
+        or bookkeeping["stale_agent_records"]
+    )
+    checks.append({
+        "name": "process_bookkeeping",
+        "status": "ok" if not drift else "warn",
+        "detail": (
+            "consistent"
+            if not drift
+            else (
+                f"registry_missing={bookkeeping['registry_missing_processes']}, "
+                f"orphaned={bookkeeping['orphaned_process_records']}, "
+                f"stale_pending={bookkeeping['stale_pending_pids']}, "
+                f"stale_agents={bookkeeping['stale_agent_records']}"
+            )
+        ),
+        "metadata": bookkeeping,
+    })
+
+    if deps.bg_executor is not None:
+        checks.append({
+            "name": "background_executor",
+            "status": "ok",
+            "detail": (
+                f"enabled, max_concurrent={deps.bg_executor.max_concurrent}, "
+                f"queued={len(getattr(deps.bg_executor, '_queue', []))}, "
+                f"running={len(getattr(deps.bg_executor, '_running', []))}"
+            ),
+        })
+    else:
+        checks.append({"name": "background_executor", "status": "info", "detail": "disabled"})
+
+    # Port reachability
     import socket
-    port = deps._settings.get("port", 8300)
+    port = int(deps.PORT or deps._settings.get("port", 8300) or 8300)
+    host = str(deps.HOST or deps._settings.get("host", "127.0.0.1") or "127.0.0.1")
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(1)
-            s.bind(("127.0.0.1", int(port) + 1))
-        checks.append({"name": "port_conflict", "status": "ok", "detail": f"port {port} in use (self)"})
+            connect_result = s.connect_ex((host, port))
+        if connect_result == 0:
+            checks.append({"name": "port_conflict", "status": "ok", "detail": f"{host}:{port} reachable"})
+        else:
+            checks.append({"name": "port_conflict", "status": "warn", "detail": f"nothing listening on {host}:{port}"})
     except OSError:
-        checks.append({"name": "port_conflict", "status": "info", "detail": f"adjacent port {int(port)+1} in use"})
+        checks.append({"name": "port_conflict", "status": "warn", "detail": f"port probe failed for {host}:{port}"})
 
     # Required Python packages
     missing_pkgs = []

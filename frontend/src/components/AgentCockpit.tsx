@@ -8,15 +8,20 @@
    sync WS live data to local state, reset state on prop change. These are the
    correct React patterns for async data initialization. */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from 'framer-motion';
 import { useChatStore } from '../stores/chatStore';
 import { api } from '../lib/api';
-import { AgentIcon } from './AgentIcon';
 import { toast } from './Toast';
 import type { Agent, ActivityEvent, AgentBrowserState, AgentReplayEvent, WorkspaceChange, FileDiffPayload } from '../types';
 import { DiffViewer } from './DiffViewer';
 import { CheckpointPanel } from './CheckpointPanel';
 import { TaskQueue } from './TaskQueue';
+import { AgentIcon } from './AgentIcon';
+import { AgentCockpitBody, NoAgentSelectedState, useCockpitTabState } from './AgentCockpitChrome';
+import { CockpitStatusBar } from './CockpitStatusBar';
+import { CockpitToolsPanel } from './CockpitToolsPanel';
+import { CockpitTaskPanel } from './CockpitTaskPanel';
+import { CockpitMemoryPanel } from './CockpitMemoryPanel';
 
 // ── Terminal Tab ──────────────────────────────────────────────────────
 
@@ -1011,20 +1016,7 @@ function CockpitReplay({ agent, onFileReverted }: { agent: Agent; onFileReverted
 
 // ── Main Cockpit Panel ────────────────────────────────────────────────
 
-const TABS = ['terminal', 'files', 'browser', 'replay', 'activity', 'tasks', 'checkpoints'] as const;
-type CockpitTab = typeof TABS[number];
-
-const TAB_ICONS: Record<CockpitTab, string> = {
-  terminal: 'terminal',
-  files: 'folder_open',
-  browser: 'language',
-  replay: 'replay',
-  activity: 'timeline',
-  tasks: 'task_alt',
-  checkpoints: 'save',
-};
-
-export function AgentCockpit() {
+export function AgentCockpitLegacy() {
   const agents = useChatStore((s) => s.agents);
   const cockpitAgent = useChatStore((s) => s.cockpitAgent);
   const thinkingStreams = useChatStore((s) => s.thinkingStreams);
@@ -1032,22 +1024,8 @@ export function AgentCockpit() {
   const setAgentPresence = useChatStore((s) => s.setAgentPresence);
   const setWorkspaceChanges = useChatStore((s) => s.setWorkspaceChanges);
   const setAgentReplayEvents = useChatStore((s) => s.setAgentReplayEvents);
-  const [tab, setTab] = useState<CockpitTab>('terminal');
+  const { tab, setTab } = useCockpitTabState(cockpitAgent);
   const prefersReducedMotion = useReducedMotion();
-
-  // Reset tab to terminal when switching agents
-  //intentional tab reset on agent switch
-  useEffect(() => { setTab('terminal'); }, [cockpitAgent]);
-
-  // Keyboard shortcut listener for tab switching
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const tab = (e as CustomEvent).detail;
-      if (tab && TABS.includes(tab)) setTab(tab);
-    };
-    window.addEventListener('cockpit-tab', handler);
-    return () => window.removeEventListener('cockpit-tab', handler);
-  }, []);
   const [filesKey, setFilesKey] = useState(0);
 
   const agent = agents.find((a) => a.name === cockpitAgent) || null;
@@ -1079,31 +1057,7 @@ export function AgentCockpit() {
     return () => { cancelled = true; };
   }, [agent, setWorkspaceChanges, setAgentReplayEvents]);
 
-  if (!agent) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="px-4 py-3 border-b border-outline-variant/10">
-          <h2 className="text-sm font-semibold text-on-surface/80">Agent Cockpit</h2>
-          <p className="text-[10px] text-on-surface-variant/30 mt-0.5">Live workspace viewer</p>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl text-primary/30">monitor</span>
-          </div>
-          <div className="text-center space-y-1.5">
-            <p className="text-xs font-medium text-on-surface-variant/50">No agent selected</p>
-            <p className="text-[10px] text-on-surface-variant/30 leading-relaxed max-w-[200px]">
-              Hover over an agent chip and click the monitor icon to open their live workspace
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 text-[9px] text-on-surface-variant/20">
-            <kbd className="px-1.5 py-0.5 rounded bg-surface-container-highest/30 font-mono">Ctrl+K</kbd>
-            <span>to search agents</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!agent) return <NoAgentSelectedState />;
 
   return (
     <div className="flex flex-col h-full">
@@ -1142,46 +1096,102 @@ export function AgentCockpit() {
       </div>
 
       {/* Tabs — scrollable, icon-only below 360px */}
-      <div className="flex border-b border-outline-variant/10 shrink-0 overflow-x-auto scrollbar-none">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex items-center justify-center gap-1 py-2 px-2.5 text-[9px] font-medium transition-colors whitespace-nowrap shrink-0 ${
-              tab === t
-                ? 'border-b-2'
-                : 'text-on-surface-variant/40 hover:text-on-surface-variant/60'
-            }`}
-            style={tab === t ? { color: agent.color, borderColor: agent.color } : undefined}
-            title={t.charAt(0).toUpperCase() + t.slice(1)}
-          >
-            <span className="material-symbols-outlined text-[13px]">{TAB_ICONS[t]}</span>
-            <span className="hidden sm:inline">{t.charAt(0).toUpperCase() + t.slice(1)}</span>
-          </button>
-        ))}
-      </div>
+      <CockpitStatusBar
+        agent={agent}
+        thinking={thinking}
+        presence={presence}
+        tab={tab}
+        onSelectTab={setTab}
+      />
 
-      {/* Tab content with smooth transitions */}
-      <div className="flex-1 min-h-0 overflow-hidden relative">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${agent.name}-${tab}`}
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={prefersReducedMotion ? undefined : { opacity: 0, y: -4 }}
-            transition={{ duration: prefersReducedMotion ? 0 : 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 flex flex-col"
-          >
-            {tab === 'terminal' && <CockpitTerminal agent={agent} />}
-            {tab === 'files' && <CockpitFiles key={filesKey} agent={agent} />}
-            {tab === 'browser' && <CockpitBrowser agent={agent} />}
-            {tab === 'replay' && <CockpitReplay agent={agent} onFileReverted={() => setFilesKey(k => k + 1)} />}
-            {tab === 'activity' && <CockpitActivity agent={agent} />}
-            {tab === 'tasks' && <TaskQueue agent={agent} />}
-            {tab === 'checkpoints' && <CheckpointPanel agent={agent} />}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      <AgentCockpitBody agentName={agent.name} tab={tab} prefersReducedMotion={!!prefersReducedMotion}>
+        {tab === 'terminal' && <CockpitTerminal agent={agent} />}
+        {tab === 'files' && <CockpitFiles key={filesKey} agent={agent} />}
+        {tab === 'browser' && <CockpitBrowser agent={agent} />}
+        {tab === 'replay' && <CockpitReplay agent={agent} onFileReverted={() => setFilesKey(k => k + 1)} />}
+        {tab === 'activity' && <CockpitActivity agent={agent} />}
+        {tab === 'tasks' && <TaskQueue agent={agent} />}
+        {tab === 'checkpoints' && <CheckpointPanel agent={agent} />}
+      </AgentCockpitBody>
+    </div>
+  );
+}
+
+export function AgentCockpit() {
+  const agents = useChatStore((s) => s.agents);
+  const cockpitAgent = useChatStore((s) => s.cockpitAgent);
+  const thinkingStreams = useChatStore((s) => s.thinkingStreams);
+  const agentPresence = useChatStore((s) => s.agentPresence);
+  const setAgentPresence = useChatStore((s) => s.setAgentPresence);
+  const setWorkspaceChanges = useChatStore((s) => s.setWorkspaceChanges);
+  const setAgentReplayEvents = useChatStore((s) => s.setAgentReplayEvents);
+  const { tab, setTab } = useCockpitTabState(cockpitAgent);
+  const prefersReducedMotion = useReducedMotion();
+  const [filesKey, setFilesKey] = useState(0);
+
+  const agent = agents.find((a) => a.name === cockpitAgent) || null;
+  const thinking = agent ? thinkingStreams[agent.name] : null;
+  const presence = agent ? agentPresence[agent.name] : null;
+
+  useEffect(() => {
+    if (!agent || presence?.updated_at) return;
+    let cancelled = false;
+    api.getAgentPresence(agent.name)
+      .then((data) => {
+        if (!cancelled) setAgentPresence(data);
+      })
+      .catch((e) => console.debug('Agent presence not available:', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [agent, presence?.updated_at, setAgentPresence]);
+
+  useEffect(() => {
+    if (!agent) return;
+    let cancelled = false;
+    Promise.all([
+      api.getAgentWorkspaceChanges(agent.name).catch(() => ({ changes: [] as WorkspaceChange[] })),
+      api.getAgentReplay(agent.name).catch(() => ({ events: [] as AgentReplayEvent[] })),
+    ]).then(([changeData, replayData]) => {
+      if (cancelled) return;
+      setWorkspaceChanges(agent.name, changeData.changes || []);
+      setAgentReplayEvents(agent.name, replayData.events || []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [agent, setWorkspaceChanges, setAgentReplayEvents]);
+
+  if (!agent) return <NoAgentSelectedState />;
+
+  return (
+    <div className="flex flex-col h-full">
+      <CockpitStatusBar
+        agent={agent}
+        thinking={thinking}
+        presence={presence}
+        tab={tab}
+        onSelectTab={setTab}
+      />
+
+      <AgentCockpitBody agentName={agent.name} tab={tab} prefersReducedMotion={!!prefersReducedMotion}>
+        <CockpitToolsPanel
+          tab={tab}
+          terminalView={<CockpitTerminal agent={agent} />}
+          replayView={<CockpitReplay agent={agent} onFileReverted={() => setFilesKey((k) => k + 1)} />}
+        />
+        <CockpitMemoryPanel
+          tab={tab}
+          filesView={<CockpitFiles key={filesKey} agent={agent} />}
+          browserView={<CockpitBrowser agent={agent} />}
+          activityView={<CockpitActivity agent={agent} />}
+        />
+        <CockpitTaskPanel
+          tab={tab}
+          tasksView={<TaskQueue agent={agent} />}
+          checkpointsView={<CheckpointPanel agent={agent} />}
+        />
+      </AgentCockpitBody>
     </div>
   );
 }

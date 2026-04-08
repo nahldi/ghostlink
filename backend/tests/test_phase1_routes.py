@@ -32,6 +32,16 @@ class _LiveProc:
         return None
 
 
+class _TrackedLiveProc(_LiveProc):
+    def terminate(self):
+        self.terminated = True
+
+
+class _TrackedDeadProc(_DeadProc):
+    def terminate(self):
+        self.terminated = True
+
+
 @pytest.fixture
 async def phase1_store(tmp_path: Path):
     from registry import AgentRegistry
@@ -117,3 +127,28 @@ async def test_cleanup_stale_reaps_dead_pending_and_agent_processes(monkeypatch)
     assert deps._agent_processes["live-agent"] is live_agent
     assert dead_pending.wait_calls == 1
     assert dead_agent.wait_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_kill_agent_skips_stale_recycled_process_record(monkeypatch):
+    from routes.agents import kill_agent
+    from registry import AgentRegistry
+
+    class _Inst:
+        def __init__(self, name: str):
+            self.name = name
+            self.agent_id = "agent-1"
+
+    stale = _TrackedLiveProc(505)
+    deps.registry = AgentRegistry()
+    deps.registry.register("codex")
+    monkeypatch.setattr("routes.agents._resolve_agent", lambda name: _Inst(name))
+    monkeypatch.setattr(deps, "is_same_process", lambda record: False)
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: subprocess.CompletedProcess(args=["tmux"], returncode=0, stdout="", stderr=""))
+    deps._agent_processes.clear()
+    deps._agent_processes["codex"] = deps.ProcessRecord(proc=stale, pid=505, created_at=1.0, command=("ghostlink",), owner="codex")
+
+    result = await kill_agent("codex")
+
+    assert bool(result["ok"]) is True
+    assert getattr(stale, "terminated", False) is False

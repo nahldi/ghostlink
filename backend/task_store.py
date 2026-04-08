@@ -156,6 +156,7 @@ class TaskStore:
         self,
         *,
         channel: str | None = None,
+        agent_id: str | None = None,
         agent_name: str | None = None,
         status: str | None = None,
         parent_task_id: str | None = None,
@@ -169,6 +170,9 @@ class TaskStore:
         if channel:
             clauses.append("channel = ?")
             params.append(channel)
+        if agent_id:
+            clauses.append("agent_id = ?")
+            params.append(agent_id)
         if agent_name:
             clauses.append("agent_name = ?")
             params.append(agent_name)
@@ -197,6 +201,8 @@ class TaskStore:
             "title",
             "description",
             "status",
+            "source_type",
+            "source_ref",
             "agent_id",
             "agent_name",
             "channel",
@@ -265,16 +271,25 @@ class TaskStore:
         finally:
             await cursor.close()
 
-    async def get_pending_cancellation(self, agent_name: str) -> dict | None:
+    async def get_pending_cancellation(self, agent_name: str = "", agent_id: str = "") -> dict | None:
+        clauses = ["status = 'cancelled'", "COALESCE(json_extract(metadata, '$.cancel_signal_delivered'), 0) != 1"]
+        params: list[object] = []
+        if agent_id:
+            clauses.append("agent_id = ?")
+            params.append(agent_id)
+        elif agent_name:
+            clauses.append("agent_name = ?")
+            params.append(agent_name)
+        else:
+            return None
         cursor = await self._db.execute(
-            """
+            f"""
             SELECT * FROM tasks
-            WHERE agent_name = ? AND status = 'cancelled'
-              AND json_extract(metadata, '$.cancel_signal_delivered') != 1
+            WHERE {' AND '.join(clauses)}
             ORDER BY updated_at DESC, id DESC
             LIMIT 1
             """,
-            (agent_name,),
+            params,
         )
         try:
             row = await cursor.fetchone()
@@ -282,16 +297,25 @@ class TaskStore:
             await cursor.close()
         return self._row_to_dict(row) if row else None
 
-    async def get_pending_pause(self, agent_name: str) -> dict | None:
+    async def get_pending_pause(self, agent_name: str = "", agent_id: str = "") -> dict | None:
+        clauses = ["status = 'paused'", "COALESCE(json_extract(metadata, '$.pause_signal_delivered'), 0) != 1"]
+        params: list[object] = []
+        if agent_id:
+            clauses.append("agent_id = ?")
+            params.append(agent_id)
+        elif agent_name:
+            clauses.append("agent_name = ?")
+            params.append(agent_name)
+        else:
+            return None
         cursor = await self._db.execute(
-            """
+            f"""
             SELECT * FROM tasks
-            WHERE agent_name = ? AND status = 'paused'
-              AND json_extract(metadata, '$.pause_signal_delivered') != 1
+            WHERE {' AND '.join(clauses)}
             ORDER BY updated_at DESC, id DESC
             LIMIT 1
             """,
-            (agent_name,),
+            params,
         )
         try:
             row = await cursor.fetchone()

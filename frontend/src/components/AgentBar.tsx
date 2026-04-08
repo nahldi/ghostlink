@@ -28,6 +28,7 @@ function AgentChip({ agent }: { agent: Agent }) {
   const isThinking = agent.state === 'thinking';
   const isOffline = agent.state === 'offline';
   const isPaused = agent.state === 'paused';
+  const hasDrift = Boolean(agent.drift_detected);
 
   const handleAction = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -91,6 +92,16 @@ function AgentChip({ agent }: { agent: Agent }) {
             <span className={isOffline ? 'text-on-surface-variant' : undefined}>
               {agent.label}
             </span>
+            {!isBeginner && agent.profile_name && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-primary/15 text-primary leading-none uppercase">
+                {agent.profile_name}
+              </span>
+            )}
+            {!isBeginner && hasDrift && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-red-500/20 text-red-300 leading-none uppercase">
+                Drift
+              </span>
+            )}
             {!isBeginner && agent.role === 'manager' && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 leading-none uppercase">MGR</span>
             )}
@@ -104,7 +115,15 @@ function AgentChip({ agent }: { agent: Agent }) {
           <div className={`text-[10px] leading-tight truncate font-medium ${
             isPaused ? 'text-orange-400' : isOnline && !isThinking ? 'text-green-400/70' : isOffline ? 'text-on-surface-variant/60' : ''
           }`} style={isThinking ? { color: agent.color, opacity: 0.85 } : undefined}>
-            {isThinking ? 'Thinking...' : isPaused ? 'Paused' : isOffline ? 'Offline' : 'Online'}
+            {hasDrift
+              ? 'Identity drift detected'
+              : isThinking
+                ? 'Thinking...'
+                : isPaused
+                  ? 'Paused'
+                  : isOffline
+                    ? 'Offline'
+                    : 'Online'}
           </div>
         </div>
 

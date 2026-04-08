@@ -159,6 +159,17 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         },
       },
       {
+        id: 'action-profiles',
+        label: 'Profiles',
+        description: 'Manage shared profile layers and assignments',
+        icon: 'badge',
+        category: 'navigation',
+        action: () => {
+          window.dispatchEvent(new CustomEvent('ghostlink:open-profiles'));
+          onClose();
+        },
+      },
+      {
         id: 'action-customization',
         label: 'Customization Rules',
         description: 'Manage project, user, and agent rules',
@@ -241,6 +252,28 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         },
       },
       {
+        id: 'action-plan-mode',
+        label: 'Plan Mode',
+        description: 'Review approval requests and export markdown',
+        icon: 'checklist',
+        category: 'action',
+        action: () => {
+          window.dispatchEvent(new CustomEvent('ghostlink:open-plan-mode'));
+          onClose();
+        },
+      },
+      {
+        id: 'action-code-review',
+        label: 'Code Review',
+        description: 'Review a diff and teach persistent review rules',
+        icon: 'rate_review',
+        category: 'action',
+        action: () => {
+          window.dispatchEvent(new CustomEvent('ghostlink:open-review-panel'));
+          onClose();
+        },
+      },
+      {
         id: 'action-export',
         label: 'Export Chat',
         description: 'Download current channel as markdown',
@@ -249,11 +282,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         action: () => {
           const channel = useChatStore.getState().activeChannel;
           api.exportChannel(channel).then((data) => {
-            const blob = new Blob([typeof data === 'string' ? data : JSON.stringify(data)], { type: 'text/markdown' });
+            const blob = new Blob([data.markdown], { type: 'text/markdown' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${channel}-export.md`;
+            a.download = data.filename || `${channel}-export.md`;
             a.click();
             URL.revokeObjectURL(url);
             toast('Chat exported', 'success');

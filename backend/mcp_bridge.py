@@ -130,7 +130,8 @@ def _run_async(coro):
 # Tools that modify state (blocked in plan/review mode)
 _WRITE_TOOLS = {
     "code_execute", "gemini_image", "gemini_video",
-    "image_generate", "text_to_speech", "speech_to_text",
+    "image_generate", "image_edit", "generate_video", "generate_music",
+    "text_to_speech", "speech_to_text",
 }
 
 
@@ -365,7 +366,13 @@ def _resolve_cancellation_agent(kwargs: dict, ctx: Context | None) -> str:
 def _pending_cancellation_message(agent_name: str) -> str | None:
     if not agent_name or _task_store is None:
         return None
-    task = _run_async(_task_store.get_pending_cancellation(agent_name))
+    inst = _registry.resolve(agent_name) if _registry else None
+    task = _run_async(
+        _task_store.get_pending_cancellation(
+            agent_name=agent_name,
+            agent_id=getattr(inst, "agent_id", ""),
+        )
+    )
     if not task:
         return None
     _run_async(_task_store.mark_cancel_signal_delivered(task["task_id"]))
@@ -375,7 +382,13 @@ def _pending_cancellation_message(agent_name: str) -> str | None:
 def _pending_pause_message(agent_name: str) -> str | None:
     if not agent_name or _task_store is None:
         return None
-    task = _run_async(_task_store.get_pending_pause(agent_name))
+    inst = _registry.resolve(agent_name) if _registry else None
+    task = _run_async(
+        _task_store.get_pending_pause(
+            agent_name=agent_name,
+            agent_id=getattr(inst, "agent_id", ""),
+        )
+    )
     if not task:
         return None
     _run_async(_task_store.mark_pause_signal_delivered(task["task_id"]))
@@ -1047,6 +1060,9 @@ def memory_search(sender: str, query: str, ctx: Context | None = None) -> str:
     for r in results[:10]:
         entries.append({
             "key": r["key"],
+            "layer": r.get("layer", "workspace"),
+            "source": r.get("source", "memory"),
+            "tags": r.get("tags", []),
             "preview": r.get("preview", ""),
             "updated_at": r.get("updated_at"),
         })
@@ -1091,7 +1107,15 @@ def memory_list(sender: str, ctx: Context | None = None) -> str:
     entries = mem.list_all()
     if not entries:
         return "No memories stored yet."
-    items = [{"key": e["key"], "size": e.get("size", 0)} for e in entries]
+    items = [
+        {
+            "key": e["key"],
+            "layer": e.get("layer", "workspace"),
+            "size": e.get("size", 0),
+            "importance": e.get("importance", 0.5),
+        }
+        for e in entries
+    ]
     return json.dumps(items, indent=2)
 
 
@@ -1116,7 +1140,18 @@ def memory_search_all(sender: str, query: str, ctx: Context | None = None) -> st
     results = search_all_memories(_data_dir, query)
     if not results:
         return "No memories match that query across any agent."
-    return json.dumps(results, indent=2)
+    entries = [
+        {
+            "agent": r.get("agent", ""),
+            "key": r.get("key", ""),
+            "layer": r.get("layer", "workspace"),
+            "source": r.get("source", "memory"),
+            "preview": r.get("preview", ""),
+            "updated_at": r.get("updated_at"),
+        }
+        for r in results
+    ]
+    return json.dumps(entries, indent=2)
 
 
 # ── Web & Browser tools ──────────────────────────────────────────────
@@ -1503,6 +1538,401 @@ def _gemini_request(endpoint: str, body: dict, timeout: int = 60) -> dict:
     return result["json"] or {}
 
 
+def _artifact_dir(kind: str) -> Path:
+    save_dir = (_data_dir / "generated" / kind) if _data_dir else (Path("./data/generated") / kind)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    return save_dir
+
+
+def _save_bytes_artifact(kind: str, prefix: str, suffix: str, payload: bytes) -> Path:
+    filepath = _artifact_dir(kind) / f"{prefix}-{int(time.time() * 1000)}{suffix}"
+    filepath.write_bytes(payload)
+    return filepath
+
+
+def _broadcast_task_update(task: dict | None) -> None:
+    if not task:
+        return
+    try:
+        import deps as _deps
+        if _deps.broadcast:
+            _run_async(_deps.broadcast("task_update", task))
+    except Exception as e:
+        log.debug("task broadcast failed: %s", e)
+
+
+def _resolve_media_provider(capability: str, provider: str = "auto") -> tuple[str, str]:
+    import deps as _deps
+    from providers import PROVIDERS
+
+    chosen = (provider or "auto").strip().lower()
+    if not _deps.provider_registry:
+        return "", "Provider registry not configured"
+    if chosen != "auto":
+        pdef = PROVIDERS.get(chosen)
+        if not pdef:
+            return "", f"Unknown provider: {chosen}"
+        if capability not in pdef.get("capabilities", []):
+            return "", f"Provider '{chosen}' does not support {capability}"
+        if not _deps.provider_registry.is_provider_available(chosen):
+            return "", f"Provider '{chosen}' is not configured"
+        return chosen, ""
+    resolved = _deps.provider_registry.resolve_capability(capability)
+    if not resolved:
+        return "", f"No {capability} generation provider configured"
+    return str(resolved.get("provider", "") or ""), ""
+
+
+def _create_media_task(sender: str, title: str, kind: str, metadata: dict) -> dict | None:
+    if _task_store is None:
+        return None
+    inst = _registry.resolve(sender) if _registry else None
+    task = _run_async(
+        _task_store.create(
+            title=title[:200],
+            description=metadata.get("prompt", "")[:4000],
+            channel="general",
+            agent_id=getattr(inst, "agent_id", None),
+            agent_name=getattr(inst, "name", None) if inst else sender,
+            profile_id=getattr(inst, "profile_id", None),
+            source_type="media_generation",
+            source_ref=kind,
+            created_by=sender,
+            status="running",
+            metadata=metadata,
+        )
+    )
+    _broadcast_task_update(task)
+    return task
+
+
+def _update_media_task_progress(task_id: str, pct: int, step: str) -> dict | None:
+    if _task_store is None or not task_id:
+        return None
+    ordered = ["routing", "generating", "finalizing", "completed"]
+    step_index = ordered.index(step) if step in ordered else -1
+    steps = []
+    for idx, label in enumerate(ordered):
+        if step_index == -1:
+            status = "pending"
+        elif idx < step_index:
+            status = "completed"
+        elif idx == step_index:
+            status = "active"
+        else:
+            status = "pending"
+        steps.append({"label": label, "status": status})
+    task = _run_async(_task_store.update_progress(task_id, pct, step, len(ordered), steps))
+    _broadcast_task_update(task)
+    return task
+
+
+def _complete_media_task(task_id: str, *, metadata: dict, error: str | None = None) -> dict | None:
+    if _task_store is None or not task_id:
+        return None
+    status = "failed" if error else "completed"
+    task = _run_async(_task_store.update(task_id, status=status, error=error, metadata=metadata))
+    _broadcast_task_update(task)
+    return task
+
+
+def _record_media_cost(sender: str, task_id: str, provider: str, model: str, *, metadata: dict, cost_usd: float | None = None) -> None:
+    try:
+        import deps as _deps
+
+        if not _deps.cost_tracker:
+            return
+        inst = _registry.resolve(sender) if _registry else None
+        _run_async(
+            _deps.cost_tracker.record(
+                agent_id=getattr(inst, "agent_id", "") or sender,
+                session_id=f"media:{sender}",
+                task_id=task_id,
+                provider=provider,
+                model=model,
+                transport="api",
+                metadata=metadata,
+                cost_usd=cost_usd,
+            )
+        )
+    except Exception as e:
+        log.debug("media cost record failed: %s", e)
+
+
+def _run_media_task(task_id: str, sender: str, metadata: dict, executor) -> None:
+    meta = dict(metadata)
+    try:
+        _update_media_task_progress(task_id, 20, "routing")
+        _update_media_task_progress(task_id, 60, "generating")
+        result = executor(meta)
+        provider = str(result.get("provider", "") or "")
+        model = str(result.get("model", "") or "")
+        artifact_path = str(result.get("artifact_path", "") or "")
+        artifact_type = str(result.get("artifact_type", meta.get("media_kind", "media")) or "media")
+        mime_type = str(result.get("mime_type", "") or "")
+        if not mime_type and artifact_path:
+            suffix = Path(artifact_path).suffix.lower()
+            mime_map = {
+                ".mp4": "video/mp4",
+                ".mov": "video/quicktime",
+                ".mp3": "audio/mpeg",
+                ".wav": "audio/wav",
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".webp": "image/webp",
+            }
+            mime_type = mime_map.get(suffix, "")
+        final_meta = dict(meta)
+        final_meta.update(result.get("metadata", {}))
+        final_meta["artifact_path"] = artifact_path
+        final_meta["artifact_type"] = artifact_type
+        final_meta["mime_type"] = mime_type
+        final_meta["provider"] = provider
+        final_meta["model"] = model
+        final_meta["transport"] = result.get("transport", "api")
+        final_meta["media_kind"] = meta.get("media_kind", "")
+        final_meta["media"] = {
+            "kind": meta.get("media_kind", ""),
+            "artifact_path": artifact_path,
+            "artifact_type": artifact_type,
+            "mime_type": mime_type,
+            "provider": provider,
+            "model": model,
+        }
+        if meta.get("media_kind") == "image_edit":
+            final_meta["image_edit"] = {
+                "artifact_path": artifact_path,
+                "mode": final_meta.get("mode", ""),
+                "source_image_path": meta.get("image_path", ""),
+                "mask_path": final_meta.get("mask_path", ""),
+            }
+        final_meta["completed_at"] = time.time()
+        _record_media_cost(
+            sender,
+            task_id,
+            provider,
+            model,
+            metadata={"media_kind": meta.get("media_kind", ""), "artifact_path": result.get("artifact_path", "")},
+            cost_usd=result.get("cost_usd"),
+        )
+        _update_media_task_progress(task_id, 90, "finalizing")
+        _update_media_task_progress(task_id, 100, "completed")
+        _complete_media_task(task_id, metadata=final_meta)
+    except Exception as e:
+        failed_meta = dict(meta)
+        failed_meta["failed_at"] = time.time()
+        _complete_media_task(task_id, metadata=failed_meta, error=str(e))
+
+
+def _start_media_task(sender: str, title: str, metadata: dict, executor) -> str:
+    task = _create_media_task(sender, title, metadata.get("media_kind", "media"), metadata)
+    if not task:
+        return json.dumps({"ok": False, "error": "Task store not configured"})
+    thread = threading.Thread(
+        target=_run_media_task,
+        args=(task["task_id"], sender, metadata, executor),
+        daemon=True,
+    )
+    thread.start()
+    return json.dumps(
+        {
+            "ok": True,
+            "task_id": task["task_id"],
+            "status": task["status"],
+            "media_kind": metadata.get("media_kind", ""),
+            "provider": metadata.get("provider", "auto"),
+        },
+        indent=2,
+    )
+
+
+def _reject_media_task(sender: str, title: str, metadata: dict, error: str) -> str:
+    task = _create_media_task(sender, title, metadata.get("media_kind", "media"), metadata)
+    if task:
+        failed = dict(metadata)
+        failed["failed_at"] = time.time()
+        _complete_media_task(task["task_id"], metadata=failed, error=error)
+        return json.dumps(
+            {
+                "ok": False,
+                "task_id": task["task_id"],
+                "status": "failed",
+                "media_kind": metadata.get("media_kind", ""),
+                "error": error,
+            },
+            indent=2,
+        )
+    return json.dumps({"ok": False, "error": error}, indent=2)
+
+
+def _parse_generated_artifact(result: str, marker: str) -> str:
+    if not result.startswith(marker):
+        raise RuntimeError(result)
+    remainder = result[len(marker):].strip()
+    return remainder.split(" ", 1)[0]
+
+
+def _multipart_form(fields: dict[str, str], files: list[tuple[str, str, bytes, str]]) -> tuple[bytes, str]:
+    boundary = f"ghostlink-{int(time.time() * 1000)}"
+    chunks: list[bytes] = []
+    for name, value in fields.items():
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode(),
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
+                str(value).encode(),
+                b"\r\n",
+            ]
+        )
+    for field_name, filename, payload, mime in files:
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode(),
+                f'Content-Disposition: form-data; name="{field_name}"; filename="{filename}"\r\n'.encode(),
+                f"Content-Type: {mime}\r\n\r\n".encode(),
+                payload,
+                b"\r\n",
+            ]
+        )
+    chunks.append(f"--{boundary}--\r\n".encode())
+    return b"".join(chunks), f"multipart/form-data; boundary={boundary}"
+
+
+def _execute_video_generation(meta: dict) -> dict:
+    provider = meta["resolved_provider"]
+    if provider != "google":
+        raise RuntimeError(f"Video generation is not implemented for provider '{provider}'")
+    result = gemini_video(meta["prompt"], duration=str(meta["duration"]), aspect_ratio=meta["aspect_ratio"])
+    artifact_path = _parse_generated_artifact(result, "Video generated:")
+    return {
+        "artifact_path": artifact_path,
+        "artifact_type": "video",
+        "mime_type": "video/mp4",
+        "provider": provider,
+        "model": "veo-3.1-generate-preview",
+        "metadata": {"duration": meta["duration"], "aspect_ratio": meta["aspect_ratio"]},
+    }
+
+
+def _execute_music_generation(meta: dict) -> dict:
+    provider = meta["resolved_provider"]
+    if provider != "minimax":
+        raise RuntimeError(f"Music generation is not implemented for provider '{provider}'")
+    prompt_parts = [meta.get("prompt", "")]
+    for label in ("genre", "mood", "tempo", "duration"):
+        value = str(meta.get(label, "") or "").strip()
+        if value:
+            prompt_parts.append(value)
+    composed_prompt = ", ".join(part for part in prompt_parts if part)
+    instrumental = bool(meta.get("instrumental", False))
+    lyrics = str(meta.get("lyrics", "") or "").strip()
+    body = {
+        "model": "music-2.5+",
+        "prompt": composed_prompt[:2000],
+        "lyrics": lyrics,
+        "lyrics_optimizer": not lyrics,
+        "is_instrumental": instrumental,
+        "output_format": "hex",
+        "audio_setting": {
+            "sample_rate": 44100,
+            "bitrate": 256000,
+            "format": "mp3",
+        },
+    }
+    result = _transport_request(
+        "music",
+        provider="minimax",
+        model="music-2.5+",
+        path="music_generation",
+        json_body=body,
+        timeout=180,
+        metadata={
+            "prompt": composed_prompt[:120],
+            "lyrics_optimizer": not lyrics,
+            "is_instrumental": instrumental,
+        },
+    )["json"] or {}
+    payload = result.get("data", {}) if isinstance(result, dict) else {}
+    raw_audio = str(payload.get("audio", "") or "")
+    if not raw_audio:
+        raise RuntimeError("Music generation completed but returned no audio payload")
+    audio_bytes = bytes.fromhex(raw_audio)
+    filepath = _save_bytes_artifact("audio", "music", ".mp3", audio_bytes)
+    return {
+        "artifact_path": str(filepath),
+        "artifact_type": "audio",
+        "mime_type": "audio/mpeg",
+        "provider": provider,
+        "model": "music-2.5+",
+        "metadata": {
+            "genre": meta.get("genre", ""),
+            "mood": meta.get("mood", ""),
+            "tempo": meta.get("tempo", ""),
+            "duration": meta.get("duration", ""),
+            "instrumental": instrumental,
+        },
+    }
+
+
+def _execute_image_edit(meta: dict) -> dict:
+    image_path = Path(meta["image_path"])
+    if not image_path.exists():
+        raise RuntimeError(f"Input image not found: {image_path}")
+    provider = meta["resolved_provider"]
+    if provider != "openai":
+        raise RuntimeError(f"Image editing is not implemented for provider '{provider}'")
+    image_bytes = image_path.read_bytes()
+    files = [("image", image_path.name, image_bytes, "image/png")]
+    mask_path = str(meta.get("mask_path", "") or "").strip()
+    if mask_path:
+        mask_file = Path(mask_path)
+        if not mask_file.exists():
+            raise RuntimeError(f"Mask image not found: {mask_file}")
+        files.append(("mask", mask_file.name, mask_file.read_bytes(), "image/png"))
+    body, content_type = _multipart_form(
+        {
+            "model": "dall-e-3",
+            "prompt": meta["prompt"],
+            "size": "1024x1024",
+            "edit_mode": meta["mode"],
+        },
+        files,
+    )
+    result = _transport_request(
+        "image",
+        provider="openai",
+        model="dall-e-3",
+        path="images/edits",
+        data=body,
+        headers={"Content-Type": content_type},
+        timeout=120,
+        metadata={"edit_mode": meta["mode"], "prompt": meta["prompt"]},
+    )["json"] or {}
+    data = result.get("data", [])
+    if not data:
+        raise RuntimeError("Image edit completed but returned no image")
+    entry = data[0]
+    if entry.get("b64_json"):
+        import base64
+
+        filepath = _save_bytes_artifact("images", "edit", ".png", base64.b64decode(entry["b64_json"]))
+        artifact_path = str(filepath)
+    else:
+        artifact_path = str(entry.get("url", "") or "")
+    if not artifact_path:
+        raise RuntimeError("Image edit completed but returned no artifact path")
+    return {
+        "artifact_path": artifact_path,
+        "artifact_type": "image",
+        "mime_type": "image/png" if artifact_path.endswith(".png") else "",
+        "provider": provider,
+        "model": "dall-e-3",
+        "cost_usd": 0.04,
+        "metadata": {"mode": meta["mode"], "mask_path": mask_path},
+    }
+
+
 def gemini_image(prompt: str, aspect_ratio: str = "1:1", model: str = "imagen-4.0-generate-001") -> str:
     """Generate an image using Google Imagen 4. Requires GEMINI_API_KEY.
 
@@ -1616,6 +2046,121 @@ def gemini_video(prompt: str, duration: str = "8", aspect_ratio: str = "16:9") -
         return f"Video generation timed out after 6 minutes. Operation: {op_name}"
     except Exception as e:
         return f"Video generation failed: {str(e)[:300]}"
+
+
+def generate_video(
+    sender: str,
+    prompt: str,
+    duration: str = "8",
+    aspect_ratio: str = "16:9",
+    provider: str = "auto",
+    ctx: Context | None = None,
+) -> str:
+    """Start an async video-generation task and return its task ID."""
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
+    if err:
+        return err
+    if duration not in ("4", "6", "8"):
+        return "Error: duration must be '4', '6', or '8' seconds"
+    if aspect_ratio not in ("16:9", "9:16"):
+        return "Error: aspect_ratio must be '16:9' or '9:16'"
+    base_meta = {
+        "media_kind": "video",
+        "prompt": prompt,
+        "duration": duration,
+        "aspect_ratio": aspect_ratio,
+        "provider": provider,
+    }
+    resolved_provider, provider_error = _resolve_media_provider("video", provider)
+    if provider_error:
+        return _reject_media_task(identity, "Generate video", base_meta, provider_error)
+    return _start_media_task(
+        identity,
+        "Generate video",
+        {**base_meta, "resolved_provider": resolved_provider},
+        _execute_video_generation,
+    )
+
+
+def generate_music(
+    sender: str,
+    prompt: str,
+    duration: str = "30",
+    genre: str = "",
+    mood: str = "",
+    tempo: str = "",
+    lyrics: str = "",
+    instrumental: bool = False,
+    provider: str = "auto",
+    ctx: Context | None = None,
+) -> str:
+    """Start an async music-generation task and return its task ID."""
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
+    if err:
+        return err
+    base_meta = {
+        "media_kind": "music",
+        "prompt": prompt,
+        "duration": duration,
+        "genre": genre,
+        "mood": mood,
+        "tempo": tempo,
+        "lyrics": lyrics,
+        "instrumental": instrumental,
+        "provider": provider,
+    }
+    resolved_provider, provider_error = _resolve_media_provider("music", provider)
+    if provider_error:
+        return _reject_media_task(identity, "Generate music", base_meta, provider_error)
+    return _start_media_task(
+        identity,
+        "Generate music",
+        {**base_meta, "resolved_provider": resolved_provider},
+        _execute_music_generation,
+    )
+
+
+def image_edit(
+    sender: str,
+    image_path: str,
+    prompt: str,
+    mode: str = "inpaint",
+    mask_path: str = "",
+    provider: str = "auto",
+    ctx: Context | None = None,
+) -> str:
+    """Start an async image-edit task using the configured provider path."""
+    identity, err = _resolve_identity(sender, ctx, field_name="sender", required=True)
+    if err:
+        return err
+    normalized_mode = (mode or "inpaint").strip().lower()
+    if normalized_mode not in {"inpaint", "outpaint"}:
+        return "Error: mode must be 'inpaint' or 'outpaint'"
+    base_meta = {
+        "media_kind": "image_edit",
+        "image_path": image_path,
+        "prompt": prompt,
+        "mode": normalized_mode,
+        "mask_path": mask_path,
+        "provider": provider,
+    }
+    resolved_provider = provider
+    if provider == "auto":
+        if os.environ.get("OPENAI_API_KEY"):
+            resolved_provider = "openai"
+        else:
+            resolved_provider = ""
+    if not resolved_provider:
+        return _reject_media_task(identity, "Edit image", base_meta, "No image editing provider configured")
+    provider_name, provider_error = _resolve_media_provider("image", resolved_provider)
+    if provider_error:
+        return _reject_media_task(identity, "Edit image", base_meta, provider_error)
+    return _start_media_task(
+        identity,
+        "Edit image",
+        {**base_meta, "resolved_provider": provider_name},
+        _execute_image_edit,
+    )
 
 
 def text_to_speech(text: str, voice: str = "Kore", model: str = "gemini-2.5-flash-preview-tts") -> str:
@@ -1854,9 +2399,10 @@ _ALL_TOOLS = [
     # Memory
     memory_save, memory_search, memory_search_all, memory_get, memory_list,
     # Web & Browser
-    web_fetch, web_search, browser_snapshot, image_generate,
+    web_fetch, web_search, browser_snapshot, image_generate, image_edit,
     # Gemini AI
-    gemini_image, gemini_video, text_to_speech, speech_to_text, code_execute,
+    gemini_image, gemini_video, generate_video, generate_music,
+    text_to_speech, speech_to_text, code_execute,
     # Agent control & delegation
     set_thinking, sessions_list, sessions_send, delegate,
     # Streaming

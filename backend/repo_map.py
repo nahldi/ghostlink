@@ -62,7 +62,7 @@ _PATTERNS[".tsx"] = _PATTERNS[".ts"] + _PATTERNS[".tsx"]
 
 IGNORE_DIRS = {
     "node_modules", "__pycache__", ".venv", "venv", ".git", "dist", "build",
-    ".next", ".cache", "coverage", ".ghostlink-worktrees", ".claude",
+    ".next", ".cache", "coverage", ".ghostlink-worktrees", ".ghostlink", ".claude",
 }
 MAX_FILES = 500
 MAX_FILE_SIZE = 200_000  # 200KB

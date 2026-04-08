@@ -1,11 +1,13 @@
 # Phase 5 & 6 Implementation Specification
 
-> **Status:** Draft
+> **Status:** Audited later-phase design
 > **Author:** jeff (spec owner)
-> **Date:** 2026-04-06
+> **Date:** 2026-04-07
 > **Prerequisite phases:** 3.5 (durable execution), 4A (policy engine), 4B (cost control), 4.5 (evals)
 > **Target version:** v6.x - v7.x
 > **Primary implementor:** tyson (backend), ned (frontend)
+
+> **2026-04-07 audit note:** This spec is intentionally later-phase design, not implementation-ready truth. It depends on foundations that do not exist yet in live code: stable Phase 1A `agent_id`, automatic crash-safe checkpointing, and a less tmux-coupled execution runtime. Treat every "current implementation" section below as audited against the actual code before building on it.
 
 ---
 
@@ -54,7 +56,7 @@ The `WorktreeManager` class already exists and provides basic worktree isolation
 
 #### 5.1.1 Key Migration: agent_name to agent_id
 
-Phase 1A introduces server-owned identity records with a stable `agent_id` (UUID or hex token). The current worktree keying uses `agent_name`, which is a display name derived from `base` + slot number (e.g., `claude`, `claude-2`). Display names can collide across sessions if a different agent reuses the same slot.
+This section is blocked on Phase 1A actually landing a stable `agent_id`. Today, live code still keys the registry and worktrees by display name. The current worktree keying uses `agent_name`, which is a display name derived from `base` + slot number (e.g., `claude`, `claude-2`). Display names can collide across sessions if a different agent reuses the same slot.
 
 **Changes required:**
 
@@ -177,6 +179,10 @@ Git worktrees are fully supported on Windows. Verified considerations:
 
 ## 5.2 Background/Async Agent Execution
 
+### Audit Constraint: This Is New Runtime Work
+
+Live GhostLink does not have a lightweight non-tmux background executor waiting to be switched on. The wrapper/runtime path is still heavily tmux-oriented, and background execution in this phase is a significant refactor, not a one-line launch-mode tweak.
+
 ### Execution Model
 
 Background agents run as **separate OS processes**, not threads. Rationale:
@@ -298,6 +304,8 @@ When a background task reaches `completed`, `failed`, or `cancelled`:
 
 Background tasks MUST checkpoint. This is a hard requirement, not optional.
 
+Audit note: live code does **not** auto-checkpoint from hooks today. `pre_tool_use` / `post_tool_use` exist on the EventBus, but there is no automatic checkpoint creation path behind them yet. This section describes required new behavior, not current behavior.
+
 - **Checkpoint frequency:** After every tool call that modifies state (file write, API call, database mutation). Read-only tool calls do not trigger checkpoints.
 - **Checkpoint content:** Current task state, tool call history, files modified, worktree commit hash, progress data, identity record.
 - **Resume flow:** On resume, the executor restores the checkpoint, recreates the worktree from the checkpoint's commit hash, and relaunches the agent process with context from the checkpoint.
@@ -326,6 +334,8 @@ The existing `EventBus` in `plugin_sdk.py` provides:
 - `HookManager` class for user-defined automation hooks stored in `data/hooks.json`
 - Hook actions: `message` (post to chat), `notify` (log), `trigger` (write to agent queue)
 - Integration: `pre_tool_use` fires with `fail_closed=True` in `mcp_bridge.py` (line ~1710). `post_tool_use` fires with `fail_closed=False` (line ~1732). `on_agent_join` fires on register. `on_agent_leave` fires on deregister. `on_message` fires on message post.
+
+Audit note: the live hook schema uses an `action` field with `message|notify|trigger` semantics. Any Phase 5 design that introduces a `type` field or shell/http execution modes is defining a new hook contract and migration, not extending an already-matching schema.
 
 ### Gap Analysis: GhostLink vs Claude Code Hooks
 
@@ -869,6 +879,10 @@ Higher-authority agents can override lower-authority agents' outputs. Authority 
 ---
 
 # Phase 6: Memory and Intelligence
+
+## Audit Constraint: Existing Memory Systems Already Exist
+
+Live code already initializes `MemoryGraph` and `RAGPipeline` in `backend/app.py` / `backend/deps.py`. Phase 6 must either integrate with those systems or explicitly replace them. It should not quietly design a parallel memory architecture that ignores them.
 
 ## 6.1 Full Memory Stratification
 

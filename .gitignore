@@ -55,6 +55,7 @@ backend/data_test/
 backend/.codex/
 
 # GhostLink local context/worktrees
+.ghostlink/
 .ghostlink-context.md
 backend/.ghostlink-context.md
 backend/.ghostlink-worktrees/

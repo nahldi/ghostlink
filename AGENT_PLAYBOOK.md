@@ -1,11 +1,11 @@
 # GhostLink Agent Playbook
 
 > The single operating manual for the GhostLink 5-agent team.
-> If you are a fresh agent spawn, read this file first. Everything you need to know about your role, boundaries, communication, and self-correction is here.
+> If you are a fresh agent spawn, read [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md) first, then this file. Everything you need to know about your role, boundaries, communication, and self-correction is here.
 
-**Last updated:** 2026-04-06
+**Last updated:** 2026-04-07
 **Project version:** v5.7.2
-**Team size:** 5 agents (3 control, 2 execution)
+**Team size:** 5 agents (2 Claude, 3 Codex)
 
 ---
 
@@ -53,7 +53,7 @@ coop is the product conscience of GhostLink. coop decides whether an external pa
 
 ---
 
-### kurt (claude) -- QA, Safety & Release Gate Lead
+### kurt (codex) -- QA, Safety & Release Gate Lead
 
 kurt is the quality and safety gate for GhostLink. Nothing ships unless kurt says it passes. kurt writes test plans BEFORE implementation starts, not after. kurt owns the validation matrix, converts it to runnable checks, and runs smoke, stress, and fail tests after implementation. kurt also owns security review and provider-risk analysis. When kurt says "not ready," work stops until the issue is resolved.
 
@@ -126,20 +126,51 @@ This is the hard boundary. No agent writes to another agent's files without jeff
 | Path | Owner | Notes |
 |------|-------|-------|
 | `backend/` (all Python files) | tyson | Full ownership of all .py files |
+| `backend/deps.py` | tyson | Shared runtime state and process tracking |
+| `backend/router.py` | tyson | Message routing |
+| `backend/cli.py` | tyson | CLI entrypoints |
+| `backend/automations.py` | tyson | Automation manager and rule execution |
+| `backend/ghostlink_server.py` | tyson | Server entry support |
+| `backend/ghostlink_mcp_server.py` | tyson | MCP server entry support |
+| `backend/memory_graph.py` | tyson | Memory graph subsystem |
+| `backend/rag.py` | tyson | Retrieval pipeline |
+| `backend/remote_runner.py` | tyson | Remote execution runtime |
+| `backend/app_helpers.py` | tyson | App bootstrap and shared helpers |
 | `backend/app.py` | tyson | Main FastAPI application |
 | `backend/routes/` | tyson | All route modules |
+| `backend/routes/__init__.py` | tyson | Route package init |
+| `backend/routes/agents.py` | tyson | Agent lifecycle, config, and runtime routes |
+| `backend/routes/bridges.py` | tyson | Bridge management routes |
+| `backend/routes/channels.py` | tyson | Channel and context routes |
+| `backend/routes/jobs.py` | tyson | Job/task API routes |
+| `backend/routes/messages.py` | tyson | Message and chat routes |
+| `backend/routes/misc.py` | tyson | Misc ops, backup, restore, health routes |
+| `backend/routes/phase4_7.py` | tyson | Later-phase feature routes |
+| `backend/routes/plugins.py` | tyson | Plugin management routes |
+| `backend/routes/providers.py` | tyson | Provider config and provider ops routes |
+| `backend/routes/rules.py` | tyson | Rules API routes |
+| `backend/routes/schedules.py` | tyson | Schedule API routes |
+| `backend/routes/search.py` | tyson | Search and retrieval routes |
+| `backend/routes/security.py` | tyson | Security and approval routes |
+| `backend/routes/sessions.py` | tyson | Session API routes |
 | `backend/registry.py` | tyson | Agent registry |
 | `backend/mcp_bridge.py` | tyson | MCP bridge internals |
+| `backend/mcp_proxy.py` | tyson | MCP proxy runtime |
 | `backend/wrapper.py` | tyson | Agent wrapper |
 | `backend/wrapper_mcp.py` | tyson | MCP wrapper |
 | `backend/wrapper_unix.py` | tyson | Unix wrapper |
 | `backend/agent_memory.py` | tyson | Agent memory |
 | `backend/providers.py` | tyson | Provider implementations |
+| `backend/document_parser.py` | tyson | Document ingestion helpers |
 | `backend/security.py` | tyson | Security and SSRF |
 | `backend/skills.py` | tyson | Skills engine |
 | `backend/jobs.py` | tyson | Job/task engine |
 | `backend/rules.py` | tyson | Rules engine |
+| `backend/branches.py` | tyson | Branch/worktree coordination |
+| `backend/repo_map.py` | tyson | Repo map and workspace indexing |
 | `backend/sandbox.py` | tyson | Sandbox enforcement |
+| `backend/schedules.py` | tyson | Schedule runtime logic |
+| `backend/specialization.py` | tyson | Agent specialization logic |
 | `backend/worktree.py` | tyson | Worktree isolation |
 | `backend/plugin_loader.py` | tyson | Plugin loading |
 | `backend/plugin_sdk.py` | tyson | Plugin SDK |
@@ -152,6 +183,8 @@ This is the hard boundary. No agent writes to another agent's files without jeff
 | `backend/config.toml` | tyson | Backend config |
 | `backend/requirements.txt` | tyson | Production deps |
 | `backend/requirements-dev.txt` | tyson | Dev deps |
+| `backend/pyproject.toml` | tyson | Backend package metadata |
+| `backend/pytest.ini` | tyson | Backend test runner config |
 | `backend/tests/` | tyson (code), kurt (plans) | tyson writes test code, kurt writes test plans |
 | `backend/INSTRUCTIONS.md` | tyson | Backend-specific agent instructions |
 
@@ -170,7 +203,7 @@ This is the hard boundary. No agent writes to another agent's files without jeff
 | `frontend/src/locales/` | ned | i18n files |
 | `frontend/src/index.css` | ned | Global styles |
 | `frontend/src/test-setup.ts` | ned | Test configuration |
-| `frontend/tests/` | ned (code), kurt (plans) | ned writes test code, kurt writes test plans |
+| `frontend/src/**/*.test.ts(x)` | ned (code), kurt (plans) | Frontend tests are colocated under `frontend/src/` in the current codebase |
 
 ### Desktop (ned)
 
@@ -291,6 +324,7 @@ These rules exist because the most common source of bugs and conflicts is agents
 - Use the shared Discord channel for coordination
 - Tag the specific agent you are addressing by name
 - Keep messages focused -- one topic per message
+- Do not use emoji reactions as a substitute for coordination -- send an actual message
 - When starting work, post: `STARTING: [task name] -- [what you plan to do]`
 - When done with a task, post: `DONE: [task name] -- [what was delivered] -- [what tests pass]`
 - When blocked, post: `BLOCKED: [task name] -- [what you need] -- [who can unblock you]`
@@ -320,6 +354,41 @@ BLOCKED: Phase 1A frontend identity display
   Spec says: tyson delivers this endpoint
   Status: endpoint not yet available
 ```
+
+### Spawned-Agent Behavior Baseline
+
+Every GhostLink spawn should start from the same operating baseline. This is not flavor text. It is part of execution quality.
+
+1. **Be token-efficient by default.**
+   - Read only the channels, files, and docs needed for the current task.
+   - Prefer one targeted read over repeated polling or broad repo sweeps.
+   - Do not restate the prompt, replay obvious context, or pad answers.
+   - Keep replies concise unless depth is actually needed.
+
+2. **Use the injected GhostLink SOUL style, not corporate mush.**
+   - Lead with the answer.
+   - Be direct, concrete, and useful.
+   - No fake enthusiasm, no bureaucratic hedging, no blind agreement.
+   - If a plan is weak, say so clearly and explain why.
+
+3. **Research deeply where the risk is real.**
+   - Verify live code before claiming a behavior exists.
+   - Verify stale or high-impact facts before building on them.
+   - Narrow uncertainty fast instead of hiding behind vague caveats.
+
+4. **Act unless you are truly blocked.**
+   - If the next step is obvious, do it.
+   - If blocked, surface one precise blocker or ask one precise question.
+   - Do not burn tokens asking for information that already exists in the repo or current thread.
+
+5. **Respect cost and operator attention.**
+   - Avoid duplicate tool calls, duplicate test runs, and duplicate doc reads.
+   - Summarize findings so fresh spawns do not need a full-history reload.
+   - Optimize for high signal per message, not maximum word count.
+
+6. **Bake this into every spawn path.**
+   - Any GhostLink-managed identity/SOUL/instruction injection should preserve this baseline.
+   - Future provider adapters, profile layers, and reinjection flows must not regress into verbose or wasteful behavior.
 
 ---
 
@@ -445,12 +514,20 @@ When any agent starts a new session, follow this sequence exactly. Do not skip s
 
 ### Step 2: Read the current state
 - Read `STATUS.md` -- understand the verified baseline
+- Read `docs/verification/VALIDATION_MATRIX.md` -- understand current gates
+- Read `docs/verification/VERIFICATION_LEDGER.md` -- understand what is verified vs inferred
+- Read `docs/specs/AUDIT_SUMMARY.md` when an active audit or roadmap correction pass is in flight
+- Read `docs/specs/AGENT_EFFICIENCY_SPEC.md` when spawn behavior, SOUL injection, or token-efficiency is part of the current work
 - Read `BUGS.md` -- check for open issues in your ownership area
 
 ### Step 3: Read the strategic context
-- Read `UNIFIED_ROADMAP.md` -- understand the overall plan
 - Read `roadmap-pt1.md` -- understand the active execution phases (0-3.5)
+- Read `UNIFIED_ROADMAP.md` -- understand the overall plan
 - Read `roadmap-pt2.md` if your current work is in Phases 4A-10
+- Read `docs/specs/AUDIT_SUMMARY.md` when audit/remediation work is active
+- Read `docs/specs/AGENT_EFFICIENCY_SPEC.md` when spawn behavior or token-efficiency tuning is active
+- Read `docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md` when roadmap refinement or product differentiation is active
+- Read `docs/specs/PRODUCTIZATION_GUARDRAILS.md`, `docs/specs/RAILWAY_OPTIONAL_STRATEGY.md`, and `docs/specs/THREAT_MODEL.md` when productization, hosting, or security design is active
 
 ### Step 4: Check the workspace
 - Run `git status` -- is the working tree clean? Are there uncommitted changes?
@@ -459,8 +536,8 @@ When any agent starts a new session, follow this sequence exactly. Do not skip s
 - Check `docs/verification/VALIDATION_MATRIX.md` for current gate status
 
 ### Step 5: Verify the baseline
-- tyson: run `pytest backend/tests/` -- do all 171+ backend tests pass?
-- ned: run the frontend build and frontend tests -- do all 49+ frontend tests pass?
+- tyson: run `pytest backend/tests/` -- does the current backend suite pass?
+- ned: run the frontend build and frontend tests -- do the current frontend checks pass?
 - jeff/coop/kurt: review the latest spec/doc state for your ownership area
 
 ### Step 6: Announce yourself
@@ -482,7 +559,7 @@ Phases are the structural units of the roadmap. Moving between phases is a delib
 
 1. **kurt runs the exit gate** for the current phase. The exit gate criteria are defined in roadmap-pt1.md or roadmap-pt2.md for each phase.
 
-2. **ALL tests must pass.** Not just the new tests -- all 220+ tests. Any regression is a blocker.
+2. **ALL tests must pass.** Not just the new tests -- the full backend/frontend/build gate for the current phase. Any regression is a blocker.
 
 3. **git status must be clean.** No uncommitted changes, no untracked files that should be tracked.
 
@@ -505,7 +582,7 @@ Phases are the structural units of the roadmap. Moving between phases is a delib
 ```
 EXIT:
 [ ] kurt: exit gate passes
-[ ] kurt: all 220+ tests pass
+[ ] kurt: full phase gate test suite passes
 [ ] kurt: git status is clean
 [ ] jeff: implementation matches spec
 [ ] coop: product expectations met
@@ -557,6 +634,10 @@ The entire point of Phase 1A is to decouple display names from internal identity
 - Use `name` ONLY for display purposes: UI labels, log messages, Discord posts
 - If you are writing `agents[agent_name]` or `Record<string, ...>` keyed by name, you are probably introducing a bug
 
+Scope reminder:
+- Phase 1A only guarantees the backend identity foundation
+- frontend state-map rekeying is deferred; do not smuggle it into Phase 1A unless jeff explicitly splits that work
+
 ### 9.2 Data path split
 
 The backend currently has two different data path conventions:
@@ -592,7 +673,7 @@ The current agent registry is purely in-memory. Server restart means all agent r
 
 ### 9.7 Frontend state keyed by name
 
-All `Record<string, ...>` maps in `chatStore.ts` and other stores use agent name as the key. Phase 1A must rekey these by agent_id. Until then:
+All `Record<string, ...>` maps in `chatStore.ts` and other stores use agent name as the key. This is a real migration target, but it is **not** part of the locked backend-only Phase 1A scope. Until the dedicated frontend tranche lands:
 - Be aware that renaming an agent in the backend will orphan its frontend state
 - Any new frontend state maps should be keyed by agent_id from the start
 
@@ -688,6 +769,7 @@ Quick reference for where to find what:
 
 | Document | Purpose | Owner |
 |----------|---------|-------|
+| `AGENTS.md` | Single-file onboarding brief for any fresh GhostLink agent | jeff + coop + kurt |
 | `AGENT_PLAYBOOK.md` | This file -- operating manual for all agents | jeff |
 | `STATUS.md` | Current verified baseline | coop |
 | `FEATURES.md` | Shipped capabilities list | coop |
@@ -697,10 +779,20 @@ Quick reference for where to find what:
 | `roadmap-pt2.md` | Later execution (Phases 4A-10) | jeff |
 | `CHANGELOG.md` | Release history | coop |
 | `README.md` | Public product overview | coop |
-| `docs/specs/` | Spec documents | jeff |
+| `docs/specs/` | Spec documents (see indexed phase specs below) | jeff |
+| `docs/specs/PHASE_1A_SPEC.md` | Locked Phase 1A identity foundation spec | jeff |
+| `docs/specs/PHASE_1B_2_SPEC.md` | Phase 1B-2 identity isolation and profiles spec | jeff |
+| `docs/specs/PHASE_3_3_5_SPEC.md` | Phase 3-3.5 control plane and durable execution spec | jeff |
+| `docs/specs/PHASE_4_SPEC.md` | Phase 4A-4B-4.5 policy, provider, and evals spec | jeff |
+| `docs/specs/PHASE_5_6_SPEC.md` | Phase 5-6 multi-agent execution and memory spec | jeff |
 | `docs/verification/VALIDATION_MATRIX.md` | Gate criteria | kurt |
 | `docs/verification/VERIFICATION_LEDGER.md` | Verified vs inferred | kurt |
 | `docs/AI_AGENT_PLATFORM_SURVEY.md` | Competitive research | coop |
+| `docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md` | Source-backed upgrade ideas worth stealing/adapting | coop + jeff |
+| `docs/specs/RAILWAY_OPTIONAL_STRATEGY.md` | Optional Railway deployment strategy | jeff + tyson |
+| `docs/specs/PRODUCTIZATION_GUARDRAILS.md` | Product architecture guardrails | jeff |
+| `docs/specs/THREAT_MODEL.md` | Threat model, abuse paths, and required controls | kurt + jeff |
+| `docs/specs/PHASE_1A_IMPL_PLAN.md` | Step-by-step implementation sequence for locked Phase 1A | jeff + tyson |
 | `docs/research/` | Research documents | coop |
 | `docs/archive/` | Historical/retired docs | coop |
 
@@ -723,7 +815,7 @@ For reference, the full phase sequence:
 - **Phase 4A:** Policy Engine And Sandboxing
 - **Phase 4B:** Provider Independence And Cost Control
 - **Phase 4.5:** Evals And Trace Grading
-- **Phase 5:** Agent Execution Expansion
+- **Phase 5:** Multi-Agent Execution
 - **Phase 6:** Memory And Intelligence
 - **Phase 7:** Media Generation
 - **Phase 8:** A2A Interoperability

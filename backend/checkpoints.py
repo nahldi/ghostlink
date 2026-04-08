@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS checkpoints (
 );
 CREATE INDEX IF NOT EXISTS idx_cp_task ON checkpoints(task_id);
 CREATE INDEX IF NOT EXISTS idx_cp_agent ON checkpoints(agent_name);
+CREATE INDEX IF NOT EXISTS idx_cp_agent_id ON checkpoints(agent_id);
 CREATE INDEX IF NOT EXISTS idx_cp_trace ON checkpoints(trace_id);
 CREATE INDEX IF NOT EXISTS idx_cp_seq ON checkpoints(task_id, sequence_num);
 CREATE INDEX IF NOT EXISTS idx_cp_created ON checkpoints(created_at);
@@ -152,11 +153,19 @@ class CheckpointStore:
             await cursor.close()
         return [self._row_to_dict(row) for row in rows]
 
-    async def list_for_agent(self, agent_name: str, limit: int = 50) -> list[dict]:
-        cursor = await self._db.execute(
-            "SELECT * FROM checkpoints WHERE agent_name = ? ORDER BY created_at DESC, id DESC LIMIT ?",
-            (agent_name, max(1, min(limit, 200))),
-        )
+    async def list_for_agent(self, agent_name: str = "", agent_id: str = "", limit: int = 50) -> list[dict]:
+        if agent_id:
+            cursor = await self._db.execute(
+                "SELECT * FROM checkpoints WHERE agent_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+                (agent_id, max(1, min(limit, 200))),
+            )
+        elif agent_name:
+            cursor = await self._db.execute(
+                "SELECT * FROM checkpoints WHERE agent_name = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+                (agent_name, max(1, min(limit, 200))),
+            )
+        else:
+            return []
         try:
             rows = await cursor.fetchall()
         finally:

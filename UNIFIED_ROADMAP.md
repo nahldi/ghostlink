@@ -1,9 +1,9 @@
 # GhostLink - Unified Roadmap
 
 > Strategic source of truth for GhostLink development.
-> Fresh agents should read [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md) first for active execution work.
+> Fresh agents should read [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md) first, then [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md) for active execution work.
 
-**Last updated:** 2026-04-06
+**Last updated:** 2026-04-07
 **Current version:** v5.7.2
 **Comparison target:** OpenClaw v2026.4.5
 **Operating model:** 5-agent team
@@ -44,7 +44,7 @@ GhostLink is now planned around a 5-agent operating model.
 ### Control layer
 - `jeff` (`claude`): architect and spec owner
 - `coop` (`claude`): product and research owner
-- `kurt` (`claude`): QA, safety, and gate owner
+- `kurt` (`codex`): QA, safety, and gate owner
 
 ### Execution layer
 - `tyson` (`codex`): backend and platform owner
@@ -81,6 +81,7 @@ GhostLink is now planned around a 5-agent operating model.
    - `hardening`
    - `UI exposure of existing backend`
    - `platform`
+8. Every GhostLink-managed agent spawn must default to concise, token-efficient, code-verified execution behavior rather than verbose filler.
 
 ---
 
@@ -88,14 +89,18 @@ GhostLink is now planned around a 5-agent operating model.
 
 For a fresh agent spawn, use this order:
 
-1. [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md)
-2. [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md)
-3. [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md)
-4. [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md)
-5. [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md)
-6. [BUGS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md)
-7. Optional strategic context: [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md)
-8. Later-phase execution detail: [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md)
+1. [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md)
+2. [AGENT_PLAYBOOK.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENT_PLAYBOOK.md)
+3. [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md)
+4. [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md)
+5. [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md)
+6. [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md)
+7. [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md)
+8. [BUGS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md)
+9. [docs/specs/AUDIT_SUMMARY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/AUDIT_SUMMARY.md) when an audit/remediation pass is active
+10. [docs/specs/AGENT_EFFICIENCY_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/AGENT_EFFICIENCY_SPEC.md) when spawn behavior, SOUL injection, or token-efficiency is relevant
+11. Optional strategic context: [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md)
+12. Later-phase execution detail: [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md)
 
 ---
 
@@ -171,14 +176,22 @@ Primary owners:
 
 ### Phase 1A - Stable Identity Records
 **Type:** hardening
-**Goal:** Introduce persisted agent instance IDs and comprehensive server-owned identity records.
+**Goal:** Land the minimum safe identity foundation first: stable backend IDs, persisted registry rows, dual lookup compatibility, and ID-keyed persistent agent storage.
 **Rough effort:** 3-5 days
 
 Key outcomes:
-- stable internal ID separate from display label
-- persisted identity record with agent_id, session_id, parent_agent_id, task_id, context_id, trace_id, artifact_namespace, auth_scope, provider, workspace_id, profile_id, capabilities, transport, and immutable rename_history
-- no core logic keyed only by agent display name
-- every tool call, task, session, artifact, and audit event joinable to one identity record
+- stable internal `agent_id` separate from display label
+- persisted registry rows in SQLite
+- dual backend lookup by name or `agent_id`
+- memory, soul, and notes stored under `data/agents/{agent_id}/`
+- backend compatibility preserved for current frontend and wrapper contracts
+
+Deferred out of Phase 1A:
+- provider-native adapter/injection work
+- frontend state-map rekeying
+- worktree rekeying
+- reconnect/session protocol redesign
+- full task/profile/trace/artifact identity graph
 
 Primary owners:
 - `jeff`: architecture and API spec
@@ -195,6 +208,7 @@ Key outcomes:
 - isolated per-agent identity storage
 - reinjection on spawn, reconnect, resume, compaction, delegation, and model switch
 - same-model agents can coexist in one repo without identity drift
+- provider/runtime identity behavior moved here on purpose instead of being crammed into Phase 1A
 
 Primary owners:
 - `jeff`: reinjection and rollback spec
@@ -330,7 +344,7 @@ Primary owners:
 - `tyson`: eval runner, trace grading engine, benchmark storage
 - `ned`: benchmark dashboard UI
 
-### Phase 5 - Agent Execution Expansion
+### Phase 5 - Multi-Agent Execution
 **Type:** new capability
 **Goal:** Add the execution features that become safe only after the foundations above exist.
 **Rough effort:** 2-3 weeks
@@ -463,9 +477,19 @@ The target state is:
 
 - [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md): active execution plan for Phases 0-3.5
 - [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md): execution plan for Phases 4A-10 with full agent assignments, file ownership, and exit gates
+- [docs/specs/PHASE_1A_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PHASE_1A_SPEC.md): locked Phase 1A identity foundation
+- [docs/specs/PHASE_1B_2_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PHASE_1B_2_SPEC.md): Phase 1B-2 identity isolation and profiles
+- [docs/specs/PHASE_3_3_5_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PHASE_3_3_5_SPEC.md): Phase 3-3.5 control plane and durable execution
+- [docs/specs/PHASE_4_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PHASE_4_SPEC.md): Phase 4A-4B-4.5 policy, provider, and evals
+- [docs/specs/PHASE_5_6_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PHASE_5_6_SPEC.md): Phase 5-6 multi-agent execution and memory
 - [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md): validation gates
 - [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md): what is verified versus inferred
 - [docs/AI_AGENT_PLATFORM_SURVEY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/AI_AGENT_PLATFORM_SURVEY.md): platform survey for `coop` adopt/adapt/reject decisions
+- [docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md): source-backed upgrade backlog for orchestration, supervision, memory, policy, and operator UX
+- [docs/specs/RAILWAY_OPTIONAL_STRATEGY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/RAILWAY_OPTIONAL_STRATEGY.md): optional hosted-control-plane strategy without founder coupling
+- [docs/specs/PRODUCTIZATION_GUARDRAILS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PRODUCTIZATION_GUARDRAILS.md): product rules for local-first, self-hostable, founder-decoupled GhostLink
+- [docs/specs/THREAT_MODEL.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/THREAT_MODEL.md): abuse paths, required controls, and defense-in-depth targets
+- [docs/specs/PHASE_1A_IMPL_PLAN.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PHASE_1A_IMPL_PLAN.md): step-by-step execution plan for tyson when implementation begins
 
 ---
 

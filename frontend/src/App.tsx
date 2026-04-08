@@ -16,7 +16,9 @@ import { ConnectionBanner } from './components/ConnectionBanner';
 import { BulkDeleteBar } from './components/BulkDeleteBar';
 import { SoundManager } from './lib/sounds';
 import { SessionBar } from './components/SessionBar';
+import { ThinkingLevelPicker } from './components/ThinkingLevelPicker';
 import { toast } from './components/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 
 // Lazy-loaded components (reduce initial bundle from ~900KB)
@@ -37,6 +39,10 @@ const PersonaMarketplace = lazy(() => import('./components/PersonaMarketplace').
 const CustomizationPanel = lazy(() => import('./components/CustomizationPanel').then(m => ({ default: m.CustomizationPanel })));
 const CollaborativeWorkspace = lazy(() => import('./components/CollaborativeWorkspace').then(m => ({ default: m.CollaborativeWorkspace })));
 const BranchList = lazy(() => import('./components/ConversationBranch').then(m => ({ default: m.BranchList })));
+const ProfileManager = lazy(() => import('./components/ProfileManager').then(m => ({ default: m.ProfileManager })));
+const AgentsMdReview = lazy(() => import('./components/AgentsMdReview').then(m => ({ default: m.AgentsMdReview })));
+const PlanModePanel = lazy(() => import('./components/PlanModePanel').then(m => ({ default: m.PlanModePanel })));
+const ReviewPanel = lazy(() => import('./components/ReviewPanel').then(m => ({ default: m.ReviewPanel })));
 
 // Agent-specific starters — shown only when that agent is online
 const AGENT_STARTERS: { agent: string; text: string; icon: string }[] = [
@@ -379,29 +385,6 @@ function MobilePanel() {
   );
 }
 
-import { Component, type ReactNode } from 'react';
-
-class ErrorBoundary extends Component<{children: ReactNode}, {error: Error | null}> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
-    console.error('[GhostLink ErrorBoundary]', error, info.componentStack);
-  }
-  render() {
-    if (this.state.error) {
-      return (
-        <div style={{padding: 40, color: '#e0dff0', background: '#08080f', minHeight: '100vh', fontFamily: 'Inter, sans-serif'}}>
-          <h1 style={{color: '#a78bfa', marginBottom: 16, fontSize: 20}}>GhostLink</h1>
-          <p style={{color: '#fca5a5', fontSize: 14}}>Something went wrong:</p>
-          <pre style={{color: '#a9a4b8', fontSize: 12, marginTop: 12, whiteSpace: 'pre-wrap'}}>{this.state.error.message}</pre>
-          <button onClick={() => window.location.reload()} style={{marginTop: 20, padding: '10px 20px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer'}}>Reload</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 function AppInner() {
   const setMessages = useChatStore((s) => s.setMessages);
   const setAgents = useChatStore((s) => s.setAgents);
@@ -411,6 +394,8 @@ function AppInner() {
   const activeChannel = useChatStore((s) => s.activeChannel);
   const clearUnread = useChatStore((s) => s.clearUnread);
   const sidebarPanel = useChatStore((s) => s.sidebarPanel);
+  const agents = useChatStore((s) => s.agents);
+  const cockpitAgent = useChatStore((s) => s.cockpitAgent);
   const updateSettings = useChatStore((s) => s.updateSettings);
   const fontSize = useChatStore((s) => s.settings.fontSize);
   const title = useChatStore((s) => s.settings.title);
@@ -419,17 +404,24 @@ function AppInner() {
   const showAgentBar = useChatStore((s) => s.settings.showAgentBar) !== false;
   const showChannelTabs = useChatStore((s) => s.settings.showChannelTabs) !== false;
   const showTypingIndicator = useChatStore((s) => s.settings.showTypingIndicator) !== false;
+  const profileManagerOpen = useChatStore((s) => s.profileManagerOpen);
+  const setProfileManagerOpen = useChatStore((s) => s.setProfileManagerOpen);
+  const pendingAgentsMdDiff = useChatStore((s) => s.pendingAgentsMdDiff);
+  const setPendingAgentsMdDiff = useChatStore((s) => s.setPendingAgentsMdDiff);
 
   const [showSearch, setShowSearch] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSessionLauncher, setShowSessionLauncher] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showPlanMode, setShowPlanMode] = useState(false);
+  const [showReviewPanel, setShowReviewPanel] = useState(false);
   const [showWorkflows, setShowWorkflows] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
   const [showPersonas, setShowPersonas] = useState(false);
   const [showCustomization, setShowCustomization] = useState(false);
   const [showWorkspace, setShowWorkspace] = useState(false);
+  const [showAgentsMdReview, setShowAgentsMdReview] = useState(false);
 
   useWebSocket();
 
@@ -510,6 +502,8 @@ function AppInner() {
       if (e.key === 'Escape') {
         if (useChatStore.getState().selectMode) { useChatStore.getState().clearSelection(); return; }
         if (showCommandPalette) { setShowCommandPalette(false); return; }
+        if (showPlanMode) { setShowPlanMode(false); return; }
+        if (showReviewPanel) { setShowReviewPanel(false); return; }
         if (showSearch) { setShowSearch(false); return; }
         if (showShortcuts) { setShowShortcuts(false); return; }
         if (showWorkflows) { setShowWorkflows(false); return; }
@@ -517,13 +511,15 @@ function AppInner() {
         if (showPersonas) { setShowPersonas(false); return; }
         if (showCustomization) { setShowCustomization(false); return; }
         if (showWorkspace) { setShowWorkspace(false); return; }
+        if (showAgentsMdReview) { setShowAgentsMdReview(false); return; }
+        if (profileManagerOpen) { setProfileManagerOpen(false); return; }
         const panel = useChatStore.getState().sidebarPanel;
         if (panel) { useChatStore.getState().setSidebarPanel(null); return; }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showSearch, showShortcuts, showCommandPalette, showWorkflows, showBranches, showPersonas, showCustomization, showWorkspace]);
+  }, [profileManagerOpen, setProfileManagerOpen, showSearch, showShortcuts, showCommandPalette, showPlanMode, showReviewPanel, showWorkflows, showBranches, showPersonas, showCustomization, showWorkspace, showAgentsMdReview]);
 
   // Apply font size to root
   useEffect(() => {
@@ -550,24 +546,42 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
+    const handler = () => setShowPlanMode(true);
+    window.addEventListener('ghostlink:open-plan-mode', handler);
+    return () => window.removeEventListener('ghostlink:open-plan-mode', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setShowReviewPanel(true);
+    window.addEventListener('ghostlink:open-review-panel', handler);
+    return () => window.removeEventListener('ghostlink:open-review-panel', handler);
+  }, []);
+
+  useEffect(() => {
     const openWorkflows = () => setShowWorkflows(true);
     const openBranches = () => setShowBranches(true);
     const openPersonas = () => setShowPersonas(true);
     const openCustomization = () => setShowCustomization(true);
     const openWorkspace = () => setShowWorkspace(true);
+    const openProfiles = () => setProfileManagerOpen(true);
+    const openAgentsMdReview = () => setShowAgentsMdReview(true);
     window.addEventListener('ghostlink:open-workflows', openWorkflows);
     window.addEventListener('ghostlink:open-branches', openBranches);
     window.addEventListener('ghostlink:open-personas', openPersonas);
     window.addEventListener('ghostlink:open-customization', openCustomization);
     window.addEventListener('ghostlink:open-workspace', openWorkspace);
+    window.addEventListener('ghostlink:open-profiles', openProfiles);
+    window.addEventListener('ghostlink:agents-md-changed', openAgentsMdReview);
     return () => {
       window.removeEventListener('ghostlink:open-workflows', openWorkflows);
       window.removeEventListener('ghostlink:open-branches', openBranches);
       window.removeEventListener('ghostlink:open-personas', openPersonas);
       window.removeEventListener('ghostlink:open-customization', openCustomization);
       window.removeEventListener('ghostlink:open-workspace', openWorkspace);
+      window.removeEventListener('ghostlink:open-profiles', openProfiles);
+      window.removeEventListener('ghostlink:agents-md-changed', openAgentsMdReview);
     };
-  }, []);
+  }, [setProfileManagerOpen]);
 
   // Apply theme
   useEffect(() => {
@@ -602,6 +616,11 @@ function AppInner() {
     return () => { stale = true; };
   }, [activeChannel, setMessages, clearUnread]);
 
+  const thinkingTarget =
+    agents.find((agent) => agent.name === cockpitAgent)
+    || agents.find((agent) => ['active', 'thinking', 'idle', 'paused'].includes(agent.state))
+    || null;
+
   return (
     <div className="min-h-[100dvh] relative w-full">
       <div className="ambient-bg" />
@@ -627,7 +646,8 @@ function AppInner() {
               <div className="flex-1 min-w-0 overflow-hidden">
                 <AgentBar />
               </div>
-              <div className="ml-3 shrink-0">
+              <div className="ml-3 flex items-center gap-2 shrink-0">
+                <ThinkingLevelPicker agent={thinkingTarget} />
                 <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><RemoteSession /></Suspense>
               </div>
             </div>
@@ -669,6 +689,24 @@ function AppInner() {
         {showCommandPalette && (
           <motion.div key="command-palette" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.15 }}>
             <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><CommandPalette onClose={() => setShowCommandPalette(false)} /></Suspense>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showPlanMode && (
+          <motion.div key="plan-mode" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}>
+              <PlanModePanel onClose={() => setShowPlanMode(false)} />
+            </Suspense>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showReviewPanel && (
+          <motion.div key="review-panel" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}>
+              <ReviewPanel onClose={() => setShowReviewPanel(false)} />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>
@@ -747,6 +785,31 @@ function AppInner() {
         {showBranches && (
           <motion.div key="branches-modal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><BranchList channel={activeChannel} onClose={() => setShowBranches(false)} /></Suspense>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {profileManagerOpen && (
+          <motion.div key="profiles-modal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}>
+              <ProfileManager onClose={() => setProfileManagerOpen(false)} />
+            </Suspense>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showAgentsMdReview && pendingAgentsMdDiff && (
+          <motion.div key="agents-md-modal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}>
+              <AgentsMdReview
+                payload={pendingAgentsMdDiff}
+                workspacePath={pendingAgentsMdDiff.workspace_path}
+                onClose={() => {
+                  setShowAgentsMdReview(false);
+                  setPendingAgentsMdDiff(null);
+                }}
+              />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>

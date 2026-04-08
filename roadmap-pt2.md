@@ -17,7 +17,7 @@
 ### Control layer
 - `jeff` (`claude`): architect and spec owner
 - `coop` (`claude`): product and research owner
-- `kurt` (`claude`): QA, safety, and gate owner
+- `kurt` (`codex`): QA, safety, and gate owner
 
 ### Execution layer
 - `tyson` (`codex`): backend and platform owner
@@ -61,18 +61,26 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 4. No overlapping write ownership unless explicitly split first.
 5. No milestone is done until the gate passes.
 6. No phase starts until prerequisite architecture is resolved.
+7. Every GhostLink-managed spawn should bias toward concise, token-efficient, code-verified work instead of repetitive context dumping.
 
 ---
 
 ## Startup Checklist For A Fresh Agent
 
-1. Read [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
-2. Read [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md).
-3. Read [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md) (this file).
-4. Read [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md).
-5. Read [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md).
-6. Read [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md).
-7. Check current blockers with `git status`, backend tests, frontend tests, and build commands.
+1. Read [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md).
+2. Read [AGENT_PLAYBOOK.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENT_PLAYBOOK.md).
+3. Read [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
+4. Read [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md).
+5. Read [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md).
+6. Read [roadmap-pt2.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt2.md) (this file).
+7. Read [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md).
+8. Read [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md).
+9. Read [BUGS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md).
+10. Read [docs/specs/AUDIT_SUMMARY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/AUDIT_SUMMARY.md) when an audit/remediation pass is active.
+11. Read [docs/specs/AGENT_EFFICIENCY_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/AGENT_EFFICIENCY_SPEC.md) when spawn behavior, SOUL injection, or token-efficiency is relevant.
+12. Read [docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md) when roadmap refinement or product differentiation is active.
+13. Read [docs/specs/PRODUCTIZATION_GUARDRAILS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PRODUCTIZATION_GUARDRAILS.md), [docs/specs/RAILWAY_OPTIONAL_STRATEGY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/RAILWAY_OPTIONAL_STRATEGY.md), and [docs/specs/THREAT_MODEL.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/THREAT_MODEL.md) when productization, hosting, or security design is relevant.
+13. Check current blockers with `git status`, backend tests, frontend tests, and build commands.
 
 ---
 
@@ -358,8 +366,9 @@ Same as Part 1. Repeated here so a fresh agent does not need to context-switch.
 **Rough effort:** 2-3 weeks
 
 ### Why this comes now
-- Phase 1 gave us stable identity. Phase 2 gave us profiles and rules. Phase 3 gave us the control plane. Phase 3.5 gave us durable execution. Phase 4A gave us policy enforcement. Phase 4B gave us cost controls. Phase 4.5 gave us evals.
-- Without worktree isolation, parallel agents overwrite each other's files. Without cost controls, parallel agents burn budget unchecked. Without the control plane, there is no way to monitor parallel work. Without durable execution, background tasks cannot recover from crashes. Without policy, autonomous agents cannot be governed. Without evals, regressions from multi-agent execution go undetected. All prerequisites are now met.
+- This phase only makes sense after stable identity, profiles, the control plane, durable execution, policy, provider controls, and evals are all actually landed.
+- Audit note: as of 2026-04-07 those prerequisites are **not** fully implemented yet. Treat Phase 5 as a later-phase design target, not a claim that the foundation is already present.
+- Without worktree isolation, parallel agents overwrite each other's files. Without cost controls, parallel agents burn budget unchecked. Without the control plane, there is no way to monitor parallel work. Without durable execution, background tasks cannot recover from crashes. Without policy, autonomous agents cannot be governed. Without evals, regressions from multi-agent execution go undetected.
 
 ### Prerequisites
 - No background agent execution without Phase 3.5 (durable execution): background tasks must be resumable after crashes.

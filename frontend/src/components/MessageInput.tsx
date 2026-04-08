@@ -127,17 +127,25 @@ export function MessageInput() {
       name: '/export',
       description: 'Download channel as markdown',
       execute: () => {
-        const channelMsgs = messages.filter(m => m.channel === activeChannel);
-        const md = channelMsgs
-          .map(m => `**${m.sender}** (${m.time})\n${m.text}`)
-          .join('\n\n---\n\n');
-        const blob = new Blob([`# #${activeChannel}\n\n${md}`], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${activeChannel}-export.md`;
-        a.click();
-        URL.revokeObjectURL(url);
+        api.exportChannel(activeChannel).then((result) => {
+          const blob = new Blob([result.markdown], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = result.filename || `${activeChannel}-export.md`;
+          link.click();
+          URL.revokeObjectURL(url);
+          toast('Markdown export ready', 'success');
+        }).catch(() => {
+          toast('Markdown export failed', 'error');
+        });
+      },
+    },
+    {
+      name: '/plan',
+      description: 'Open plan mode and approval history',
+      execute: () => {
+        window.dispatchEvent(new CustomEvent('ghostlink:open-plan-mode'));
       },
     },
     {
@@ -331,6 +339,7 @@ export function MessageInput() {
           '/status — show agent states',
           '/clear — clear chat display',
           '/export — download channel as markdown',
+          '/plan — open plan mode and approval history',
           '/ping — check backend latency',
           '/theme — toggle dark/light theme',
           '/focus — scroll to bottom',

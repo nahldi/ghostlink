@@ -6,3 +6,4 @@ tomli==2.4.0
 websockets==16.0
 mcp==1.27.0
 cryptography==46.0.6
+psutil==7.1.0

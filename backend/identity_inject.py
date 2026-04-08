@@ -113,6 +113,11 @@ def get_effective_state(data_dir: Path, agent_identifier: str) -> dict:
         "last_heartbeat_at": 0.0,
         "injection_count": 0,
         "drift_detected": False,
+        "drift_score": 0.0,
+        "drift_reason": "",
+        "reinforcement_pending": False,
+        "last_reinforcement_at": 0.0,
+        "reinforcement_count": 0,
         "degraded": False,
         "degraded_reason": "",
         "reason": "",
@@ -133,7 +138,26 @@ def mark_identity_drift(data_dir: Path, agent_identifier: str, *, reason: str) -
     state = get_effective_state(data_dir, agent_identifier)
     state["drift_detected"] = True
     state["reason"] = reason
+    state["drift_reason"] = reason
+    state["drift_score"] = max(float(state.get("drift_score", 0.0) or 0.0), 1.0)
+    state["reinforcement_pending"] = True
     state["updated_at"] = time.time()
+    write_effective_state(data_dir, agent_identifier, state)
+    return state
+
+
+def record_identity_reinforcement(data_dir: Path, agent_identifier: str, *, trigger: str) -> dict:
+    state = get_effective_state(data_dir, agent_identifier)
+    now = time.time()
+    state["last_inject_trigger"] = trigger
+    state["last_reinforcement_at"] = now
+    state["reinforcement_count"] = int(state.get("reinforcement_count", 0) or 0) + 1
+    state["reinforcement_pending"] = False
+    state["drift_detected"] = False
+    state["drift_score"] = 0.0
+    state["drift_reason"] = ""
+    state["reason"] = ""
+    state["updated_at"] = now
     write_effective_state(data_dir, agent_identifier, state)
     return state
 
@@ -195,6 +219,12 @@ def inject_identity(
         "last_inject_at": now,
         "injection_count": int(existing_state.get("injection_count", 0) or 0) + 1,
         "drift_detected": False,
+        "drift_score": 0.0,
+        "drift_reason": "",
+        "reinforcement_pending": False,
+        "last_reinforcement_at": now,
+        "reinforcement_count": int(existing_state.get("reinforcement_count", 0) or 0)
+        + (1 if trigger != "spawn" else 0),
         "reason": "",
         "updated_at": now,
         "degraded": False,
@@ -224,6 +254,9 @@ def inject_identity(
     if degraded_reason:
         state["drift_detected"] = True
         state["reason"] = degraded_reason
+        state["drift_reason"] = degraded_reason
+        state["drift_score"] = 1.0
+        state["reinforcement_pending"] = True
 
     identity_md = _identity_markdown(
         agent_id=agent_id,

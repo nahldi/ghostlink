@@ -13,11 +13,13 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import html
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 import deps
+from app_helpers import save_settings
 from identity_inject import get_effective_state, mark_identity_drift, write_effective_state
 from profiles import (
     DEFAULT_PROFILE_ID,
@@ -39,7 +41,20 @@ from profiles import (
     update_profile,
 )
 from plugin_sdk import event_bus
+from plans import build_plan, create_plan, get_plan, list_plans, update_plan_status
 from registry import persist_agent
+from versioning import (
+    deprecate_asset_version,
+    get_asset_health,
+    list_asset_versions,
+    promote_asset_version,
+    publish_asset_version,
+    record_asset_health_event,
+    rollback_profile_version,
+    rollback_skill_version,
+    snapshot_profile,
+    snapshot_skill,
+)
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -90,6 +105,177 @@ _KNOWN_MODEL_FLAGS: dict[str, str] = {
     "grok": "--model",
     "aider": "--model",
 }
+_PLAN_MODE_ENABLED_KEY = "planModeEnabled"
+_PLAN_MODE_THRESHOLD_KEY = "planModeCostThresholdUsd"
+
+
+def _save_runtime_settings() -> None:
+    save_settings()
+
+
+def _plan_mode_settings_payload() -> dict[str, object]:
+    enabled = bool(deps._settings.get(_PLAN_MODE_ENABLED_KEY, False))
+    try:
+        threshold = float(deps._settings.get(_PLAN_MODE_THRESHOLD_KEY, 0.0) or 0.0)
+    except (TypeError, ValueError):
+        threshold = 0.0
+    return {
+        "plan_mode_enabled": enabled,
+        "auto_threshold_usd": round(max(0.0, threshold), 4),
+    }
+
+
+async def _queue_plan_execution(plan: dict[str, object]) -> dict | None:
+    if deps.task_store is None:
+        return None
+    existing = await deps.task_store.get_by_source_ref("plan", str(plan["plan_id"]))
+    if existing:
+        return existing
+    agent_name = str(plan.get("agent_name") or "").strip()
+    inst = deps.registry.resolve(agent_name) if deps.registry and agent_name else None
+    steps = [{"label": step, "status": "pending"} for step in (plan.get("steps") or []) if str(step).strip()]
+    metadata = {
+        "plan_id": plan["plan_id"],
+        "plan_prompt": plan.get("prompt", ""),
+        "plan_steps": list(plan.get("steps") or []),
+        "plan_files": list(plan.get("files") or []),
+        "estimated_cost_usd": plan.get("estimated_cost_usd", 0),
+        "estimated_tokens": plan.get("estimated_tokens", 0),
+        "estimated_seconds": plan.get("estimated_seconds", 0),
+        "queued_from_plan_approval": True,
+    }
+    created = await deps.task_store.create(
+        title=f"Execute approved plan: {str(plan.get('prompt') or '').strip()[:120]}",
+        description=str(plan.get("prompt") or ""),
+        channel=str(plan.get("channel") or "general"),
+        agent_id=getattr(inst, "agent_id", None),
+        agent_name=getattr(inst, "name", None) if inst else (agent_name or None),
+        profile_id=getattr(inst, "profile_id", None),
+        source_type="plan",
+        source_ref=str(plan["plan_id"]),
+        trace_id=str(plan["plan_id"]),
+        created_by="operator",
+        status="queued",
+        metadata=metadata,
+    )
+    if steps:
+        created = await deps.task_store.update_progress(created["task_id"], 0, "queued", len(steps), {"steps": steps})
+    if deps.broadcast is not None:
+        await deps.broadcast("task_update", created)
+    if deps.store is not None and agent_name:
+        from app_helpers import route_mentions
+
+        dispatch_text = f"@{agent_name} Approved plan ready to execute: {str(plan.get('prompt') or '').strip()}"
+        await deps.store.add(
+            sender="system",
+            text=dispatch_text,
+            msg_type="system",
+            channel=str(plan.get("channel") or "general"),
+            metadata=json.dumps({"plan_id": plan["plan_id"], "task_id": created["task_id"], "status": "queued"}),
+        )
+        if deps.router_inst is not None and deps.registry is not None:
+            route_mentions("system", dispatch_text, str(plan.get("channel") or "general"))
+    return created
+
+
+async def _attach_plan_execution_task(plan: dict[str, object]) -> dict[str, object]:
+    payload = dict(plan)
+    if deps.task_store is None:
+        return payload
+    task = await deps.task_store.get_by_source_ref("plan", str(plan["plan_id"]))
+    if task is not None:
+        payload["execution_task"] = task
+    return payload
+
+
+def _productization_version_shape(item: dict, health: dict | None = None) -> dict:
+    compatibility = dict(item.get("compatibility") or {})
+    return {
+        "version": item.get("version", ""),
+        "channel": item.get("channel", "private"),
+        "status": item.get("status", "active"),
+        "changelog": item.get("changelog", ""),
+        "compatibility": compatibility,
+        "deprecated": item.get("status") == "deprecated",
+        "deprecation_message": item.get("deprecation_message", ""),
+        "replacement_version": item.get("replacement_version", ""),
+        "distribution_scope": item.get("distribution_scope", "workspace"),
+        "distribution_target": item.get("distribution_target", ""),
+        "health": health or {"error_rate": 0.0, "cost_usd": 0.0, "eval_score": None, "sample_count": 0},
+    }
+
+
+def _parse_json_blob(raw: object, fallback):
+    if isinstance(raw, (dict, list)):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            return json.loads(raw)
+        except Exception:
+            return fallback
+    return fallback
+
+
+async def _export_channel_markdown(channel: str, limit: int = 1000, offset: int = 0) -> dict:
+    if deps.store is None or deps.store._db is None:
+        raise RuntimeError("Message store not initialized")
+    limit = max(1, min(limit, 1000))
+    offset = max(0, offset)
+    count_cursor = await deps.store._db.execute("SELECT COUNT(*) AS count FROM messages WHERE channel = ?", (channel,))
+    try:
+        total = int((await count_cursor.fetchone())["count"])
+    finally:
+        await count_cursor.close()
+    cursor = await deps.store._db.execute(
+        """
+        SELECT * FROM messages
+        WHERE channel = ?
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (channel, limit, offset),
+    )
+    try:
+        rows = await cursor.fetchall()
+    finally:
+        await cursor.close()
+    msgs = [deps.store._row_to_dict(row) for row in reversed(rows)]
+    lines = [f"# Conversation Export: #{channel}", "", f"_Exported at {time.strftime('%Y-%m-%d %H:%M:%S')}._", ""]
+    if total > len(msgs):
+        start = offset + 1 if msgs else 0
+        end = offset + len(msgs)
+        lines.extend([f"_Showing {start}-{end} of {total} messages._", ""])
+    for msg in msgs:
+        lines.append(f"## {msg['sender']} ({msg.get('time', '')})")
+        if msg.get("type") and msg["type"] != "chat":
+            lines.append(f"_Type: `{msg['type']}`_")
+        lines.append("")
+        lines.append(msg["text"])
+        attachments = _parse_json_blob(msg.get("attachments"), [])
+        if isinstance(attachments, list) and attachments:
+            lines.extend(["", "Attachments:"])
+            for item in attachments:
+                if not isinstance(item, dict):
+                    continue
+                label = str(item.get("name") or item.get("type") or "attachment")
+                url = str(item.get("url") or item.get("path") or "").strip()
+                if url:
+                    lines.append(f"- [{label}]({url})")
+        metadata = _parse_json_blob(msg.get("metadata"), {})
+        if isinstance(metadata, dict):
+            tool_name = str(metadata.get("tool_name") or metadata.get("tool") or "").strip()
+            tool_result = str(metadata.get("tool_result") or metadata.get("result_summary") or "").strip()
+            if tool_name:
+                lines.extend(["", f"Tool: `{tool_name}`"])
+            if tool_result:
+                lines.append(f"Result: {tool_result}")
+        lines.extend(["", "---", ""])
+    return {
+        "markdown": "\n".join(lines).strip() + "\n",
+        "filename": f"{channel}-conversation-export.md",
+        "message_count": len(msgs),
+        "total_messages": total,
+    }
 
 
 def _resolve_agent(identifier: str):
@@ -581,7 +767,7 @@ async def _post_register_setup(agent_name: str) -> None:
         if inst is None:
             return
         if hasattr(deps, "worktree_manager") and deps.worktree_manager:
-            await asyncio.to_thread(deps.worktree_manager.create_worktree, inst.name)
+            await asyncio.to_thread(deps.worktree_manager.create_worktree, inst.agent_id, None, agent_name=inst.name)
         else:
             _warn_missing_worktree_manager("register", inst.name)
         from app_helpers import get_full_agent_list
@@ -630,6 +816,9 @@ async def register_agent(request: Request):
             if pid_int is not None:
                 proc = deps._pending_spawns.pop(pid_int, None)
                 if proc is not None:
+                    if isinstance(proc, deps.ProcessRecord):
+                        proc.owner = inst.name
+                        proc.token = inst.token
                     deps._agent_processes[inst.name] = proc
     if deps.runtime_db is not None:
         await persist_agent(deps.runtime_db, inst)
@@ -645,8 +834,7 @@ async def deregister_agent(name: str):
         return {"ok": False}
     resolved_name = inst.name
     if hasattr(deps, "worktree_manager") and deps.worktree_manager:
-        deps.worktree_manager.merge_changes(resolved_name)
-        deps.worktree_manager.remove_worktree(resolved_name)
+        deps.worktree_manager.on_agent_disconnect(inst.agent_id)
     else:
         _warn_missing_worktree_manager("deregister", resolved_name)
     removed = deps.registry.deregister(resolved_name)
@@ -952,7 +1140,7 @@ async def spawn_agent(request: Request):
         _th.Thread(target=_drain_pipe, args=(proc.stderr, base, _stderr_buf, stderr_log), daemon=True).start()
 
         async with deps._agent_lock:
-            deps._pending_spawns[proc.pid] = proc
+            deps._pending_spawns[proc.pid] = deps.capture_process_record(proc, owner=f"spawn:{base}")
         asyncio.create_task(deps.watch_agent_process_exit(proc, f"spawn:{base}"))
 
         try:
@@ -983,9 +1171,9 @@ async def spawn_agent(request: Request):
 async def kill_agent(name: str):
     """Kill a specific agent by name."""
     import mcp_bridge
+    inst = _resolve_agent(name)
     if hasattr(deps, "worktree_manager") and deps.worktree_manager:
-        deps.worktree_manager.merge_changes(name)
-        deps.worktree_manager.remove_worktree(name)
+        deps.worktree_manager.on_agent_disconnect(getattr(inst, "agent_id", name))
     else:
         _warn_missing_worktree_manager("kill", name)
     ok = deps.registry.deregister(name)
@@ -1009,16 +1197,17 @@ async def kill_agent(name: str):
                 if key.startswith(name + "_"):
                     proc = deps._agent_processes.pop(key, None)
                     break
-    if proc:
+    live_proc = deps._unwrap_process(proc)
+    if proc and live_proc and deps.is_same_process(proc):
         try:
-            proc.terminate()
+            live_proc.terminate()
         except Exception as e:
             log.debug("Process terminate for %s: %s", name, e)
 
-        async def _sigkill_escalation(_proc=proc, _name=name):
+        async def _sigkill_escalation(_proc=live_proc, _record=proc, _name=name):
             await asyncio.sleep(5)
             try:
-                if _proc.poll() is None:
+                if deps.is_same_process(_record) and _proc.poll() is None:
                     _proc.kill()
                     log.info("SIGKILL sent to %s (SIGTERM was ignored)", _name)
             except Exception as _e:
@@ -1071,17 +1260,18 @@ async def shutdown_server():
     async with deps._agent_lock:
         for inst in list(deps.registry.get_all()):
             try:
-                proc = deps._agent_processes.get(inst.name)
-                if proc and proc.poll() is None:
+                record = deps._agent_processes.get(inst.name)
+                proc = deps._unwrap_process(record)
+                if record and proc and deps.is_same_process(record) and proc.poll() is None:
                     proc.terminate()
-                    procs_to_kill.append(proc)
+                    procs_to_kill.append((record, proc))
             except Exception as e:
                 log.debug("Shutdown: failed to terminate %s: %s", inst.name, e)
     if procs_to_kill:
         await asyncio.sleep(5)
-        for proc in procs_to_kill:
+        for record, proc in procs_to_kill:
             try:
-                if proc.poll() is None:
+                if deps.is_same_process(record) and proc.poll() is None:
                     proc.kill()
             except Exception:
                 pass
@@ -1379,6 +1569,354 @@ async def toggle_agent_skill(agent_name: str, request: Request):
     return {"ok": True, "agent": agent_name, "skillId": skill_id, "enabled": enabled}
 
 
+@router.get("/api/skills/{skill_id}/versions")
+async def api_list_skill_versions(skill_id: str):
+    return {"skill_id": skill_id, "versions": await list_asset_versions(deps.runtime_db, "skill", skill_id)}
+
+
+@router.post("/api/skills/{skill_id}/versions")
+async def api_publish_skill_version(skill_id: str, request: Request):
+    body = await request.json()
+    skill = next((item for item in deps.skills_registry.get_all_skills() if item.get("id") == skill_id), None)
+    if skill is None:
+        return JSONResponse({"error": "skill not found"}, 404)
+    try:
+        return await publish_asset_version(
+            deps.runtime_db,
+            asset_type="skill",
+            asset_id=skill_id,
+            version=str(body.get("version") or ""),
+            payload=snapshot_skill(skill),
+            changelog=str(body.get("changelog") or ""),
+            compatibility=body.get("compatibility") if isinstance(body.get("compatibility"), dict) else {},
+            dependencies=body.get("dependencies") if isinstance(body.get("dependencies"), list) else [],
+            channel=str(body.get("channel") or "private"),
+            distribution_scope=str(body.get("distribution_scope") or body.get("scope") or "workspace"),
+            distribution_target=str(body.get("distribution_target") or body.get("target") or ""),
+            created_by=str(body.get("created_by") or ""),
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+
+
+@router.post("/api/skills/{skill_id}/versions/{version}/promote")
+async def api_promote_skill_version(skill_id: str, version: str, request: Request):
+    body = await request.json()
+    channel = str(body.get("channel") or "").strip().lower()
+    if channel == "stable" and deps.policy_engine is not None:
+        from policy import PolicyContext
+
+        decision = await deps.policy_engine.evaluate(
+            "asset_promotion",
+            "high_risk_write",
+            PolicyContext(
+                workspace_id=str(body.get("distribution_target") or "*"),
+                metadata={"asset_type": "skill", "asset_id": skill_id, "version": version, "channel": channel},
+            ),
+        )
+        if decision.get("decision") != "allow":
+            return JSONResponse({"error": f"promotion blocked: {decision.get('reason', 'policy')}"}, 403)
+    try:
+        return await promote_asset_version(deps.runtime_db, asset_type="skill", asset_id=skill_id, version=version, channel=channel)
+    except (KeyError, ValueError) as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+
+
+@router.post("/api/skills/{skill_id}/versions/{version}/deprecate")
+async def api_deprecate_skill_version(skill_id: str, version: str, request: Request):
+    body = await request.json()
+    try:
+        return await deprecate_asset_version(
+            deps.runtime_db,
+            asset_type="skill",
+            asset_id=skill_id,
+            version=version,
+            message=str(body.get("message") or ""),
+            replacement_version=str(body.get("replacement_version") or ""),
+        )
+    except KeyError:
+        return JSONResponse({"error": "version not found"}, 404)
+
+
+@router.post("/api/plans")
+async def api_create_execution_plan(request: Request):
+    body = await request.json()
+    prompt = str(body.get("prompt") or body.get("task") or "").strip()
+    if not prompt:
+        return JSONResponse({"error": "prompt required"}, 400)
+    settings_payload = _plan_mode_settings_payload()
+    threshold_value = body.get("cost_threshold_usd")
+    if threshold_value is None:
+        threshold_value = body.get("cost_threshold")
+    if threshold_value is None:
+        threshold_value = settings_payload["auto_threshold_usd"]
+    plan = await create_plan(
+        deps.runtime_db,
+        agent_name=str(body.get("agent_name") or body.get("agent") or ""),
+        channel=str(body.get("channel") or "general"),
+        prompt=prompt,
+        files=body.get("files") if isinstance(body.get("files"), list) else [],
+        cost_threshold_usd=float(threshold_value or 0.0),
+        metadata=body.get("metadata") if isinstance(body.get("metadata"), dict) else {},
+    )
+    if deps.store is not None:
+        await deps.store.add(
+            sender="system",
+            text=f"Plan requested for {plan['agent_name'] or 'agent'}: approval needed before execution.",
+            msg_type="approval_request",
+            channel=plan["channel"],
+            metadata=json.dumps(
+                {
+                    "plan_id": plan["plan_id"],
+                    "estimated_cost_usd": plan["estimated_cost_usd"],
+                    "estimated_tokens": plan["estimated_tokens"],
+                    "estimated_seconds": plan["estimated_seconds"],
+                }
+            ),
+        )
+    return await _attach_plan_execution_task(plan)
+
+
+@router.get("/api/plans/settings")
+async def api_get_execution_plan_settings():
+    return _plan_mode_settings_payload()
+
+
+@router.post("/api/plans/settings")
+async def api_save_execution_plan_settings(request: Request):
+    body = await request.json()
+    enabled_raw = body.get("plan_mode_enabled", body.get("planModeEnabled"))
+    threshold_raw = body.get("auto_threshold_usd", body.get("autoThresholdUsd"))
+    payload = _plan_mode_settings_payload()
+    if enabled_raw is not None:
+        payload["plan_mode_enabled"] = bool(enabled_raw)
+    if threshold_raw is not None:
+        try:
+            payload["auto_threshold_usd"] = round(max(0.0, float(threshold_raw or 0.0)), 4)
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "invalid auto_threshold_usd"}, 400)
+    async with deps._settings_lock:
+        deps._settings[_PLAN_MODE_ENABLED_KEY] = bool(payload["plan_mode_enabled"])
+        deps._settings[_PLAN_MODE_THRESHOLD_KEY] = float(payload["auto_threshold_usd"])
+        _save_runtime_settings()
+    return payload
+
+
+@router.post("/api/plans/evaluate")
+async def api_evaluate_execution_plan(request: Request):
+    body = await request.json()
+    prompt = str(body.get("prompt") or body.get("task") or "").strip()
+    if not prompt:
+        return JSONResponse({"error": "prompt required"}, 400)
+    files = [str(item).strip() for item in (body.get("files") or []) if str(item).strip()]
+    preview = build_plan(prompt, files)
+    settings_payload = _plan_mode_settings_payload()
+    enabled = bool(settings_payload["plan_mode_enabled"])
+    try:
+        threshold = float(body.get("auto_threshold_usd", body.get("autoThresholdUsd", settings_payload["auto_threshold_usd"])) or 0.0)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "invalid auto_threshold_usd"}, 400)
+    try:
+        estimated_cost = float(body.get("estimated_cost_usd", body.get("estimatedCostUsd", preview["estimated_cost_usd"])) or 0.0)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "invalid estimated_cost_usd"}, 400)
+    force_plan = bool(body.get("force_plan", body.get("forcePlan", False)))
+    requires_plan = force_plan or (enabled and threshold > 0 and estimated_cost >= threshold)
+    if force_plan:
+        reason = "forced"
+    elif not enabled:
+        reason = "plan mode disabled"
+    elif threshold <= 0:
+        reason = "no auto threshold configured"
+    elif estimated_cost >= threshold:
+        reason = "estimated cost exceeds threshold"
+    else:
+        reason = "estimated cost below threshold"
+    return {
+        "requires_plan": requires_plan,
+        "reason": reason,
+        "settings": settings_payload,
+        "auto_threshold_usd": round(max(0.0, threshold), 4),
+        "estimated_cost_usd": round(max(0.0, estimated_cost), 4),
+        "estimated_tokens": int(preview["estimated_tokens"]),
+        "estimated_seconds": int(preview["estimated_seconds"]),
+        "steps": preview["steps"],
+        "files": preview["files"],
+    }
+
+
+@router.get("/api/plans")
+async def api_list_execution_plans(channel: str = "", agent_name: str = "", status: str = "", limit: int = 100, offset: int = 0):
+    plans = await list_plans(deps.runtime_db, channel=channel, agent_name=agent_name, status=status, limit=limit, offset=offset)
+    return {"plans": [await _attach_plan_execution_task(plan) for plan in plans]}
+
+
+@router.get("/api/plans/{plan_id}")
+async def api_get_execution_plan(plan_id: str):
+    try:
+        return await _attach_plan_execution_task(await get_plan(deps.runtime_db, plan_id))
+    except KeyError:
+        return JSONResponse({"error": "not found"}, 404)
+
+
+@router.post("/api/plans/{plan_id}/approve")
+async def api_approve_execution_plan(plan_id: str, request: Request):
+    body = await request.json()
+    try:
+        plan = await update_plan_status(deps.runtime_db, plan_id, "approved", str(body.get("note") or ""))
+    except KeyError:
+        return JSONResponse({"error": "not found"}, 404)
+    execution_task = await _queue_plan_execution(plan)
+    if deps.store is not None:
+        await deps.store.add(
+            sender="system",
+            text=f"Plan approved for {plan['agent_name'] or 'agent'}. Execution queued.",
+            msg_type="system",
+            channel=plan["channel"],
+            metadata=json.dumps(
+                {
+                    "plan_id": plan["plan_id"],
+                    "status": "approved",
+                    "execution_task_id": (execution_task or {}).get("task_id", ""),
+                }
+            ),
+        )
+    if execution_task is not None:
+        plan = dict(plan)
+        plan["execution_task"] = execution_task
+    return await _attach_plan_execution_task(plan)
+
+
+@router.post("/api/plans/{plan_id}/reject")
+async def api_reject_execution_plan(plan_id: str, request: Request):
+    body = await request.json()
+    try:
+        plan = await update_plan_status(deps.runtime_db, plan_id, "rejected", str(body.get("note") or ""))
+    except KeyError:
+        return JSONResponse({"error": "not found"}, 404)
+    if deps.store is not None:
+        await deps.store.add(
+            sender="system",
+            text=f"Plan rejected for {plan['agent_name'] or 'agent'}.",
+            msg_type="system",
+            channel=plan["channel"],
+            metadata=json.dumps({"plan_id": plan["plan_id"], "status": "rejected"}),
+        )
+    return await _attach_plan_execution_task(plan)
+
+
+@router.get("/api/conversations/{channel}/export-markdown")
+async def api_export_conversation_markdown(channel: str, limit: int = 1000, offset: int = 0):
+    try:
+        return await _export_channel_markdown(channel, limit=limit, offset=offset)
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, 503)
+
+
+@router.get("/api/productization/assets")
+async def api_productization_assets():
+    profiles = await list_profiles(deps.runtime_db)
+    skills = deps.skills_registry.get_all_skills()
+    assets = []
+    for profile in profiles:
+        versions = await list_asset_versions(deps.runtime_db, "profile", profile["profile_id"])
+        assets.append(
+            {
+                "kind": "profile",
+                "asset_id": profile["profile_id"],
+                "name": profile["name"],
+                "template": profile["profile_id"] == DEFAULT_PROFILE_ID,
+                "versions": [
+                    _productization_version_shape(
+                        item,
+                        await get_asset_health(deps.runtime_db, "profile", profile["profile_id"], item["version"]),
+                    )
+                    for item in versions
+                ],
+            }
+        )
+    for skill in skills:
+        versions = await list_asset_versions(deps.runtime_db, "skill", skill["id"])
+        assets.append(
+            {
+                "kind": "skill",
+                "asset_id": skill["id"],
+                "name": skill.get("name", skill["id"]),
+                "template": bool(skill.get("builtin")),
+                "versions": [
+                    _productization_version_shape(
+                        item,
+                        await get_asset_health(deps.runtime_db, "skill", skill["id"], item["version"]),
+                    )
+                    for item in versions
+                ],
+            }
+        )
+    return {"assets": assets}
+
+
+@router.post("/api/productization/assets/{kind}/{asset_id}/versions/{version}/health")
+async def api_record_productization_asset_health(kind: str, asset_id: str, version: str, request: Request):
+    body = await request.json()
+    await record_asset_health_event(
+        deps.runtime_db,
+        asset_type=kind,
+        asset_id=asset_id,
+        version=version,
+        event_type=str(body.get("event_type") or "run"),
+        ok=bool(body.get("ok", True)),
+        cost_usd=float(body.get("cost_usd") or 0.0),
+        eval_score=float(body["eval_score"]) if body.get("eval_score") is not None else None,
+        metadata=body.get("metadata") if isinstance(body.get("metadata"), dict) else {},
+    )
+    return {"ok": True, "health": await get_asset_health(deps.runtime_db, kind, asset_id, version)}
+
+
+@router.post("/api/productization/assets/{kind}/{asset_id}/promote")
+async def api_promote_productization_asset(kind: str, asset_id: str, request: Request):
+    body = await request.json()
+    version = str(body.get("version") or "").strip()
+    channel = str(body.get("channel") or "stable").strip().lower()
+    if not version:
+        return JSONResponse({"error": "version required"}, 400)
+    if channel == "stable" and deps.policy_engine is not None:
+        from policy import PolicyContext
+
+        decision = await deps.policy_engine.evaluate(
+            "asset_promotion",
+            "high_risk_write",
+            PolicyContext(
+                workspace_id=str(body.get("distribution_target") or "*"),
+                metadata={"asset_type": kind, "asset_id": asset_id, "version": version, "channel": channel},
+            ),
+        )
+        if decision.get("decision") != "allow":
+            return JSONResponse({"error": f"promotion blocked: {decision.get('reason', 'policy')}"}, 403)
+    try:
+        promoted = await promote_asset_version(deps.runtime_db, asset_type=kind, asset_id=asset_id, version=version, channel=channel)
+    except (KeyError, ValueError) as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+    return {"ok": True, "asset": _productization_version_shape(promoted)}
+
+
+@router.post("/api/productization/assets/{kind}/{asset_id}/rollback")
+async def api_rollback_productization_asset(kind: str, asset_id: str, request: Request):
+    body = await request.json()
+    version = str(body.get("version") or "").strip()
+    if not version:
+        return JSONResponse({"error": "version required"}, 400)
+    try:
+        if kind == "profile":
+            profile = await rollback_profile_version(deps.runtime_db, asset_id, version)
+            return {"ok": True, "profile": profile}
+        if kind == "skill":
+            skill = await rollback_skill_version(deps.DATA_DIR, deps.runtime_db, asset_id, version)
+            return {"ok": True, "skill": skill}
+        return JSONResponse({"error": "unsupported asset kind"}, 400)
+    except KeyError:
+        return JSONResponse({"error": "version not found"}, 404)
+
+
 # ── Agent soul, notes, health, config, memories ──────────────────────
 
 from agent_memory import get_agent_memory, get_notes, get_soul, set_notes, set_soul
@@ -1454,6 +1992,84 @@ async def api_delete_profile(profile_id: str):
         return {"ok": True}
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, 400)
+
+
+@router.get("/api/profiles/{profile_id}/versions")
+async def api_list_profile_versions(profile_id: str):
+    return {"profile_id": profile_id, "versions": await list_asset_versions(deps.runtime_db, "profile", profile_id)}
+
+
+@router.post("/api/profiles/{profile_id}/versions")
+async def api_publish_profile_version(profile_id: str, request: Request):
+    body = await request.json()
+    try:
+        payload = await snapshot_profile(deps.runtime_db, profile_id, deps.skills_registry.get_all_skills())
+        return await publish_asset_version(
+            deps.runtime_db,
+            asset_type="profile",
+            asset_id=profile_id,
+            version=str(body.get("version") or ""),
+            payload=payload,
+            changelog=str(body.get("changelog") or ""),
+            compatibility=body.get("compatibility") if isinstance(body.get("compatibility"), dict) else {},
+            dependencies=body.get("dependencies") if isinstance(body.get("dependencies"), list) else [],
+            channel=str(body.get("channel") or "private"),
+            distribution_scope=str(body.get("distribution_scope") or body.get("scope") or "workspace"),
+            distribution_target=str(body.get("distribution_target") or body.get("target") or ""),
+            created_by=str(body.get("created_by") or ""),
+        )
+    except KeyError:
+        return JSONResponse({"error": "profile not found"}, 404)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+
+
+@router.post("/api/profiles/{profile_id}/versions/{version}/promote")
+async def api_promote_profile_version(profile_id: str, version: str, request: Request):
+    body = await request.json()
+    channel = str(body.get("channel") or "").strip().lower()
+    if channel == "stable" and deps.policy_engine is not None:
+        from policy import PolicyContext
+
+        decision = await deps.policy_engine.evaluate(
+            "asset_promotion",
+            "high_risk_write",
+            PolicyContext(
+                workspace_id=str(body.get("distribution_target") or "*"),
+                metadata={"asset_type": "profile", "asset_id": profile_id, "version": version, "channel": channel},
+            ),
+        )
+        if decision.get("decision") != "allow":
+            return JSONResponse({"error": f"promotion blocked: {decision.get('reason', 'policy')}"}, 403)
+    try:
+        return await promote_asset_version(deps.runtime_db, asset_type="profile", asset_id=profile_id, version=version, channel=channel)
+    except (KeyError, ValueError) as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+
+
+@router.post("/api/profiles/{profile_id}/versions/{version}/deprecate")
+async def api_deprecate_profile_version(profile_id: str, version: str, request: Request):
+    body = await request.json()
+    try:
+        return await deprecate_asset_version(
+            deps.runtime_db,
+            asset_type="profile",
+            asset_id=profile_id,
+            version=version,
+            message=str(body.get("message") or ""),
+            replacement_version=str(body.get("replacement_version") or ""),
+        )
+    except KeyError:
+        return JSONResponse({"error": "version not found"}, 404)
+
+
+@router.post("/api/profiles/{profile_id}/versions/{version}/rollback")
+async def api_rollback_profile_version(profile_id: str, version: str):
+    try:
+        profile = await rollback_profile_version(deps.runtime_db, profile_id, version)
+    except KeyError:
+        return JSONResponse({"error": "version not found"}, 404)
+    return {"ok": True, "profile": profile}
 
 
 @router.get("/api/profiles/{profile_id}/settings")
@@ -1659,6 +2275,19 @@ async def list_agent_memories(name: str):
     return {"memories": mem.list_all()}
 
 
+@router.get("/api/agents/{name}/memories/search")
+async def search_agent_memories(name: str, q: str = "", layer: str = "", tag: str = ""):
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    if not q.strip():
+        return {"results": []}
+    _inst, agent_key = _resolved_agent_key(name)
+    mem = get_agent_memory(deps.DATA_DIR, agent_key)
+    layers = [layer] if layer.strip() else None
+    tags = [tag] if tag.strip() else None
+    return {"results": mem.search(q, layers=layers, tags=tags)}
+
+
 @router.get("/api/agents/{name}/memories/{key}")
 async def api_get_agent_memory(name: str, key: str):
     if not _VALID_AGENT_NAME.match(name):
@@ -1679,6 +2308,20 @@ async def api_delete_agent_memory(name: str, key: str):
     mem = get_agent_memory(deps.DATA_DIR, agent_key)
     ok = mem.delete(key)
     return {"ok": ok}
+
+
+@router.post("/api/agents/{name}/memories/{key}/promote")
+async def api_promote_agent_memory(name: str, key: str, request: Request):
+    if not _VALID_AGENT_NAME.match(name):
+        return JSONResponse({"error": "invalid agent name"}, 400)
+    body = await request.json() if request is not None else {}
+    target_layer = str(body.get("layer", "workspace") or "workspace")
+    _inst, agent_key = _resolved_agent_key(name)
+    mem = get_agent_memory(deps.DATA_DIR, agent_key)
+    promoted = mem.promote(key, target_layer=target_layer)
+    if promoted is None:
+        return JSONResponse({"error": "not found"}, 404)
+    return {"ok": True, "memory": promoted}
 
 
 @router.post("/api/agents/{name}/feedback")
@@ -2619,6 +3262,8 @@ async def list_agent_tasks(name: str):
         return {"tasks": _load_agent_tasks(name)}
     try:
         tasks = await deps.task_store.list_tasks(agent_name=inst.name, limit=_TASK_RETENTION)
+        if not tasks:
+            tasks = await deps.task_store.list_tasks(agent_id=inst.agent_id, limit=_TASK_RETENTION)
     except Exception:
         return {"tasks": _load_agent_tasks(name)}
     mapped = [

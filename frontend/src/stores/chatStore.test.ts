@@ -241,6 +241,27 @@ describe('chatStore', () => {
     expect(useChatStore.getState().sidebarPanel).toBeNull();
   });
 
+  it('marks identity drift on a specific agent', () => {
+    useChatStore.getState().setAgents([
+      { name: 'claude', base: 'claude', label: 'Claude', color: '#e8734a', state: 'active' as const, slot: 1 },
+      { name: 'codex', base: 'codex', label: 'Codex', color: '#10a37f', state: 'idle' as const, slot: 2 },
+    ]);
+    useChatStore.getState().markAgentDrift('codex', true);
+    expect(useChatStore.getState().agents.find((agent) => agent.name === 'codex')?.drift_detected).toBe(true);
+    expect(useChatStore.getState().agents.find((agent) => agent.name === 'claude')?.drift_detected).toBeUndefined();
+  });
+
+  it('stores pending AGENTS.md review payload', () => {
+    useChatStore.getState().setPendingAgentsMdDiff({
+      has_changes: true,
+      workspace_path: 'C:/repo',
+      diff: { added_rules: [{ rule: 'test' }] },
+    });
+    expect(useChatStore.getState().pendingAgentsMdDiff?.has_changes).toBe(true);
+    useChatStore.getState().setPendingAgentsMdDiff(null);
+    expect(useChatStore.getState().pendingAgentsMdDiff).toBeNull();
+  });
+
   // Reply management
   it('sets and clears reply target', () => {
     const msg = { id: 1, uid: 't', sender: 'user', text: 'test', type: 'chat' as const, timestamp: 1, time: '1', channel: 'general' };

@@ -95,18 +95,26 @@ class SkillsRegistry:
             backup.write_text(self._config_path().read_text("utf-8"), "utf-8")
 
     def get_all_skills(self) -> list[dict]:
-        skills = list(BUILTIN_SKILLS)
+        skills_by_id = {skill["id"]: dict(skill) for skill in BUILTIN_SKILLS}
         if self.skills_dir.exists():
             for path in sorted(self.skills_dir.glob("*.json")):
                 try:
                     skill = json.loads(path.read_text("utf-8"))
                     if isinstance(skill, dict) and "id" in skill:
-                        skill["builtin"] = False
-                        skill.setdefault("source", "custom")
-                        skills.append(skill)
+                        skill_id = str(skill["id"])
+                        if skill_id in skills_by_id:
+                            merged = dict(skills_by_id[skill_id])
+                            merged.update(skill)
+                            merged["builtin"] = bool(skills_by_id[skill_id].get("builtin", False))
+                            merged["source"] = "customized"
+                            skills_by_id[skill_id] = merged
+                        else:
+                            skill["builtin"] = False
+                            skill.setdefault("source", "custom")
+                            skills_by_id[skill_id] = skill
                 except Exception:
                     pass
-        return skills
+        return list(skills_by_id.values())
 
     async def get_effective_skills(self, agent_id: str, profile_id: str) -> list[str]:
         from profiles import get_profile_skills

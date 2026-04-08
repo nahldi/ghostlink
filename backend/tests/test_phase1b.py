@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 import deps
-from identity_inject import get_effective_state, inject_identity
+from identity_inject import get_effective_state, inject_identity, record_identity_reinforcement
 from tests.test_phase1a import _DummyRequest, phase1a_env
 from wrapper_mcp import _compose_exec_prompt
 
@@ -94,7 +94,26 @@ async def test_identity_drift_route_broadcasts_event(phase1a_env):
     deps.broadcast = _broadcast
     response = await agents.api_identity_drift(result["name"], _DummyRequest({"reason": "compaction_detected"}))
     assert response == {"ok": True, "reason": "compaction_detected"}
+    state = get_effective_state(deps.DATA_DIR, result["agent_id"])
+    assert state["drift_detected"] is True
+    assert state["drift_score"] == 1.0
+    assert state["reinforcement_pending"] is True
     assert any(event == "identity_drift" for event, _payload in seen)
+
+
+@pytest.mark.asyncio
+async def test_identity_reinforcement_clears_pending_drift_state(phase1a_env):
+    from routes import agents
+
+    result = await agents.register_agent(_DummyRequest({"base": "codex"}))
+    await agents.api_identity_drift(result["name"], _DummyRequest({"reason": "compaction_detected"}))
+    state = record_identity_reinforcement(deps.DATA_DIR, result["agent_id"], trigger="compaction_reinjection")
+
+    assert state["drift_detected"] is False
+    assert state["drift_score"] == 0.0
+    assert state["reinforcement_pending"] is False
+    assert state["reinforcement_count"] >= 1
+    assert state["last_reinforcement_at"] > 0
 
 
 def test_exec_prompt_uses_identity_context(tmp_path: Path):

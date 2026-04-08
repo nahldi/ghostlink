@@ -1,7 +1,7 @@
 # GhostLink Roadmap Part 1
 
 > Active execution roadmap for the first phases.
-> Fresh agents should start here after reading [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
+> Fresh agents should start here after reading [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md), [AGENT_PLAYBOOK.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENT_PLAYBOOK.md), and [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
 
 **Scope:** Phases 0-3.5
 **Team model:** 5 agents
@@ -17,7 +17,7 @@ Phase 0 is complete locally. It stays in this document so fresh agents understan
 ### Control layer
 - `jeff` (`claude`): architect and spec owner
 - `coop` (`claude`): product and research owner
-- `kurt` (`claude`): QA, safety, and gate owner
+- `kurt` (`codex`): QA, safety, and gate owner
 
 ### Execution layer
 - `tyson` (`codex`): backend and platform owner
@@ -59,17 +59,25 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 4. No overlapping write ownership unless explicitly split first.
 5. No milestone is done until the gate passes.
 6. No phase starts until prerequisite architecture is resolved.
+7. Every GhostLink-managed spawn should bias toward concise, token-efficient, code-verified work instead of repetitive context dumping.
 
 ---
 
 ## Startup Checklist For A Fresh Agent
 
-1. Read [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
-2. Read [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md).
-3. Read [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md).
-4. Read [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md).
-5. Read [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md).
-6. Check current blockers with `git status`, backend tests, frontend tests, and build commands.
+1. Read [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md).
+2. Read [AGENT_PLAYBOOK.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENT_PLAYBOOK.md).
+3. Read [STATUS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/STATUS.md).
+4. Read [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md).
+5. Read [UNIFIED_ROADMAP.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md).
+6. Read [docs/verification/VALIDATION_MATRIX.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VALIDATION_MATRIX.md).
+7. Read [docs/verification/VERIFICATION_LEDGER.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/verification/VERIFICATION_LEDGER.md).
+8. Read [BUGS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md).
+9. Read [docs/specs/AUDIT_SUMMARY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/AUDIT_SUMMARY.md) when an audit/remediation pass is active.
+10. Read [docs/specs/AGENT_EFFICIENCY_SPEC.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/AGENT_EFFICIENCY_SPEC.md) when spawn behavior, SOUL injection, or token-efficiency is relevant.
+11. Read [docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/COMPETITIVE_UPGRADES_2026-04-07.md) when roadmap refinement or product differentiation is active.
+12. Read [docs/specs/PRODUCTIZATION_GUARDRAILS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/PRODUCTIZATION_GUARDRAILS.md), [docs/specs/RAILWAY_OPTIONAL_STRATEGY.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/RAILWAY_OPTIONAL_STRATEGY.md), and [docs/specs/THREAT_MODEL.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/docs/specs/THREAT_MODEL.md) when productization, hosting, or security design is relevant.
+12. Check current blockers with `git status`, backend tests, frontend tests, and build commands.
 
 ---
 
@@ -81,7 +89,6 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 
 ### Current blockers
 - working tree is not clean
-- roadmap/status/bugs wording is not fully aligned
 - local readiness truth and historical release truth are mixed together in docs
 
 ### Deliverables
@@ -138,7 +145,7 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 ## Phase 1A - Stable Identity Records
 
 **Type:** hardening
-**Goal:** Stop keying the system off display names. Establish a comprehensive identity record that every subsystem can join against.
+**Goal:** Land the minimum safe identity foundation without dragging wrapper protocol, provider injection, worktrees, or frontend rekeying into the same phase.
 **Rough effort:** 3-5 days
 
 ### Why this comes first
@@ -147,26 +154,25 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 - A full identity record is the foundation for auditability, artifact attribution, delegation lineage, and multi-agent tracing.
 
 ### Deliverables
-- persisted agent instance ID
-- server-owned identity record
-- identity record includes all required fields:
-  - `agent_id`, `session_id`, `parent_agent_id`, `task_id`, `context_id`, `trace_id`
-  - `artifact_namespace`, `auth_scope`, `provider`, `workspace_id`, `profile_id`
-  - `capabilities`, `transport`, immutable `rename_history`
-- name changes no longer break ownership or config continuity
-- every tool call, task, session, artifact, and audit event can be joined back to one identity record
-- rename preserves lineage via immutable rename_history
-- restart preserves agent_id but creates a new session_id
-- delegation records parent_agent_id
-- artifact writes are namespaced and attributable
+- stable backend `agent_id` added to registry records
+- persisted registry rows in SQLite
+- dual lookup by display name or `agent_id`
+- memory/soul/notes paths unified under `data/agents/{agent_id}/`
+- backend compatibility preserved for current frontend and wrapper contracts
+
+### Explicit deferrals
+- no provider adapter abstraction
+- no frontend store rekey
+- no worktree path/key migration
+- no restart/reconnect protocol redesign for ambiguous same-base agents
+- no full identity schema with `task_id`, `context_id`, `trace_id`, `profile_id`, `capabilities`, or `rename_history`
 
 ### Agent assignments
 
 #### `jeff`
-- Write the identity record spec with all required fields.
-- Define exact storage model and API contract.
-- Define rename, restore, and rollback behavior.
-- Define the join contract: how tool calls, tasks, sessions, artifacts, and audit events reference the identity record.
+- Write the locked Phase 1A spec around the four safe deliverables only.
+- Define exact storage model and compatibility boundaries.
+- Call out what is explicitly deferred so fresh agents do not overscope the phase.
 
 #### `coop`
 - Compare against Codex, Claude Code, Gemini, and OpenClaw patterns.
@@ -174,37 +180,35 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 
 #### `kurt`
 - Write tests for:
-  - same-model multi-agent coexistence
-  - rename continuity and lineage preservation
-  - restart continuity (agent_id stable, session_id changes)
-  - delegation with parent_agent_id
-  - artifact namespace attribution
-  - state corruption and recovery
+  - durable `agent_id` assignment
+  - SQLite persistence of registry rows
+  - dual lookup by name or `agent_id`
+  - memory/soul/notes path migration and canonicalization
+  - state corruption and recovery within the narrowed backend scope
 
 #### `tyson`
-- Implement the ID and identity record backend with all required fields.
-- Replace name-only coupling in backend platform surfaces.
+- Implement the narrowed backend identity foundation.
+- Replace only the backend name-only coupling needed for persistence and path unification.
 
 #### `ned`
-- Add only the minimum UI/operator exposure needed to show stable identity and effective state.
+- No required implementation work in Phase 1A unless jeff explicitly splits a separate compatibility surface.
 
 ### Primary file ownership
 - `tyson`
   - `backend/registry.py`
   - `backend/routes/agents.py`
   - `backend/mcp_bridge.py`
+  - `backend/agent_memory.py`
+  - `backend/deps.py`
   - backend identity tests
-- `ned`
-  - agent/operator info surfaces that expose identity state
 
 ### Exit gate
 - two same-model agents can exist without name-based collisions in backend state
-- rename does not break skills/settings/identity continuity
-- rename_history is immutable and preserves full lineage
-- restore after restart keeps agent_id stable and creates a new session_id
-- delegation records parent_agent_id correctly
-- artifact writes are namespaced by agent and attributable via identity record
-- every tool call, task, session, artifact, and audit event can be joined back to one identity record
+- every live registry record has a stable `agent_id`
+- SQLite persistence survives deregistration and backend restart as stored rows
+- backend routes can resolve by name or `agent_id`
+- memory/soul/notes use canonical ID-keyed storage paths
+- no Phase 1A change requires frontend store rekeying or a wrapper protocol redesign
 
 ---
 
@@ -215,8 +219,8 @@ If a milestone crosses these boundaries, `jeff` must split the file ownership be
 **Rough effort:** 4-7 days
 
 ### Why this is separate
-- Stable IDs solve identity persistence.
-- Runtime isolation/reinjection solves identity drift in long sessions, resume flows, and same-provider workspaces.
+- Phase 1A only lands storage identity, persistence, and ID-safe paths.
+- Runtime isolation/reinjection solves the deferred hard problems: provider-specific injection, reconnect behavior, and same-provider workspace collisions.
 
 ### Deliverables
 - isolated per-agent identity storage

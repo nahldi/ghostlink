@@ -1,7 +1,7 @@
 # Roadmap Approach Audit
 
 **Auditor:** Independent technical audit agent
-**Date:** 2026-04-06
+**Date:** 2026-04-07
 **Scope:** UNIFIED_ROADMAP.md, roadmap-pt1.md, roadmap-pt2.md, all listed backend/frontend source files
 **Verdict:** Roadmap is architecturally sound but has 7 blocking issues, 9 significant risks, and several effort underestimates.
 
@@ -55,7 +55,7 @@ The `AgentInstance` dataclass needs 12+ new fields. But the real work is the nam
 
 ### Risks
 
-- **UUID v7 is mentioned in roadmap context but not available.** Python 3.10 (the project's minimum) has only `uuid4()`. The `uuid7` package is not installed. If Phase 1A intends to use UUID v7 for time-sorted IDs, it needs the `uuid7` or `uuid_utils` pip package added to `pyproject.toml`. UUID v4 works fine as a substitute but loses time-ordering. **Decision needed before implementation.**
+- **UUID v7 is no longer the plan.** The locked 2026-04-07 Phase 1A scope settled on `uuid.uuid4().hex` for `agent_id`. No extra UUID dependency is needed for 1A. If time-sortable IDs become important later, that can be revisited in a later phase without blocking the current foundation work.
 
 ### Simpler alternative
 
@@ -114,7 +114,7 @@ The current `_BUILTIN_DEFAULTS` dict shows three MCP injection modes:
 
 ### Issues
 
-5. **No circular dependency with Phase 1A, but sequencing matters.** Phase 2 adds profiles keyed by `profile_id`. Phase 1A adds `profile_id` to the identity record. If Phase 1A ships the `profile_id` field before Phase 2 builds the profile model, the field sits unused. This is not a blocker but creates a "dead field" window.
+5. **No circular dependency with Phase 1A, but sequencing matters.** Phase 2 adds profiles keyed by `profile_id`. Under the locked 2026-04-07 Phase 1A scope, `profile_id` is explicitly deferred and should land via a Phase 2 migration instead of being added early as a dead field. This is no longer a blocker for 1A, but it does mean the profile migration belongs to Phase 2 on purpose.
 
 ### Effort estimate (1-2 weeks): Reasonable. The profile model is new code, not a deep refactor.
 
@@ -321,7 +321,7 @@ However, there is a **practical coupling** between Phase 1B (identity isolation)
 
 | Phase | Missing prerequisite |
 |-------|---------------------|
-| 1A | `uuid7` or `uuid_utils` package if time-sorted IDs are desired (not in `pyproject.toml`) |
+| 1A | No UUID package prerequisite remains. Locked Phase 1A uses Python's built-in `uuid.uuid4().hex`; time-sorted IDs are explicitly deferred. |
 | 1A | Database migration tooling for SQLite schema changes (no Alembic or equivalent present) |
 | 3.5 | No existing checkpoint data model or storage mechanism |
 | 4A | Container sandbox tier requires Docker on Windows (not a default install) |
@@ -375,12 +375,34 @@ However, there is a **practical coupling** between Phase 1B (identity isolation)
 ## Recommended Immediate Actions
 
 1. **Phase 1A scope decision:** Add `agent_id` as a UUID field first, then migrate subsystems incrementally. Do not try to add all 12+ identity fields at once.
-2. **UUID package decision:** Add `uuid_utils` to `pyproject.toml` if time-sorted IDs are wanted, or explicitly decide to use UUID v4.
+2. **UUID decision is now resolved:** locked Phase 1A uses built-in `uuid.uuid4().hex`. Do not add `uuid_utils` or another UUID dependency in this phase.
 3. **Database migration tooling:** Add a lightweight migration approach for SQLite schema changes before Phase 1A starts.
 4. **Scope clarification for Phase 1B:** Document that full workspace isolation requires Phase 5 worktrees. Phase 1B delivers GhostLink-managed-state isolation only.
 5. **Phase 3.5 split:** Separate checkpoint+resume from replay+fork+idempotency. Ship the first half early.
 6. **Worktree path configuration:** Make the worktree base path configurable before Phase 5 implementation, so it can be placed outside OneDrive.
 7. **Phase 5 scope cut:** Ship worktrees + background execution first. Defer arena, spec-driven, and collaboration to a later sub-phase.
+
+---
+
+## 2026-04-07 Follow-Up Audit Lock
+
+The project discussion after this audit correctly narrowed **Phase 1A** to the four safe items below:
+
+1. stable `agent_id`
+2. persistent registry DB
+3. dual name/ID lookup compatibility
+4. memory/soul/notes path unification
+
+The earlier broad Phase 1A draft should be treated as superseded where it included:
+- provider adapters
+- frontend state rekeying
+- worktree key migration
+- reconnect/session protocol redesign
+
+Those were the three real blockers hiding inside the old draft:
+- DB/API naming changes that would force frontend churn too early
+- re-registration semantics that the current `/api/register` contract cannot safely support
+- provider adapter work that belongs with Phase 1B runtime isolation, not storage identity
 
 ---
 

@@ -1,6 +1,6 @@
 # GhostLink Verification Ledger
 
-**Last updated:** 2026-04-06
+**Last updated:** 2026-04-07
 **Purpose:** Local fact ledger for product research, code-grounded verification, provider/runtime capability checks, and release-gate evidence.
 
 ---
@@ -17,7 +17,7 @@
 
 ## Current Verified Product Baseline
 
-These items are verified against the current repository state as of 2026-04-06.
+These items are verified against the current repository state as of 2026-04-07.
 
 - Version: `v5.7.2`
 - API/websocket endpoints: `217`
@@ -101,7 +101,7 @@ These still need a deeper pass before implementation resumes.
 
 - Verify each provider's real shipped capabilities against `backend/providers.py`
 - Verify where docs/roadmap are aspirational vs implemented
-- Verify which provider claims are current as of 2026-04-06
+- Verify which provider claims are current as of 2026-04-07
 
 ### MCP tool truth table
 
@@ -125,4 +125,3 @@ These still need a deeper pass before implementation resumes.
 - Code-grounded facts should cite exact files/modules.
 - External ecosystem comparisons should cite official docs/releases where possible.
 - When a claim is based on inference from code rather than direct runtime proof, mark it as inferred.
-

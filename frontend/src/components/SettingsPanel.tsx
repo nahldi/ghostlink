@@ -8,6 +8,10 @@ import { SoundManager, SOUND_OPTIONS } from '../lib/sounds';
 import { Section, Toggle, SettingField } from './settings/SettingsUI';
 import { SecurityTab } from './settings/SecurityTab';
 import { AdvancedTab } from './settings/AdvancedTab';
+import { ProviderOpsPanel } from './ProviderOpsPanel';
+import { A2APanel } from './A2APanel';
+import { ProductizationPanel } from './ProductizationPanel';
+import { ReviewRulesEditor } from './ReviewRulesEditor';
 import type { Plugin, SkillPack, Hook, Bridge } from '../types';
 import type { Settings, PersistentAgent, StatsSections } from '../types';
 
@@ -24,9 +28,6 @@ const AGENT_PRESETS: { base: string; label: string; command: string; color: stri
 ];
 
 type SettingsTab = 'general' | 'appearance' | 'agents' | 'providers' | 'integrations' | 'security' | 'advanced';
-type ProviderStatus = Awaited<ReturnType<typeof api.getProviders>>;
-type ProviderCapability = ProviderStatus['capabilities'][string];
-
 const TABS: { id: SettingsTab; label: string; icon: string }[] = [
   { id: 'general', label: 'General', icon: 'tune' },
   { id: 'agents', label: 'Agents', icon: 'smart_toy' },
@@ -150,6 +151,7 @@ export function SettingsPanel() {
           <IntegrationsTab />
         </>)}
         {tab === 'advanced' && (<>
+          <ReviewRulesEditor />
           <SecurityTab />
           <AdvancedTab display={display} applyInstant={applyInstant} settings={settings} />
         </>)}
@@ -645,6 +647,14 @@ function IntegrationsTab() {
 
   return (
     <>
+      <ProductizationPanel />
+
+      <div className="h-px bg-outline-variant/8" />
+
+      <A2APanel />
+
+      <div className="h-px bg-outline-variant/8" />
+
       <div className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider mb-2">Channel Bridges</div>
       <div className="text-[10px] text-on-surface-variant/40 mb-4">
         Connect GhostLink to external platforms. Messages sync bidirectionally — your agents respond everywhere.
@@ -745,146 +755,7 @@ function IntegrationsTab() {
 /* ── Tab: Providers ──────────────────────────────────────────────── */
 
 function ProvidersTab() {
-  const [status, setStatus] = useState<ProviderStatus | null>(null);
-  const [configuring, setConfiguring] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState('');
-  const [saved, setSaved] = useState('');
-  const [testing, setTesting] = useState('');
-  const [testResult, setTestResult] = useState<{ provider: string; ok: boolean; message: string } | null>(null);
-
-  useEffect(() => {
-    api.getProviders().then(setStatus).catch((e) => console.warn('Providers fetch:', e.message || e));
-  }, []);
-
-  const handleSaveKey = async (provider: string) => {
-    if (!apiKey.trim()) return;
-    try {
-      await api.configureProvider(provider, apiKey.trim());
-      // Test the key
-      setTesting(provider);
-      try {
-        const testR = await fetch(`/api/providers/${provider}/test`, { method: 'POST' });
-        const testD = await testR.json();
-        setTestResult({ provider, ok: testR.ok, message: testD.message || testD.error || 'Unknown' });
-      } catch {
-        setTestResult({ provider, ok: true, message: 'Key saved (test unavailable)' });
-      }
-      setTesting('');
-      setApiKey('');
-      setConfiguring(null);
-      setSaved(provider);
-      setTimeout(() => { setSaved(''); setTestResult(null); }, 3000);
-      api.getProviders().then(setStatus).catch((e) => console.warn('Providers fetch:', e.message || e));
-    } catch (e) { console.warn('Save provider key:', e instanceof Error ? e.message : String(e)); }
-  };
-
-  if (!status) return <div className="text-xs text-on-surface-variant/40 text-center py-8">Loading providers...</div>;
-
-  const capLabels: Record<string, string> = {
-    chat: 'Chat/LLM', code: 'Code', image: 'Image Gen', video: 'Video Gen',
-    tts: 'Text-to-Speech', stt: 'Speech-to-Text', code_exec: 'Code Execution', embedding: 'Embeddings',
-  };
-
-  return (
-    <>
-      <Section title="Capabilities" icon="auto_awesome" defaultOpen>
-        <div className="grid grid-cols-2 gap-1.5">
-          {Object.entries(status.capabilities).map(([cap, info]) => {
-            const capability = info as ProviderCapability;
-            return (
-            <div key={cap} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] ${
-              capability.available ? 'bg-green-500/8 text-green-400/80' : 'bg-surface-container/30 text-on-surface-variant/30'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${capability.available ? 'bg-green-400' : 'bg-outline-variant/30'}`} />
-              <span className="font-medium">{capLabels[cap] || cap}</span>
-              {capability.provider_name && <span className="ml-auto text-[8px] text-on-surface-variant/30">{capability.provider_name}</span>}
-            </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="Providers" icon="cloud" defaultOpen>
-        <div className="space-y-2">
-          {status.providers.map((p) => (
-            <div key={p.id} className={`rounded-xl p-3 border transition-all ${
-              p.configured ? 'bg-green-500/5 border-green-500/15' : p.free_tier ? 'bg-primary/5 border-primary/10' : 'bg-surface-container/20 border-outline-variant/8'
-            }`}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${p.configured ? 'bg-green-400' : p.local ? 'bg-blue-400' : 'bg-outline-variant/30'}`} />
-                  <span className="text-[11px] font-semibold text-on-surface">{p.name}</span>
-                  {p.free_tier && <span className="text-[8px] px-1.5 py-0.5 rounded bg-primary/15 text-primary/80 font-medium">FREE</span>}
-                  {p.local && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400/80 font-medium">LOCAL</span>}
-                </div>
-                {p.configured ? (
-                  <span className="text-[9px] text-green-400/70 font-medium">
-                    {testing === p.id ? 'Testing...' : saved === p.id ? (testResult?.ok ? 'Verified!' : 'Saved') : 'Connected'}
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => { setConfiguring(configuring === p.id ? null : p.id); setApiKey(''); }}
-                    className="text-[9px] font-medium text-primary hover:text-primary/80"
-                  >
-                    {configuring === p.id ? 'Cancel' : 'Configure'}
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1 mb-1">
-                {(p.capabilities || []).map((c: string) => (
-                  <span key={c} className="text-[8px] px-1 py-0.5 rounded bg-surface-container/40 text-on-surface-variant/40">{capLabels[c] || c}</span>
-                ))}
-              </div>
-              {configuring === p.id && (
-                <div className="mt-2 space-y-2">
-                  {p.setup_instructions && (
-                    <div className="text-[9px] text-on-surface-variant/50 leading-relaxed whitespace-pre-line bg-surface-container/20 rounded-lg px-2.5 py-2">
-                      {p.setup_instructions}
-                    </div>
-                  )}
-                  {p.setup_url && (
-                    <a
-                      href={p.setup_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                      {p.local ? 'Download' : 'Get API Key'}
-                    </a>
-                  )}
-                  {!p.local && (
-                    <div className="flex gap-1.5">
-                      <input
-                        value={apiKey}
-                        onChange={e => setApiKey(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSaveKey(p.id)}
-                        type="password"
-                        placeholder="Paste API key..."
-                        className="flex-1 bg-surface-container/40 border border-outline-variant/10 rounded-md px-2 py-1.5 text-[10px] text-on-surface outline-none focus:border-primary/30 font-mono"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => handleSaveKey(p.id)}
-                        className="px-2.5 py-1.5 bg-primary-container text-white rounded-md text-[10px] font-medium hover:brightness-110"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      {status.free_options.length > 0 && (
-        <div className="text-[10px] text-on-surface-variant/40 leading-relaxed mt-2">
-          Free: {status.free_options.map((p) => p.name).join(', ')}
-        </div>
-      )}
-      </Section>
-    </>
-  );
+  return <ProviderOpsPanel />;
 }
 
 /* ── PersistentAgentCard — expandable agent editor ──────────────── */

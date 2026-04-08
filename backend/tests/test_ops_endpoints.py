@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import socket
 import time
 import zipfile
 from pathlib import Path
@@ -56,6 +57,8 @@ async def test_diagnostics_returns_checks(ops_env):
     assert "disk_space" in check_names
     assert "agents" in check_names
     assert "dependencies" in check_names
+    assert "process_bookkeeping" in check_names
+    assert "background_executor" in check_names
 
 
 @pytest.mark.asyncio
@@ -90,6 +93,45 @@ async def test_diagnostics_python_check_ok(ops_env):
     py_check = next(c for c in result["checks"] if c["name"] == "python")
     assert py_check["status"] == "ok"
     assert f"{sys.version_info.major}.{sys.version_info.minor}" in py_check["detail"]
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_reports_process_bookkeeping_drift(ops_env):
+    from routes.misc import diagnostics
+
+    deps._agent_processes.clear()
+    deps._pending_spawns.clear()
+    deps._agent_processes["orphaned"] = object()
+
+    result = await diagnostics()
+    check = next(c for c in result["checks"] if c["name"] == "process_bookkeeping")
+    assert check["status"] == "warn"
+    assert check["metadata"]["orphaned_process_records"] == ["orphaned"]
+    assert "orphaned=['orphaned']" in check["detail"]
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_reports_unreachable_port(ops_env, monkeypatch: pytest.MonkeyPatch):
+    class _Socket:
+        def settimeout(self, _timeout):
+            return None
+
+        def connect_ex(self, _addr):
+            return 10061
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: _Socket())
+
+    from routes.misc import diagnostics
+    result = await diagnostics()
+    check = next(c for c in result["checks"] if c["name"] == "port_conflict")
+    assert check["status"] == "warn"
+    assert "nothing listening" in check["detail"]
 
 
 # ── /api/backup ──────────────────────────────────────────────────────

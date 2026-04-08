@@ -30,6 +30,18 @@ function parseMetadata(raw: unknown): Record<string, unknown> {
   return {};
 }
 
+function deriveArtifactAttachments(metadata: Record<string, unknown>): Attachment[] {
+  const nestedMedia = (metadata.media_task && typeof metadata.media_task === 'object' ? metadata.media_task : null)
+    || (metadata.media && typeof metadata.media === 'object' ? metadata.media : null);
+  if (nestedMedia) return [];
+  const artifactPath = typeof metadata.artifact_path === 'string' ? metadata.artifact_path : '';
+  if (!artifactPath) return [];
+  const mimeType = typeof metadata.mime_type === 'string' ? metadata.mime_type : 'application/octet-stream';
+  const artifactType = typeof metadata.artifact_type === 'string' ? metadata.artifact_type : 'artifact';
+  const name = artifactPath.split('/').pop() || `${artifactType}-output`;
+  return [{ name, url: artifactPath, type: mimeType }];
+}
+
 function parseReactions(raw: unknown): Record<string, string[]> {
   if (!raw) return {};
   if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, string[]>;
@@ -194,8 +206,33 @@ export function ChatMessage({ message }: ChatMessageProps) {
   }, [agents]);
   // Sync to module-level ref for renderWithMentions (external to React tree)
   useEffect(() => { setMentionColorMap(agentColorMap); }, [agentColorMap]);
+  const metadata = parseMetadata(message.metadata);
   const isUser = message.sender === settings.username || message.sender === 'You' || (!agentNames.has(message.sender) && message.type === 'chat');
   const isSystem = message.type === 'system' || message.type === 'join';
+
+  if (message.type === 'approval_request') {
+    const estimatedCost = typeof metadata.estimated_cost_usd === 'number' ? metadata.estimated_cost_usd : null;
+    const estimatedTokens = typeof metadata.estimated_tokens === 'number' ? metadata.estimated_tokens : null;
+    const estimatedSeconds = typeof metadata.estimated_seconds === 'number' ? metadata.estimated_seconds : null;
+    const planId = typeof metadata.plan_id === 'string' ? metadata.plan_id : '';
+    return (
+      <div className="flex justify-center py-2">
+        <div className="max-w-[520px] rounded-2xl border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-left">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-amber-200/70">
+            <span className="material-symbols-outlined text-[14px]">approval</span>
+            Approval request
+          </div>
+          <div className="mt-1 text-[11px] font-medium text-on-surface">{message.text}</div>
+          <div className="mt-2 flex flex-wrap gap-2 text-[9px] text-on-surface-variant/55">
+            {planId ? <span>plan {planId.slice(0, 8)}</span> : null}
+            {estimatedCost != null ? <span>${estimatedCost.toFixed(2)}</span> : null}
+            {estimatedTokens != null ? <span>{estimatedTokens} tokens</span> : null}
+            {estimatedSeconds != null ? <span>{estimatedSeconds}s</span> : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isSystem) {
     return (
@@ -207,8 +244,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
     );
   }
 
-  const metadata = parseMetadata(message.metadata);
-  const attachments = parseAttachments(message.attachments);
+  const attachments = [...parseAttachments(message.attachments), ...deriveArtifactAttachments(metadata)];
   const reactions = parseReactions(message.reactions);
   const agentColor = agent?.color || '#a78bfa';
 

@@ -4,6 +4,7 @@ import { useChatStore } from '../stores/chatStore';
 import { SoundManager } from '../lib/sounds';
 import { api } from '../lib/api';
 import { getRemoteAccessToken } from '../lib/remoteAccess';
+import { toast } from '../components/Toast';
 import type { WSEvent } from '../types';
 
 function updateFaviconBadge(count: number) {
@@ -52,8 +53,11 @@ export function useWebSocket() {
     setAgents,
     setTyping,
     updateJob,
+    upsertTask,
+    updateTaskProgress,
     setRules,
     setChannels,
+    setChannelContext,
     pinMessage,
     deleteMessages,
     reactMessage,
@@ -73,6 +77,8 @@ export function useWebSocket() {
     setCollaborators,
     setWorkspaceInvites,
     addMcpInvocation,
+    markAgentDrift,
+    setPendingAgentsMdDiff,
   } = useChatStore();
   const activeChannel = useChatStore((s) => s.activeChannel);
   const sidebarPanel = useChatStore((s) => s.sidebarPanel);
@@ -242,11 +248,20 @@ export function useWebSocket() {
           case 'job_update':
             updateJob(parsed.data);
             break;
+          case 'task_update':
+            upsertTask(parsed.data);
+            break;
+          case 'task_progress':
+            updateTaskProgress(parsed.data.task_id, parsed.data);
+            break;
           case 'rule_update':
             setRules(parsed.data.rules);
             break;
           case 'channel_update':
             setChannels(parsed.data.channels);
+            break;
+          case 'channel_context':
+            setChannelContext(parsed.data.channel, parsed.data.context);
             break;
           case 'pin':
             pinMessage(parsed.data.message_id, parsed.data.pinned);
@@ -276,6 +291,30 @@ export function useWebSocket() {
             if (parsed.data?.agent && parsed.data?.entry) {
               addMcpInvocation(parsed.data.agent, parsed.data.entry);
             }
+            break;
+          case 'identity_drift':
+            if (parsed.data?.agent) {
+              markAgentDrift(parsed.data.agent, true);
+              toast(`${parsed.data.agent} drift detected${parsed.data.reason ? `: ${parsed.data.reason}` : ''}`, 'warning');
+            }
+            break;
+          case 'memory_conflict':
+            if (parsed.data?.key) {
+              const agents = Array.isArray(parsed.data.agents) && parsed.data.agents.length > 0 ? ` (${parsed.data.agents.join(', ')})` : '';
+              toast(`Memory conflict: ${parsed.data.key}${agents}`, 'warning');
+            }
+            break;
+          case 'cache_alert':
+            if (parsed.data?.provider) {
+              const streak = typeof parsed.data.consecutive_misses === 'number' ? ` | ${parsed.data.consecutive_misses} miss streak` : '';
+              const rate = typeof parsed.data.cache_hit_rate === 'number' ? ` | ${Math.round(parsed.data.cache_hit_rate * 100)}% hit rate` : '';
+              toast(`Cache alert: ${parsed.data.provider}${rate}${streak}`, 'warning');
+            }
+            break;
+          case 'agents_md_changed':
+            setPendingAgentsMdDiff(parsed.data);
+            window.dispatchEvent(new CustomEvent('ghostlink:agents-md-changed'));
+            toast('AGENTS.md changed. Review import before applying.', 'info');
             break;
           case 'workspace_change':
             addWorkspaceChange(parsed.data);

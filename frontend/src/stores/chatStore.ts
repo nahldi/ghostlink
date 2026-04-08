@@ -14,6 +14,9 @@ import type {
   FileDiffPayload,
   Collaborator,
   WorkspaceInvite,
+  AgentsMdDiffResponse,
+  Task,
+  ChannelContextSettings,
 } from '../types';
 
 interface FailedMessage {
@@ -46,6 +49,7 @@ interface ChatState {
   // Agents
   agents: Agent[];
   setAgents: (agents: Agent[]) => void;
+  markAgentDrift: (agentName: string, drifted: boolean) => void;
   typingAgents: Record<string, Record<string, number>>;  // v2.5.0: per-channel typing: { channel: { agent: timestamp } }
   setTyping: (sender: string, channel: string) => void;
 
@@ -53,6 +57,16 @@ interface ChatState {
   jobs: Job[];
   setJobs: (jobs: Job[]) => void;
   updateJob: (job: Job) => void;
+
+  // Unified tasks
+  tasks: Task[];
+  setTasks: (tasks: Task[]) => void;
+  upsertTask: (task: Task) => void;
+  updateTaskProgress: (taskId: string, progress: { progress_pct: number; progress_step: string; progress_total: number; steps?: import('../types').TaskProgressStep[]; updated_at?: number }) => void;
+
+  // Channel context
+  channelContexts: Record<string, ChannelContextSettings>;
+  setChannelContext: (channel: string, context: ChannelContextSettings) => void;
 
   // Rules
   rules: Rule[];
@@ -125,6 +139,10 @@ interface ChatState {
   setCollaborators: (collaborators: Collaborator[]) => void;
   workspaceInvites: WorkspaceInvite[];
   setWorkspaceInvites: (invites: WorkspaceInvite[]) => void;
+  profileManagerOpen: boolean;
+  setProfileManagerOpen: (open: boolean) => void;
+  pendingAgentsMdDiff: AgentsMdDiffResponse | null;
+  setPendingAgentsMdDiff: (payload: AgentsMdDiffResponse | null) => void;
 
   // Multi-select deletion
   selectMode: boolean;
@@ -243,6 +261,12 @@ export const useChatStore = create<ChatState>((set) => ({
     const sidebarPanel = !cockpitAgent && s.sidebarPanel === 'cockpit' ? null : s.sidebarPanel;
     return { agents, terminalStreams: cleanTerminal, browserStates: cleanBrowser, agentPresence: cleanPresence, cockpitAgent, sidebarPanel };
   }),
+  markAgentDrift: (agentName, drifted) =>
+    set((s) => ({
+      agents: s.agents.map((agent) =>
+        agent.name === agentName ? { ...agent, drift_detected: drifted } : agent
+      ),
+    })),
   typingAgents: {},
   setTyping: (sender, channel) =>
     set((s) => {
@@ -265,6 +289,39 @@ export const useChatStore = create<ChatState>((set) => ({
   updateJob: (job) =>
     set((s) => ({
       jobs: s.jobs.map((j) => (j.id === job.id ? job : j)),
+    })),
+  tasks: [],
+  setTasks: (tasks) => set({ tasks }),
+  upsertTask: (task) =>
+    set((s) => {
+      const idx = s.tasks.findIndex((t) => t.task_id === task.task_id);
+      if (idx === -1) {
+        return { tasks: [task, ...s.tasks].slice(0, 500) };
+      }
+      const tasks = [...s.tasks];
+      tasks[idx] = { ...tasks[idx], ...task };
+      tasks.sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
+      return { tasks };
+    }),
+  updateTaskProgress: (taskId, progress) =>
+    set((s) => ({
+      tasks: s.tasks.map((task) =>
+        task.task_id === taskId
+          ? {
+              ...task,
+              progress_pct: progress.progress_pct,
+              progress_step: progress.progress_step,
+              progress_total: progress.progress_total,
+              progress_data: { steps: progress.steps || [] },
+              updated_at: progress.updated_at || task.updated_at,
+            }
+          : task
+      ),
+    })),
+  channelContexts: {},
+  setChannelContext: (channel, context) =>
+    set((s) => ({
+      channelContexts: { ...s.channelContexts, [channel]: context },
     })),
 
   rules: [],
@@ -446,6 +503,10 @@ export const useChatStore = create<ChatState>((set) => ({
   setCollaborators: (collaborators) => set({ collaborators }),
   workspaceInvites: [],
   setWorkspaceInvites: (workspaceInvites) => set({ workspaceInvites }),
+  profileManagerOpen: false,
+  setProfileManagerOpen: (profileManagerOpen) => set({ profileManagerOpen }),
+  pendingAgentsMdDiff: null,
+  setPendingAgentsMdDiff: (pendingAgentsMdDiff) => set({ pendingAgentsMdDiff }),
 
   // Multi-select deletion
   selectMode: false,

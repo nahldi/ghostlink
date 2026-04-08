@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "5.7.2"
+__version__ = "6.0.0"
 
 import collections
 import functools
@@ -310,8 +310,8 @@ async def _auto_spawn_agent(pa: dict):
             stderr=_sp.PIPE,
         )
         async with deps._agent_lock:
-            deps._pending_spawns[proc.pid] = proc
-        asyncio.create_task(deps.watch_agent_process_exit(proc, f"auto-spawn:{base}"))
+            deps._pending_spawns[proc.pid] = deps.capture_process_record(proc, owner=f"auto-spawn:{base}")
+            asyncio.create_task(deps.watch_agent_process_exit(proc, f"auto-spawn:{base}"))
         log.info("Auto-spawned %s (pid %d)", base, proc.pid)
     except Exception as e:
         log.warning("Auto-spawn failed for %s: %s", base, e)
@@ -386,8 +386,16 @@ async def lifespan(_app: FastAPI):
     data_manager = DataManager(DATA_DIR, store=store, audit_store=audit_store)
     # v3.6.0: Worktree manager for agent isolation + automation manager
     WorktreeManager = _require_startup_attr("worktree", "WorktreeManager")
+    BackgroundExecutor = _require_startup_attr("bg_executor", "BackgroundExecutor")
     AutomationManager = _require_startup_attr("automations", "AutomationManager")
     worktree_manager = WorktreeManager(str(BASE_DIR))
+    bg_executor = BackgroundExecutor(
+        output_root=DATA_DIR,
+        task_store=task_store,
+        checkpoint_store=checkpoint_store,
+        worktree_manager=worktree_manager,
+        max_concurrent=int(deps._settings.get("backgroundMaxConcurrentTasks", 3) or 3),
+    )
     automation_manager = AutomationManager(DATA_DIR)
     audit_log.log("server_start", {"version": __version__, "port": PORT})
 
@@ -416,18 +424,17 @@ async def lifespan(_app: FastAPI):
     deps.audit_store = audit_store
     deps.data_manager = data_manager
     deps.worktree_manager = worktree_manager
+    deps.bg_executor = bg_executor
     deps.automation_manager = automation_manager
     await hook_manager.register_all_async()
 
-    # v4.4.0: Remote runner + A2A bridge + user auth
+    # v4.4.0+: Remote runner + A2A + user auth
     RemoteRunner = _require_startup_attr("remote_runner", "RemoteRunner")
     deps.remote_runner = RemoteRunner(server_port=PORT)
     UserManager = _require_startup_attr("auth", "UserManager")
     deps.user_manager = UserManager(DATA_DIR)
-    A2ABridge = _require_startup_attr("a2a_bridge", "A2ABridge")
-    setup_a2a = _require_startup_attr("a2a_bridge", "setup_routes")
-    deps.a2a_bridge = A2ABridge(server_version=__version__)
-    setup_a2a(app, deps.a2a_bridge)
+    A2AManager = _require_startup_attr("a2a", "A2AManager")
+    deps.a2a_bridge = A2AManager(DATA_DIR, server_version=__version__)
     AutonomousManager = _require_startup_attr("autonomous", "AutonomousManager")
     deps.autonomous_manager = AutonomousManager()
     MemoryGraph = _require_startup_attr("memory_graph", "MemoryGraph")
@@ -436,6 +443,9 @@ async def lifespan(_app: FastAPI):
     deps.specialization = SpecializationEngine(DATA_DIR)
     RAGPipeline = _require_startup_attr("rag", "RAGPipeline")
     deps.rag_pipeline = RAGPipeline(DATA_DIR)
+    ObservationEngine = _require_startup_attr("observer", "ObservationEngine")
+    deps.observer_engine = ObservationEngine(DATA_DIR)
+    deps.observer_engine.start()
 
     # Broadcast new messages via WebSocket
     async def on_msg(msg: dict):
@@ -755,7 +765,7 @@ async def lifespan(_app: FastAPI):
                         try:
                             if deps.task_store and deps.checkpoint_store:
                                 tasks = asyncio.run_coroutine_threadsafe(
-                                    deps.task_store.list_tasks(agent_name=inst.name, limit=200),
+                                    deps.task_store.list_tasks(agent_id=inst.agent_id, limit=200),
                                     _main_loop,
                                 ).result(timeout=5)
                                 now = time.time()
@@ -806,7 +816,7 @@ async def lifespan(_app: FastAPI):
                         try:
                             if deps.task_store and deps.checkpoint_store:
                                 tasks = asyncio.run_coroutine_threadsafe(
-                                    deps.task_store.list_tasks(agent_name=inst.name, limit=200),
+                                    deps.task_store.list_tasks(agent_id=inst.agent_id, limit=200),
                                     _main_loop,
                                 ).result(timeout=5)
                                 for task in tasks:
@@ -1013,6 +1023,8 @@ async def lifespan(_app: FastAPI):
     _terminal_stop.set()
     _workspace_stop.set()
     bridge_manager.stop_all()
+    if deps.bg_executor is not None:
+        await deps.bg_executor.shutdown()
     await store.close()
     await db.close()
 
@@ -1148,6 +1160,7 @@ async def ws_endpoint(ws: WebSocket):
 # ── Include route modules ───────────────────────────────────────────
 
 from routes import agents as _r_agents
+from routes import a2a as _r_a2a
 from routes import audit as _r_audit
 from routes import bridges as _r_bridges
 from routes import channels as _r_channels
@@ -1158,6 +1171,7 @@ from routes import misc as _r_misc
 from routes import phase4_7 as _r_phase4_7
 from routes import plugins as _r_plugins
 from routes import providers as _r_providers
+from routes import review as _r_review
 from routes import rules as _r_rules
 from routes import schedules as _r_schedules
 from routes import search as _r_search
@@ -1167,6 +1181,7 @@ from routes import tasks as _r_tasks
 
 app.include_router(_r_jobs.router)
 app.include_router(_r_tasks.router)
+app.include_router(_r_a2a.router)
 app.include_router(_r_audit.router)
 app.include_router(_r_evals.router)
 app.include_router(_r_rules.router)
@@ -1180,6 +1195,7 @@ app.include_router(_r_agents.router)
 app.include_router(_r_search.router)
 app.include_router(_r_plugins.router)
 app.include_router(_r_providers.router)
+app.include_router(_r_review.router)
 app.include_router(_r_misc.router)
 app.include_router(_r_phase4_7.router)
 

@@ -83,7 +83,7 @@ Scopes form a hierarchy. From broadest to narrowest:
 
 #### Policy Storage
 
-Rules are stored in the existing SQLite database (`ghostlink.db`). The `policy_rules` table is created on first startup via migration. Legacy `exec_policies.json` rules are migrated into the table on first load.
+Rules are stored in the runtime SQLite database, which is currently `ghostlink_v2.db` in `backend/app.py`. Some ops/backup code still references `ghostlink.db`, and there is no schema migration framework today. Those naming and migration gaps must be resolved before this phase is implementation-ready.
 
 Migration path:
 - Read existing `exec_policies.json` per-agent policies.
@@ -465,6 +465,11 @@ Enterprise mode is enabled by setting `"enterprise_hooks": true` in workspace se
 The registry does not abstract transport. All providers are assumed to be API-based (HTTP calls). MCP transport for the GhostLink bridge itself is handled separately in `mcp_bridge.py`. CLI-based agent interaction goes through `wrapper.py` which manages tmux sessions and MCP config injection.
 
 There is no unified `Transport` interface.
+
+Audit constraints:
+- CLI-wrapped agents make their own provider calls outside any GhostLink transport chokepoint.
+- Cost tracking, budget enforcement, and failover can be made robust first for direct API/local transports.
+- CLI-backed transports will need partial or derived accounting unless the CLI itself exposes reliable usage data.
 
 #### Transport Interface
 

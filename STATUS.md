@@ -1,7 +1,7 @@
 # GhostLink — Project Status
 
-**Last updated:** 2026-04-06
-**Version:** v5.7.2
+**Last updated:** 2026-04-08
+**Version:** v6.0.0
 **License:** MIT
 
 ---
@@ -24,7 +24,7 @@ This is the current verified baseline for `v5.7.2`:
 - No tracked runtime data, local settings, API keys, or local databases are included in git
 - Release/install defaults remain neutral for new users
 
-For current local execution order and active readiness work, start with [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md).
+For current local execution order and active readiness work, start with [AGENTS.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/AGENTS.md), then [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md).
 
 Runtime and local-only paths intentionally stay out of git:
 
@@ -81,7 +81,7 @@ Anthropic, OpenAI, Google, xAI, Groq, Together, Hugging Face, Ollama, Mistral, O
 - **v5.7.1** — safe dependency refresh and version sync
 - **v5.7.0** — health/diagnostics/backup/restore, updater reliability, visual reset, test expansion
 
-See [CHANGELOG.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/CHANGELOG.md) for release-by-release detail.
+See [CHANGELOG.md](./CHANGELOG.md) for release-by-release detail.
 
 ---
 
@@ -129,7 +129,7 @@ See [CHANGELOG.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/CHANGE
 
 ## Active Gaps
 
-These are current, real gaps. They are tracked in [UNIFIED_ROADMAP.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md), not historical bug archaeology:
+These are current, real gaps. They are tracked in [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md), not historical bug archaeology:
 
 - Plugin trust model is still incomplete: per-plugin tool allowlists and fail-closed hooks now exist, but provenance/signing, owner-managed trust controls, and durable exec approval allowlists are still missing
 - Workspace-facing agent identity is still too loose: per-agent memory exists, but shared instruction files can still be overwritten by another agent in the same workspace
@@ -156,11 +156,42 @@ These are current, real gaps. They are tracked in [UNIFIED_ROADMAP.md](/mnt/c/Us
 
 ## Doc Map
 
-- [README.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/README.md): public product overview
-- [CHANGELOG.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/CHANGELOG.md): release history
-- [FEATURES.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/FEATURES.md): current shipped capability reference
-- [BUGS.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/BUGS.md): active risks and known gaps
-- [roadmap-pt1.md](/C:/Users/skull/OneDrive/Desktop/projects/ghostlink/roadmap-pt1.md): active execution roadmap for fresh agents
-- [UNIFIED_ROADMAP.md](/mnt/c/Users/skull/OneDrive/Desktop/projects/ghostlink/UNIFIED_ROADMAP.md): phased execution plan
+### Core
+- [README.md](./README.md): public product overview
+- [CHANGELOG.md](./CHANGELOG.md): release history
+- [FEATURES.md](./FEATURES.md): current shipped capability reference
+- [BUGS.md](./BUGS.md): active risks and known gaps
+
+### Roadmap & Operations
+- [AGENT_PLAYBOOK.md](./AGENT_PLAYBOOK.md): 5-agent operating manual (start here for fresh agents)
+- [UNIFIED_ROADMAP.md](./UNIFIED_ROADMAP.md): strategic phased execution plan
+- [roadmap-pt1.md](./roadmap-pt1.md): operational roadmap, Phases 0-3.5
+- [roadmap-pt2.md](./roadmap-pt2.md): operational roadmap, Phases 4A-10
+
+### Specs (docs/specs/)
+- `PHASE_1A_SPEC.md`: identity foundation (locked scope)
+- `PHASE_1A_IMPL_PLAN.md`: step-by-step build sequence for Phase 1A
+- `PHASE_1A_RISK_AUDIT.md`: regression risk analysis
+- `PHASE_1B_2_SPEC.md`: identity isolation + profiles
+- `PHASE_3_3_5_SPEC.md`: operator control plane + durable execution
+- `PHASE_4_SPEC.md`: policy engine (4A), provider independence (4B), evals (4.5)
+- `PHASE_5_6_SPEC.md`: multi-agent execution + memory stratification
+- `AGENT_EFFICIENCY_SPEC.md`: token efficiency + SOUL behavioral contract
+- `AUDIT_SUMMARY.md`: consolidated cross-spec audit (12 blockers, ~30 warnings)
+- `APPROACH_AUDIT.md`: 7 architectural blocking issues
+- `COMPETITIVE_UPGRADES_2026-04-07.md`: source-backed competitive patterns
+- `THREAT_MODEL.md`: OWASP agentic risks + abuse paths
+- `PRODUCTIZATION_GUARDRAILS.md`: local-first product rules
+- `RAILWAY_OPTIONAL_STRATEGY.md`: optional hosted infra boundaries
+
+### Verification (docs/verification/)
+- `VALIDATION_MATRIX.md`: repeatable test gates per phase
+- `VERIFICATION_LEDGER.md`: verified claims ledger
+
+### Research
+- `docs/AI_AGENT_PLATFORM_SURVEY.md`: 40+ platform competitive survey
+- `docs/research/`: CLI, MCP, provider verification docs
+
+### Archive
 - `docs/archive/`: historical audits and retired planning docs
 - `docs/screenshots/`: retained product screenshots and audit captures

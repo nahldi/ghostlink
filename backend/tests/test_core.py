@@ -25,6 +25,7 @@ def test_imports_clean():
     """Backend imports without error."""
     import agent_memory  # noqa: F401
     import app  # noqa: F401
+    import bg_executor  # noqa: F401
     import bridges  # noqa: F401
     import jobs  # noqa: F401
     import mcp_bridge  # noqa: F401
