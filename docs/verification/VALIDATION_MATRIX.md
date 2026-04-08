@@ -294,6 +294,30 @@ Everything in Gates 0-6, plus:
 
 ---
 
+## Gate 8: Post-A2A Interoperability (After Phase 8)
+
+Everything in Gates 0-7, plus:
+
+### Agent Cards and Discovery
+- [ ] GhostLink serves a valid `/.well-known/agent-card.json` surface for exposed local agents
+- [ ] Agent cards publish truthful identity, capability, and auth metadata
+- [ ] Remote A2A discovery handles malformed or unauthenticated cards with clear failure
+- [ ] Disabling A2A exposure does not regress local-only GhostLink behavior
+
+### Auth, Policy, and Mapping
+- [ ] Inbound A2A requests are evaluated by the Phase 4A policy engine before execution
+- [ ] Unsigned or invalidly signed cards/notifications are rejected when enforcement is enabled
+- [ ] GhostLink `agent_id`, `task_id`, trace IDs, and artifact references round-trip cleanly through A2A mappings
+- [ ] A2A auth failures and policy rejections are auditable
+
+### Streaming and Cross-Platform Tasks
+- [ ] Long-running A2A tasks stream truthful progress over SSE
+- [ ] Disconnected long-running tasks use authenticated callback/push flow instead of silent drops
+- [ ] Cross-platform task progress shown in UI matches backend truth
+- [ ] Remote invocation results map back into GhostLink task/artifact state without provenance loss
+
+---
+
 ## Stress Tests (Run Before Any Release)
 
 These are manual verification flows, not automated tests.
