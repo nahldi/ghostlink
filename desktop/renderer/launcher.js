@@ -272,9 +272,19 @@ function renderProviders(statuses) {
       const nameEl = document.createElement('span');
       nameEl.className = 'agent-name';
       nameEl.textContent = s.name;
+      // Pricing badge so users know cost before installing
+      const pricing = PRICING_MAP[s.provider] || PRICING_MAP[s.command];
+      if (pricing) {
+        const badge = document.createElement('span');
+        badge.textContent = pricing.label;
+        badge.style.cssText = 'font-size:8px;padding:1px 5px;border-radius:4px;margin-left:6px;font-weight:600;vertical-align:middle;color:' + pricing.color + ';background:' + pricing.bg;
+        nameEl.appendChild(badge);
+      }
+      const desc = AGENT_DESCRIPTIONS[s.provider] || AGENT_DESCRIPTIONS[s.command];
       const provEl = document.createElement('span');
       provEl.className = 'agent-provider';
-      provEl.textContent = 'Not installed';
+      provEl.textContent = desc || 'Not installed';
+      provEl.style.color = '#888';
       const btn = document.createElement('button');
       btn.className = 'connect-btn install-btn';
       btn.textContent = 'Install';
@@ -384,11 +394,22 @@ function renderProviders(statuses) {
     action.className = 'provider-action';
 
     if (isConnected) {
-      // Green "Connected" badge
+      // Green "Connected" badge + Re-login button
       const badge = document.createElement('span');
       badge.className = 'connected-badge';
       badge.textContent = 'Connected';
       action.appendChild(badge);
+      const reloginBtn = document.createElement('button');
+      reloginBtn.className = 'connect-btn';
+      reloginBtn.textContent = 'Switch';
+      reloginBtn.title = 'Re-login or switch account';
+      reloginBtn.style.cssText = 'font-size:9px;padding:2px 8px;margin-left:6px;background:rgba(167,139,250,0.12);color:#a78bfa;border:1px solid rgba(167,139,250,0.25);';
+      reloginBtn.addEventListener('click', async () => {
+        reloginBtn.textContent = '...';
+        reloginBtn.disabled = true;
+        await ipcBridge.invoke('auth:login', s.provider);
+      });
+      action.appendChild(reloginBtn);
     } else if (needsReauth) {
       // "Reconnect" button — logout + login flow
       const btn = document.createElement('button');
