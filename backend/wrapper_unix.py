@@ -126,7 +126,13 @@ def run_agent(
         agent_cmd = " ".join(cmd_parts)
 
     from pathlib import Path
-    abs_cwd = str(Path(cwd).resolve())
+    # Convert Windows paths to WSL mount paths when running under WSL
+    _cwd = cwd
+    if _cwd and len(_cwd) >= 3 and _cwd[1] == ':' and _cwd[2] in ('\\', '/'):
+        drive = _cwd[0].lower()
+        rest = _cwd[3:].replace('\\', '/')
+        _cwd = f"/mnt/{drive}/{rest}"
+    abs_cwd = str(Path(_cwd).resolve())
 
     def inject_fn(text): return inject(text, tmux_session=session_name, delay=inject_delay)
     start_watcher(inject_fn)

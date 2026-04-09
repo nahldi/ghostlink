@@ -996,6 +996,11 @@ async def spawn_agent(request: Request):
 
     # Validate workspace path — block directory traversal
     if cwd:
+        # Convert Windows paths to WSL mount paths when running under WSL
+        if cwd and len(cwd) >= 3 and cwd[1] == ':' and cwd[2] in ('\\', '/'):
+            drive = cwd[0].lower()
+            rest = cwd[3:].replace('\\', '/')
+            cwd = f"/mnt/{drive}/{rest}"
         resolved_cwd = Path(cwd).resolve()
         if not resolved_cwd.exists() or not resolved_cwd.is_dir():
             return JSONResponse({"error": f"workspace path does not exist: {cwd}"}, 400)
