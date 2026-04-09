@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChatStore } from '../stores/chatStore';
 import { AgentIcon } from './AgentIcon';
@@ -166,7 +167,10 @@ function AgentChip({ agent }: { agent: Agent }) {
         )}
       </div>
 
-      {showInfo && <AgentInfoPanel agent={agent} onClose={() => setShowInfo(false)} />}
+      {showInfo && createPortal(
+        <AgentInfoPanel agent={agent} onClose={() => setShowInfo(false)} />,
+        document.body
+      )}
     </>
   );
 }
