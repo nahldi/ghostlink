@@ -792,7 +792,12 @@ function PersistentAgentCard({ agent, onUpdate, onRemove }: {
         <AgentIcon base={agent.base} color={agent.color} size={28} />
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-semibold" style={{ color: agent.color }}>{agent.nickname || agent.label}</div>
-          <div className="text-[9px] text-on-surface-variant/45 font-mono truncate">{agent.command} {(agent.args || []).join(' ')}</div>
+          <div className="text-[9px] text-on-surface-variant/45 truncate">
+            {agent.args?.includes('--dangerously-skip-permissions') ? 'Full Access'
+              : agent.args?.includes('danger-full-access') ? 'Full Bypass'
+              : agent.args?.includes('--yes') ? 'Auto-approve'
+              : 'Default'}
+          </div>
         </div>
         <span className="material-symbols-outlined text-[14px] text-on-surface-variant/30">{expanded ? 'expand_less' : 'expand_more'}</span>
         <button

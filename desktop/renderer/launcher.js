@@ -401,13 +401,25 @@ function renderProviders(statuses) {
       action.appendChild(badge);
       const reloginBtn = document.createElement('button');
       reloginBtn.className = 'connect-btn';
-      reloginBtn.textContent = 'Switch';
-      reloginBtn.title = 'Re-login or switch account';
+      reloginBtn.textContent = 'Change Account';
+      reloginBtn.title = 'Sign in with a different account or API key';
       reloginBtn.style.cssText = 'font-size:9px;padding:2px 8px;margin-left:6px;background:rgba(167,139,250,0.12);color:#a78bfa;border:1px solid rgba(167,139,250,0.25);';
       reloginBtn.addEventListener('click', async () => {
+        // Ask user for auth method instead of dumping straight into terminal
+        const method = confirm('Use API key?\n\nOK = Enter API key\nCancel = Browser sign-in');
         reloginBtn.textContent = '...';
         reloginBtn.disabled = true;
-        await ipcBridge.invoke('auth:login', s.provider);
+        if (method) {
+          // API key path — use save-key flow
+          const key = prompt('Paste your API key:');
+          if (key && key.trim()) {
+            await ipcBridge.invoke('auth:save-key', s.provider, key.trim());
+          }
+        } else {
+          // Browser login path
+          await ipcBridge.invoke('auth:browser-login', s.provider);
+        }
+        setTimeout(() => { reloginBtn.textContent = 'Change Account'; reloginBtn.disabled = false; refreshAuth(); }, 5000);
       });
       action.appendChild(reloginBtn);
     } else if (needsReauth) {

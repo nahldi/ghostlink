@@ -316,9 +316,34 @@ function RightPanel() {
     document.body.style.userSelect = 'none';
   }, [panel, cockpitWidth, setCockpitWidth]);
 
+  const isSettings = panel === 'settings';
+
   return (
     <AnimatePresence>
-      {panel && (
+      {panel && isSettings && (
+        <motion.div
+          key="settings-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 bg-surface/98 backdrop-blur-xl max-lg:hidden overflow-y-auto"
+        >
+          <button
+            onClick={() => setSidebarPanel(null)}
+            className="absolute top-4 right-4 z-10 p-2 rounded-xl hover:bg-surface-container-high text-on-surface-variant/50 hover:text-on-surface-variant/80 transition-colors"
+            title="Close settings"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+          <div className="max-w-3xl mx-auto py-6 px-8">
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}>
+              <SettingsPanel />
+            </Suspense>
+          </div>
+        </motion.div>
+      )}
+      {panel && !isSettings && (
         <>
           <div className="fixed inset-0 z-[29] max-lg:hidden" onClick={() => setSidebarPanel(null)} />
           <motion.aside
@@ -346,7 +371,6 @@ function RightPanel() {
             <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}>
               {panel === 'jobs' && <JobsPanel />}
               {panel === 'rules' && <RulesPanel />}
-              {panel === 'settings' && <SettingsPanel />}
               {panel === 'cockpit' && <AgentCockpit />}
             </Suspense>
           </motion.aside>
