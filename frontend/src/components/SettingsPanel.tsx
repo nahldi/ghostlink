@@ -241,8 +241,8 @@ function GeneralTab({
         </SettingField>
       </Section>
 
-      <Section title="Voice" icon="mic">
-        <SettingField label="Input Language">
+      <Section title="Speech Input" icon="mic">
+        <SettingField label="Language" description="Language for voice-to-text when using the microphone button">
           <select value={display.voiceLanguage || navigator.language || 'en-US'} onChange={(e) => applyInstant({ voiceLanguage: e.target.value })} className="setting-input text-[12px] w-full">
             <option value="">Auto-detect</option>
             <option value="en-US">English (US)</option>

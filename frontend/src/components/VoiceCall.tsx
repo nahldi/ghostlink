@@ -252,13 +252,13 @@ export function VoiceCall({ onClose }: VoiceCallProps) {
               <span className="material-symbols-outlined text-2xl">call_end</span>
             </button>
 
-            <button
-              className="w-14 h-14 rounded-full bg-surface-container-high/50 text-on-surface-variant/60 flex items-center justify-center opacity-30 cursor-not-allowed"
-              disabled
-              aria-label="Speaker (always on)"
+            {/* Speaker indicator — audio plays automatically */}
+            <div
+              className="w-14 h-14 rounded-full bg-surface-container-high/30 text-on-surface-variant/40 flex items-center justify-center"
+              title="Audio plays automatically"
             >
               <span className="material-symbols-outlined text-xl">volume_up</span>
-            </button>
+            </div>
           </div>
         </motion.div>
       </motion.div>
