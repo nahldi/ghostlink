@@ -1,5 +1,21 @@
 # GhostLink Changelog
 
+## v6.1.0 — 2026-04-08
+### UX Overhaul
+- **Full-page settings** — settings now opens as a full-page overlay instead of a cramped sidebar
+- **Experience mode gating** — security, policy, debug, and ops sections hidden from normal users (Advanced mode only)
+- **Honest status indicators** — active agents show green "Working", idle agents show blue "Ready" (no more identical green for both)
+- **Human-readable labels** — "Debug Mode" → "Developer Mode", "Server Config" → "Server Settings", "Egress Controls" → "Outbound Access Rules", "Policy Engine" → "Policy Rules"
+- **Hide CLI flags** — persistent agents show "Full Access" / "Auto-approve" instead of raw `--dangerously-skip-permissions`
+- **Change Account flow** — "Switch" renamed to "Change Account" with API key vs browser sign-in chooser (no more broken terminal dumps)
+- **Speech Input** — "Voice" renamed to "Speech Input" with clear description
+- **Dead controls removed** — disabled speaker button replaced with passive indicator
+- **Agent chip buttons always visible** — start/stop and workspace buttons no longer hidden behind hover
+- **"Open Cockpit" → "View workspace"** — clearer label
+- **Repo cleanup** — stale startup scripts, old branding, duplicate dirs removed
+- **Pricing badges** — visible in Supported Agents before installing
+- **Context dropdown removed** — confusing header control stripped
+
 ## v6.0.5 — 2026-04-08
 ### Settings Cleanup & Repo Hygiene
 - **Experience mode gating** — Security/policy/debug sections hidden from Beginner/Standard users (Advanced only)
