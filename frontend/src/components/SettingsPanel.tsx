@@ -645,15 +645,16 @@ function IntegrationsTab() {
     loadBridges();
   };
 
+  const isAdvanced = useChatStore.getState().settings.experienceMode === 'advanced';
+
   return (
     <>
-      <ProductizationPanel />
-
-      <div className="h-px bg-outline-variant/8" />
-
-      <A2APanel />
-
-      <div className="h-px bg-outline-variant/8" />
+      {isAdvanced && (<>
+        <ProductizationPanel />
+        <div className="h-px bg-outline-variant/8" />
+        <A2APanel />
+        <div className="h-px bg-outline-variant/8" />
+      </>)}
 
       <div className="text-[10px] font-semibold text-on-surface-variant/50 uppercase tracking-wider mb-2">Channel Bridges</div>
       <div className="text-[10px] text-on-surface-variant/40 mb-4">
