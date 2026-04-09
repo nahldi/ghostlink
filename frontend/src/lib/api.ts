@@ -201,6 +201,9 @@ export const api = {
     return { agents: asArray<import('../types').Agent>(res?.agents) };
   },
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getHealth: () => request<any>('/api/health'),
+
   getSettings: () =>
     request<import('../types').Settings>('/api/settings'),
 

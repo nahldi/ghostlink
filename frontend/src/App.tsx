@@ -13,12 +13,14 @@ import { MessageInput } from './components/MessageInput';
 import { TypingIndicator } from './components/TypingIndicator';
 import { StatsPanel } from './components/StatsPanel';
 import { ConnectionBanner } from './components/ConnectionBanner';
+import { UpdateBanner } from './components/UpdateBanner';
 import { BulkDeleteBar } from './components/BulkDeleteBar';
 import { SoundManager } from './lib/sounds';
 import { SessionBar } from './components/SessionBar';
 import { ThinkingLevelPicker } from './components/ThinkingLevelPicker';
 import { toast } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { UpdateBanner } from './components/UpdateBanner';
 
 
 // Lazy-loaded components (reduce initial bundle from ~900KB)
@@ -749,6 +751,7 @@ function AppInner() {
         )}
       </AnimatePresence>
       <ConnectionBanner />
+      <UpdateBanner />
       <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><FirstRunWizard /></Suspense>
       <Suspense fallback={<div className="flex items-center justify-center p-8"><span className="material-symbols-outlined animate-spin text-primary/40">progress_activity</span></div>}><OnboardingTour /></Suspense>
       <AnimatePresence>

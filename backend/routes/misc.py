@@ -147,11 +147,26 @@ async def get_ws_token(request: Request):
 
 @router.get("/api/health")
 async def health_check():
-    return {
+    update_info = getattr(deps, '_update_available', None)
+    result = {
         "status": "ok",
         "version": __import__("app").__version__,
         "uptime": time.time() - deps._settings.get("_server_start", time.time()),
     }
+    if update_info:
+        result["update_available"] = update_info
+    return result
+
+
+@router.post("/api/update-status")
+async def set_update_status(request: Request):
+    """Called by the Electron main process when an update is available."""
+    body = await request.json()
+    if body.get("version"):
+        deps._update_available = {"version": body["version"], "release_notes": body.get("release_notes", "")}
+    elif body.get("clear"):
+        deps._update_available = None
+    return {"ok": True}
 
 
 @router.get("/api/diagnostics")

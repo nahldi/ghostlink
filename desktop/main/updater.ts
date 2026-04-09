@@ -117,6 +117,15 @@ export function setupUpdater(launcherWindow: BrowserWindow): void {
       releaseDate: info.releaseDate,
       releaseName: info.releaseName,
     });
+    // Notify the backend so the chat UI can show an update banner
+    try {
+      const http = require('http');
+      const data = JSON.stringify({ version: info.version, release_notes: info.releaseName || '' });
+      const req = http.request({ hostname: '127.0.0.1', port: 8300, path: '/api/update-status', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } });
+      req.on('error', () => {});
+      req.write(data);
+      req.end();
+    } catch { /* best effort */ }
   });
 
   autoUpdater.on('update-not-available', (info: UpdateInfo) => {
