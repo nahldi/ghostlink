@@ -129,16 +129,16 @@ function AgentChip({ agent }: { agent: Agent }) {
           </div>
         </div>
 
-        {/* Quick action button */}
+        {/* Quick action button — always visible */}
         <button
           onClick={handleAction}
           disabled={busy}
-          className={`w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0 ${
+          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all shrink-0 ${
             isPaused
-              ? 'hover:bg-green-500/15 text-green-400/60 hover:text-green-400'
+              ? 'hover:bg-green-500/15 text-green-400/50 hover:text-green-400'
               : isOnline
-                ? 'hover:bg-red-500/15 text-red-400/60 hover:text-red-400'
-                : 'hover:bg-green-500/15 text-green-400/60 hover:text-green-400'
+                ? 'hover:bg-red-500/15 text-red-400/50 hover:text-red-400'
+                : 'hover:bg-green-500/15 text-green-400/50 hover:text-green-400'
           } disabled:opacity-30`}
           title={isPaused ? 'Resume' : isOnline ? 'Stop' : 'Launch'}
         >
@@ -146,7 +146,7 @@ function AgentChip({ agent }: { agent: Agent }) {
             {busy ? 'hourglass_empty' : isPaused ? 'play_circle' : isOnline ? 'stop_circle' : 'play_circle'}
           </span>
         </button>
-        {/* Cockpit button — opens agent workspace panel */}
+        {/* Workspace button — opens agent workspace panel */}
         {isOnline && (
           <button
             onClick={(e) => {
@@ -158,8 +158,8 @@ function AgentChip({ agent }: { agent: Agent }) {
                 store.setCockpitAgent(agent.name);
               }
             }}
-            className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0 hover:bg-primary/15 text-primary/50 hover:text-primary"
-            title="Open Cockpit"
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all shrink-0 hover:bg-primary/15 text-primary/40 hover:text-primary"
+            title="View workspace"
           >
             <span className="material-symbols-outlined text-[16px]">monitor</span>
           </button>
