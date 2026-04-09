@@ -6,6 +6,7 @@ export function MobileHeader() {
   const mobileMenuOpen = useChatStore((s) => s.mobileMenuOpen);
   const setMobileMenuOpen = useChatStore((s) => s.setMobileMenuOpen);
   const agents = useChatStore((s) => s.agents);
+  const setCockpitAgent = useChatStore((s) => s.setCockpitAgent);
 
   const onlineAgents = agents.filter(a => a.state === 'active' || a.state === 'idle');
 
@@ -37,8 +38,9 @@ export function MobileHeader() {
             return (
               <div
                 key={agent.name}
-                className="relative"
+                className="relative cursor-pointer"
                 title={`${agent.label}: ${isOnline ? 'Online' : 'Offline'}`}
+                onClick={() => setCockpitAgent(isOnline ? agent.name : null)}
               >
                 <AgentIcon base={agent.base} color={isOnline ? agent.color : '#3a3548'} size={28} />
                 <div
