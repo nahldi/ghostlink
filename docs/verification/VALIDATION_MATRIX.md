@@ -61,6 +61,25 @@ Run Gate 0, plus:
 
 ---
 
+## Release Gate: v6.1.0 UX Cleanup
+
+Run Gate 0, plus:
+
+- [ ] `docs/verification/V6_1_0_UX_TEST_PLAN.md` requirements are satisfied
+- [ ] Beginner mode contains zero dev/internal jargon on visible user-facing surfaces
+- [ ] Standard mode hides transport/auth/fallback/policy metadata
+- [ ] Advanced-only sections do not render at all outside Advanced mode
+- [ ] Green provider state means actually usable now, not merely configured-looking
+- [ ] Every visible `Configure` / `Switch` action performs a real useful flow
+- [ ] Gemini connected-provider switch flow offers the correct auth path and does not dead-end in terminal-only failure
+- [ ] Settings use a readable full-page layout for dense configuration
+- [ ] Agent chip click produces a visible, useful response
+- [ ] No mystery or dead header controls remain on the tested surface
+- [ ] Installed desktop build passes a real click-through smoke test after packaging
+- [ ] Release assets include valid updater metadata before the release is called ready
+
+---
+
 ## Gate 1A: Post-Identity Foundation (After Phase 1A)
 
 Everything in Gate 0, plus:
