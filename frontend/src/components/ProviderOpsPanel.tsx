@@ -26,6 +26,7 @@ export function ProviderOpsPanel() {
   const settings = useChatStore((s) => s.settings);
   const updateSettings = useChatStore((s) => s.updateSettings);
   const agents = useChatStore((s) => s.agents);
+  const isAdvanced = settings.experienceMode === 'advanced';
 
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [usage, setUsage] = useState<Awaited<ReturnType<typeof api.getUsage>> | null>(null);
@@ -189,7 +190,7 @@ export function ProviderOpsPanel() {
 
   return (
     <>
-      <Section title="Capabilities" icon="auto_awesome" defaultOpen>
+      {isAdvanced && <Section title="Capabilities" icon="auto_awesome" defaultOpen>
         <div className="grid grid-cols-2 gap-1.5">
           {Object.entries(providerStatus?.capabilities || {}).map(([capability, info]) => (
             <div
@@ -204,7 +205,7 @@ export function ProviderOpsPanel() {
             </div>
           ))}
         </div>
-      </Section>
+      </Section>}
 
       <Section title="Provider Health" icon="cloud" defaultOpen>
         <div className="space-y-3">
@@ -218,7 +219,10 @@ export function ProviderOpsPanel() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${provider.health?.healthy !== false ? 'bg-green-400' : 'bg-red-400'}`} />
+                      <span className={`h-2 w-2 rounded-full ${
+                        provider.health?.active ? 'bg-green-400' :
+                        provider.health?.healthy !== false ? 'bg-yellow-400' : 'bg-red-400'
+                      }`} title={provider.health?.active ? 'Connected and ready' : provider.health?.healthy !== false ? 'Available but not connected' : 'Error'} />
                       <span className="text-[11px] font-semibold text-on-surface">{provider.name}</span>
                       {provider.free_tier && <StatusChip tone="primary" text="FREE" />}
                       {provider.local && <StatusChip tone="info" text="LOCAL" />}
@@ -234,17 +238,20 @@ export function ProviderOpsPanel() {
                     </div>
                   </div>
                   <button onClick={() => openProviderConfig(provider)} className="text-[9px] font-medium text-primary hover:text-primary/80">
-                    {configuring === provider.id ? 'Close' : 'Configure'}
+                    {configuring === provider.id ? 'Close' : (isAdvanced ? 'Configure' : 'Set API Key')}
                   </button>
                 </div>
 
+                {isAdvanced && (
                 <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard label="Transport" value={provider.transport_mode || 'api'} />
                   <MetricCard label="Auth" value={provider.auth_method || 'api_key'} />
                   <MetricCard label="Fallback" value={provider.degraded_mode_behavior || 'failover'} />
                   <MetricCard label="Preferred" value={preferredFor.length ? preferredFor.join(', ') : 'Auto'} />
                 </div>
+                )}
 
+                {isAdvanced && (
                 <div className="mt-2 grid gap-2 md:grid-cols-2">
                   <div className="rounded-xl bg-surface-container/25 p-2.5">
                     <div className="text-[9px] font-semibold uppercase tracking-wider text-on-surface-variant/35">Policy Risk</div>
@@ -263,6 +270,7 @@ export function ProviderOpsPanel() {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {configuring === provider.id && (
                   <div className="mt-3 rounded-xl border border-outline-variant/10 bg-surface-container/15 p-3">
@@ -276,6 +284,7 @@ export function ProviderOpsPanel() {
                           className="setting-input"
                         />
                       )}
+                      {isAdvanced && (<>
                       <input
                         value={draft.baseUrl}
                         onChange={(event) => updateProviderDraft(provider.id, { baseUrl: event.target.value })}
@@ -302,6 +311,7 @@ export function ProviderOpsPanel() {
                           className="setting-input"
                         />
                       </div>
+                      </>)}
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className={`text-[10px] ${providerNotice?.provider === provider.id ? (providerNotice.ok ? 'text-green-400/80' : 'text-red-400/80') : 'text-on-surface-variant/35'}`}>
@@ -323,7 +333,7 @@ export function ProviderOpsPanel() {
         </div>
       </Section>
 
-      <Section title="Cost & Budgets" icon="payments" defaultOpen>
+      {isAdvanced && <Section title="Cost & Budgets" icon="payments" defaultOpen>
         <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-3">
             <div className="grid gap-2 md:grid-cols-3">
@@ -401,13 +411,13 @@ export function ProviderOpsPanel() {
             </div>
           </div>
         </div>
-      </Section>
+      </Section>}
 
-      <Section title="Prompt Cache Diagnostics" icon="data_object" defaultOpen>
+      {isAdvanced && <Section title="Prompt Cache Diagnostics" icon="data_object" defaultOpen>
         <CacheDiagnostics diagnostics={cacheDiagnostics} />
-      </Section>
+      </Section>}
 
-      <Section title="Benchmark Dashboard" icon="monitoring" defaultOpen>
+      {isAdvanced && <Section title="Benchmark Dashboard" icon="monitoring" defaultOpen>
         <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-3">
             <div className="grid gap-2 md:grid-cols-4">
@@ -447,7 +457,7 @@ export function ProviderOpsPanel() {
             <RecentBenchmarks results={evalSummary.results.slice(0, 8)} />
           </div>
         </div>
-      </Section>
+      </Section>}
     </>
   );
 }
